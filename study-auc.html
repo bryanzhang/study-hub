@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PR-AUC vs ROC-AUC 图文调研</title>
+<style>
+  :root{
+    --bg:#0f1220; --card:#1a1f35; --card2:#232a47; --ink:#e8ecf8; --muted:#9aa4c4;
+    --pos:#ff6b6b; --neg:#4dabf7; --line:#2c3358; --accent:#ffd43b; --green:#51cf66;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:linear-gradient(160deg,#0f1220,#141a30);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    line-height:1.7;padding:0 0 60px}
+  .wrap{max-width:960px;margin:0 auto;padding:0 20px}
+  header{padding:48px 20px 32px;text-align:center;background:radial-gradient(ellipse at top,#232a47,transparent)}
+  h1{font-size:34px;margin:0 0 10px;letter-spacing:.5px}
+  h1 .sub{display:block;font-size:15px;color:var(--muted);font-weight:400;margin-top:10px}
+  h2{font-size:23px;margin:40px 0 14px;padding-left:12px;border-left:4px solid var(--accent)}
+  h3{font-size:18px;margin:26px 0 8px;color:var(--accent)}
+  p{margin:10px 0}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px 24px;margin:18px 0;
+    box-shadow:0 8px 30px rgba(0,0,0,.25)}
+  code{background:#0c0f1c;padding:2px 7px;border-radius:5px;font-size:13px;color:#ffd8a8;
+    font-family:"SF Mono",Menlo,Consolas,monospace}
+  pre{background:#0c0f1c;border:1px solid var(--line);border-radius:10px;padding:16px;overflow:auto;
+    font-size:13px;font-family:"SF Mono",Menlo,Consolas,monospace;color:#d0d7f5}
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:14px}
+  th,td{border:1px solid var(--line);padding:10px 12px;text-align:left;vertical-align:top}
+  th{background:var(--card2);color:var(--accent)}
+  tr:nth-child(even) td{background:rgba(255,255,255,.02)}
+  .muted{color:var(--muted)}
+  .pos{color:var(--pos)} .neg{color:var(--neg)} .green{color:var(--green)}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media(max-width:760px){.grid2{grid-template-columns:1fr}}
+  canvas{background:#0c0f1c;border-radius:10px;border:1px solid var(--line);width:100%;height:auto}
+  .controls{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:16px 0 6px}
+  .controls label{font-size:14px;color:var(--muted)}
+  input[type=range]{flex:1;min-width:180px;accent-color:var(--accent)}
+  .badge{display:inline-block;padding:2px 10px;border-radius:20px;font-size:12px;font-weight:600}
+  .b-roc{background:rgba(77,171,247,.15);color:var(--neg);border:1px solid var(--neg)}
+  .b-pr{background:rgba(255,107,107,.15);color:var(--pos);border:1px solid var(--pos)}
+  .metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:12px}
+  .metric{background:var(--card2);border-radius:10px;padding:12px;text-align:center}
+  .metric .v{font-size:22px;font-weight:700}
+  .metric .k{font-size:12px;color:var(--muted);margin-top:2px}
+  .cm{display:grid;grid-template-columns:auto 1fr 1fr;gap:6px;font-size:13px;margin-top:10px}
+  .cm div{padding:10px;border-radius:8px;text-align:center;background:var(--card2)}
+  .cm .h{background:transparent;color:var(--muted);font-weight:600}
+  .tp{background:rgba(81,207,102,.2)!important} .tn{background:rgba(77,171,247,.18)!important}
+  .fp{background:rgba(255,212,59,.15)!important} .fn{background:rgba(255,107,107,.2)!important}
+  .callout{background:linear-gradient(90deg,rgba(255,212,59,.12),transparent);
+    border-left:4px solid var(--accent);border-radius:8px;padding:14px 18px;margin:16px 0}
+  ul{padding-left:22px} li{margin:6px 0}
+  .tag{font-size:12px;background:var(--card2);padding:2px 8px;border-radius:6px;color:var(--muted)}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <h1>PR-AUC vs ROC-AUC
+      <span class="sub">两种评估曲线的原理、区别，以及在类别不平衡数据下的选择 —— 图文调研</span>
+    </h1>
+  </div>
+</header>
+
+<div class="wrap">
+
+<div class="card">
+  <h3 style="margin-top:0">一句话总览</h3>
+  <p><span class="badge b-roc">ROC-AUC</span> 衡量模型在<strong>全体正例与全体负例之间</strong>的排序能力，对类别比例不敏感、结果稳定；
+  <span class="badge b-pr">PR-AUC</span> 聚焦<strong>“预测为正的样本里有多少真的是正”</strong>，在正例稀少（如你的 50:1）时更能反映真实价值。</p>
+</div>
+
+<h2>一、先搞清楚 4 个基础量</h2>
+<div class="card">
+  <p>一切都建立在混淆矩阵（Confusion Matrix）上。设“正例”为我们关心的少数类：</p>
+  <table>
+    <tr><th></th><th>预测为正</th><th>预测为负</th></tr>
+    <tr><th>真实为正</th><td class="green">TP 真正例</td><td class="pos">FN 漏报</td></tr>
+    <tr><th>真实为负</th><td style="color:var(--accent)">FP 误报</td><td class="neg">TN 真负例</td></tr>
+  </table>
+  <div class="grid2">
+    <div>
+      <p><strong>ROC 用的两个指标：</strong></p>
+      <ul>
+        <li><strong>TPR（召回率 Recall）</strong> = TP / (TP+FN) <span class="muted">→ 真正例里抓到多少</span></li>
+        <li><strong>FPR</strong> = FP / (FP+TN) <span class="muted">→ 负例里误伤多少</span></li>
+      </ul>
+    </div>
+    <div>
+      <p><strong>PR 用的两个指标：</strong></p>
+      <ul>
+        <li><strong>Precision 精确率</strong> = TP / (TP+FP) <span class="muted">→ 报警里多少是真的</span></li>
+        <li><strong>Recall 召回率</strong> = TP / (TP+FN) <span class="muted">→ 同 TPR</span></li>
+      </ul>
+    </div>
+  </div>
+  <div class="callout">
+    <strong>关键差异的根源：</strong> FPR 的分母是 <code>FP+TN</code>（全体负例），当负例有 5 万个时，分母巨大，少量 FP 几乎不影响 FPR；
+    而 Precision 的分母是 <code>TP+FP</code>（预测为正的样本），FP 的增加会<strong>直接、显著</strong>拉低 Precision。这就是两条曲线在不平衡数据上表现迥异的本质原因。
+  </div>
+</div>
+
+<h2>二、两条曲线怎么画</h2>
+<div class="card">
+  <p>把分类阈值从高到低滑动，每个阈值得到一组 (TP,FP,FN,TN)，从而得到一个坐标点，连起来就是曲线，曲线下面积就是 AUC。</p>
+  <div class="grid2">
+    <div>
+      <p><span class="badge b-roc">ROC 曲线</span></p>
+      <ul>
+        <li>横轴 <strong>FPR</strong>，纵轴 <strong>TPR</strong></li>
+        <li>左下 (0,0) → 右上 (1,1)</li>
+        <li>对角线 = 随机猜测，AUC=0.5</li>
+        <li>越靠<strong>左上</strong>越好，AUC=1 完美</li>
+      </ul>
+    </div>
+    <div>
+      <p><span class="badge b-pr">PR 曲线</span></p>
+      <ul>
+        <li>横轴 <strong>Recall</strong>，纵轴 <strong>Precision</strong></li>
+        <li>越靠<strong>右上</strong>越好</li>
+        <li>基准线 = 正例比例（你的数据 ≈ 1000/51000 ≈ <strong>0.0196</strong>）</li>
+        <li>随机模型 PR-AUC ≈ 正例比例，而非 0.5</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<h2>三、交互演示：亲手滑动阈值</h2>
+<div class="card">
+  <p class="muted">下面用一个模拟分类器（正例 <span id="nPos"></span> 个、负例 <span id="nNeg"></span> 个，比例约 50:1，与你的场景一致）实时计算。
+  拖动滑块改变判定阈值，观察混淆矩阵、两条曲线上的工作点如何联动变化。</p>
+
+  <div class="controls">
+    <label>判定阈值 threshold = <b id="thVal" class="green"></b></label>
+    <input id="th" type="range" min="0" max="1" step="0.005" value="0.5">
+  </div>
+
+  <div class="metrics">
+    <div class="metric"><div class="v neg" id="mFpr"></div><div class="k">FPR</div></div>
+    <div class="metric"><div class="v green" id="mTpr"></div><div class="k">TPR / Recall</div></div>
+    <div class="metric"><div class="v" style="color:var(--accent)" id="mPrec"></div><div class="k">Precision</div></div>
+    <div class="metric"><div class="v pos" id="mF1"></div><div class="k">F1</div></div>
+  </div>
+
+  <div class="cm">
+    <div class="h"></div><div class="h">预测正</div><div class="h">预测负</div>
+    <div class="h">真实正</div><div class="tp" id="cTP"></div><div class="fn" id="cFN"></div>
+    <div class="h">真实负</div><div class="fp" id="cFP"></div><div class="tn" id="cTN"></div>
+  </div>
+
+  <div class="grid2" style="margin-top:20px">
+    <div>
+      <p style="text-align:center"><span class="badge b-roc">ROC 曲线</span> &nbsp; AUC = <b id="rocAuc" class="neg"></b></p>
+      <canvas id="rocCanvas" width="440" height="440"></canvas>
+    </div>
+    <div>
+      <p style="text-align:center"><span class="badge b-pr">PR 曲线</span> &nbsp; AUC = <b id="prAuc" class="pos"></b></p>
+      <canvas id="prCanvas" width="440" height="440"></canvas>
+    </div>
+  </div>
+  <p class="muted" style="font-size:13px;margin-top:12px">
+    💡 试试把阈值调低：ROC 上的点几乎贴着左上角平移、AUC 看起来很“漂亮”；但 PR 曲线的 Precision 会明显掉下来 —— 这正是不平衡数据下 ROC 的“乐观假象”。
+  </p>
+</div>
+
+<h2>四、核心区别对照表</h2>
+<div class="card">
+  <table>
+    <tr><th>维度</th><th><span class="neg">ROC-AUC</span></th><th><span class="pos">PR-AUC</span></th></tr>
+    <tr><td>坐标轴</td><td>FPR（横） vs TPR（纵）</td><td>Recall（横） vs Precision（纵）</td></tr>
+    <tr><td>是否用到 TN</td><td><strong>用到</strong>（FPR 含 TN）</td><td><strong>不用</strong>（只看 TP/FP/FN）</td></tr>
+    <tr><td>对类别不平衡</td><td>不敏感，比例变化时曲线基本不变</td><td>敏感，直接反映正例稀缺带来的困难</td></tr>
+    <tr><td>随机基准</td><td>恒为 0.5</td><td>= 正例占比（你的数据≈0.02）</td></tr>
+    <tr><td>关注点</td><td>整体排序 / 区分能力</td><td>正类预测的“查准 vs 查全”权衡</td></tr>
+    <tr><td>易给出乐观假象</td><td><strong>会</strong>（负例多时 FPR 被稀释）</td><td>不会，FP 增加立刻惩罚</td></tr>
+    <tr><td>可跨数据集比较</td><td>较好（受基率影响小）</td><td>差（基率不同不可直接比）</td></tr>
+    <tr><td>典型场景</td><td>类别较均衡、关注整体排序</td><td>不平衡、稀有事件（风控/欺诈/疾病/推荐）</td></tr>
+  </table>
+</div>
+
+<h2>五、什么时候用哪个？</h2>
+<div class="grid2">
+  <div class="card">
+    <p><span class="badge b-roc">优先 ROC-AUC</span></p>
+    <ul>
+      <li>正负样本较均衡</li>
+      <li>你同等关心正类和负类</li>
+      <li>需要一个对阈值/比例稳定、便于跨实验比较的指标</li>
+      <li>关心模型整体“排序能力”本身</li>
+    </ul>
+  </div>
+  <div class="card">
+    <p><span class="badge b-pr">优先 PR-AUC</span></p>
+    <ul>
+      <li><strong>严重不平衡</strong>（正例稀少）</li>
+      <li>你只关心把少数“正例”找准找全</li>
+      <li>误报代价高（每个 FP 都要人去核实）</li>
+      <li>欺诈检测、风控、疾病筛查、异常检测、信息检索</li>
+    </ul>
+  </div>
+</div>
+
+<div class="card callout">
+  <strong>针对你的数据（负例 5 万、正例 1 千、50:1）：</strong>
+  应以 <span class="badge b-pr">PR-AUC</span> 为主要选型/调参指标，ROC-AUC 作为辅助参考。
+  原因：50000 个负例会把 FPR 的分母撑得极大，即便模型误报几百个，FPR 依然很小、ROC-AUC 依旧亮眼，
+  但这几百个 FP 会让实际使用中的 Precision 惨不忍睹。PR 曲线能如实暴露这个问题。
+</div>
+
+<h2>六、代码：两者怎么算</h2>
+<div class="card">
+<pre>from sklearn.metrics import roc_auc_score, average_precision_score
+from sklearn.metrics import roc_curve, precision_recall_curve
+
+# y_true: 0/1 标签；y_score: 模型输出的正类概率
+roc = roc_auc_score(y_true, y_score)              # ROC-AUC
+pr  = average_precision_score(y_true, y_score)    # PR-AUC(平均精度 AP，最常用实现)
+
+# 画曲线用的坐标
+fpr, tpr, _   = roc_curve(y_true, y_score)
+prec, rec, _  = precision_recall_curve(y_true, y_score)
+
+# 交叉验证里指定指标
+from sklearn.model_selection import cross_val_score, StratifiedKFold
+cv = StratifiedKFold(5, shuffle=True, random_state=0)
+cross_val_score(clf, X, y, cv=cv, scoring='average_precision')  # PR-AUC
+cross_val_score(clf, X, y, cv=cv, scoring='roc_auc')            # ROC-AUC</pre>
+  <p class="muted" style="font-size:13px">注：PR-AUC 常用 <code>average_precision_score</code>（AP，阶梯式精确计算），
+  比用梯形法对 PR 曲线积分更稳、更常见。二者数值相近但不完全相同。</p>
+</div>
+
+<h2>七、一句话结论</h2>
+<div class="card">
+  <p>
+    <span class="neg">ROC-AUC</span> 回答“模型能不能把正例排在负例前面”，稳定但在不平衡时过于乐观；
+    <span class="pos">PR-AUC</span> 回答“当模型报警时，你能相信它到什么程度、又能覆盖多少真正例”。
+    <strong>正例越稀少，PR-AUC 越是那个说真话的指标</strong>。对你的 50:1 任务，<strong>以 PR-AUC 为主</strong>。
+  </p>
+</div>
+
+<p class="muted" style="text-align:center;margin-top:40px;font-size:13px">
+  本页为自包含单文件，图表由浏览器基于模拟数据实时计算，无需联网。
+</p>
+
+</div>
+
+<script>
+// ---------- 模拟一个不平衡数据集的分类器打分 ----------
+function randn(){ // Box-Muller 标准正态
+  let u=0,v=0; while(!u)u=Math.random(); while(!v)v=Math.random();
+  return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);
+}
+function sigmoid(x){return 1/(1+Math.exp(-x));}
+
+const N_POS=1000, N_NEG=50000;
+// 正例分数偏高、负例分数偏低，但有重叠(模拟真实非完美分类器)
+const scores=[], labels=[];
+for(let i=0;i<N_POS;i++){ scores.push(sigmoid(1.1+1.3*randn())); labels.push(1); }
+for(let i=0;i<N_NEG;i++){ scores.push(sigmoid(-1.1+1.3*randn())); labels.push(0); }
+
+document.getElementById('nPos').textContent=N_POS;
+document.getElementById('nNeg').textContent=N_NEG;
+
+// 预排序，便于快速阈值扫描
+const idx=[...scores.keys()].sort((a,b)=>scores[b]-scores[a]);
+const sSorted=idx.map(i=>scores[i]);
+const lSorted=idx.map(i=>labels[i]);
+const P=N_POS, Ntot=N_POS+N_NEG, Nneg=N_NEG;
+
+// ---------- 扫描所有阈值，构建 ROC 与 PR 曲线点 ----------
+function buildCurves(){
+  const roc=[[0,0]], pr=[];
+  let tp=0, fp=0;
+  // PR 起点：阈值最高时，取第一个样本前，Precision 约定为 1
+  for(let k=0;k<sSorted.length;k++){
+    if(lSorted[k]===1) tp++; else fp++;
+    const tpr=tp/P, fpr=fp/Nneg;
+    const prec= (tp+fp)>0 ? tp/(tp+fp) : 1;
+    const rec=tp/P;
+    roc.push([fpr,tpr]);
+    pr.push([rec,prec]);
+  }
+  return {roc,pr};
+}
+const {roc:ROC, pr:PR}=buildCurves();
+
+// AUC via 梯形积分
+function auc(points){ // points sorted by x asc for ROC; PR sort by recall asc
+  let a=0;
+  for(let i=1;i<points.length;i++){
+    const [x0,y0]=points[i-1],[x1,y1]=points[i];
+    a+=(x1-x0)*(y0+y1)/2;
+  }
+  return a;
+}
+const rocPts=[...ROC].sort((a,b)=>a[0]-b[0]);
+const prPts=[...PR].sort((a,b)=>a[0]-b[0]);
+const ROC_AUC=auc(rocPts);
+const PR_AUC=auc(prPts);
+document.getElementById('rocAuc').textContent=ROC_AUC.toFixed(3);
+document.getElementById('prAuc').textContent=PR_AUC.toFixed(3);
+
+// ---------- 画布绘制 ----------
+function drawCurve(canvas, curve, opt){
+  const dpr=window.devicePixelRatio||1;
+  const W=canvas.width, H=canvas.height;
+  const ctx=canvas.getContext('2d');
+  ctx.clearRect(0,0,W,H);
+  const pad=48;
+  const x0=pad, y0=H-pad, x1=W-16, y1=16;
+  const sx=v=>x0+v*(x1-x0);
+  const sy=v=>y0-v*(y0-y1);
+  // grid
+  ctx.strokeStyle='#2c3358'; ctx.fillStyle='#9aa4c4'; ctx.lineWidth=1;
+  ctx.font='11px sans-serif';
+  for(let g=0;g<=5;g++){
+    const t=g/5;
+    ctx.globalAlpha=.4;
+    ctx.beginPath();ctx.moveTo(sx(t),y0);ctx.lineTo(sx(t),y1);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(x0,sy(t));ctx.lineTo(x1,sy(t));ctx.stroke();
+    ctx.globalAlpha=1;
+    ctx.fillText(t.toFixed(1), sx(t)-8, y0+16);
+    ctx.fillText(t.toFixed(1), x0-30, sy(t)+4);
+  }
+  // axes labels
+  ctx.fillStyle='#e8ecf8'; ctx.font='13px sans-serif';
+  ctx.fillText(opt.xlab, (x0+x1)/2-30, H-8);
+  ctx.save();ctx.translate(14,(y0+y1)/2+30);ctx.rotate(-Math.PI/2);
+  ctx.fillText(opt.ylab,0,0);ctx.restore();
+  // baseline
+  ctx.strokeStyle=opt.base; ctx.setLineDash([5,5]); ctx.globalAlpha=.7;
+  ctx.beginPath();
+  if(opt.type==='roc'){ctx.moveTo(sx(0),sy(0));ctx.lineTo(sx(1),sy(1));}
+  else{ctx.moveTo(sx(0),sy(opt.baseVal));ctx.lineTo(sx(1),sy(opt.baseVal));}
+  ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha=1;
+  // fill under curve
+  ctx.beginPath();
+  ctx.moveTo(sx(curve[0][0]),y0);
+  curve.forEach(p=>ctx.lineTo(sx(p[0]),sy(p[1])));
+  ctx.lineTo(sx(curve[curve.length-1][0]),y0);
+  ctx.closePath();
+  ctx.fillStyle=opt.fill; ctx.globalAlpha=.18; ctx.fill(); ctx.globalAlpha=1;
+  // curve
+  ctx.beginPath();
+  curve.forEach((p,i)=> i?ctx.lineTo(sx(p[0]),sy(p[1])):ctx.moveTo(sx(p[0]),sy(p[1])));
+  ctx.strokeStyle=opt.stroke; ctx.lineWidth=2.4; ctx.stroke();
+  return {sx,sy};
+}
+
+// 当前阈值对应的工作点
+function computeAt(th){
+  let tp=0,fp=0;
+  for(let k=0;k<sSorted.length;k++){
+    if(sSorted[k]>=th){ if(lSorted[k]===1)tp++; else fp++; } else break;
+  }
+  const fn=P-tp, tn=Nneg-fp;
+  const tpr=tp/P, fpr=fp/Nneg;
+  const prec=(tp+fp)>0?tp/(tp+fp):1;
+  const rec=tpr;
+  const f1=(prec+rec)>0?2*prec*rec/(prec+rec):0;
+  return {tp,fp,fn,tn,tpr,fpr,prec,rec,f1};
+}
+
+function marker(canvas,map,x,y,color){
+  const ctx=canvas.getContext('2d');
+  ctx.beginPath();ctx.arc(map.sx(x),map.sy(y),6,0,2*Math.PI);
+  ctx.fillStyle=color;ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.stroke();
+}
+
+const rocCanvas=document.getElementById('rocCanvas');
+const prCanvas=document.getElementById('prCanvas');
+const baseVal=P/Ntot;
+
+function render(){
+  const th=parseFloat(document.getElementById('th').value);
+  document.getElementById('thVal').textContent=th.toFixed(3);
+  const m=computeAt(th);
+  // metrics
+  document.getElementById('mFpr').textContent=m.fpr.toFixed(3);
+  document.getElementById('mTpr').textContent=m.tpr.toFixed(3);
+  document.getElementById('mPrec').textContent=m.prec.toFixed(3);
+  document.getElementById('mF1').textContent=m.f1.toFixed(3);
+  document.getElementById('cTP').textContent='TP '+m.tp;
+  document.getElementById('cFN').textContent='FN '+m.fn;
+  document.getElementById('cFP').textContent='FP '+m.fp;
+  document.getElementById('cTN').textContent='TN '+m.tn;
+  // curves
+  const rmap=drawCurve(rocCanvas,rocPts,{type:'roc',xlab:'FPR',ylab:'TPR',
+    stroke:'#4dabf7',fill:'#4dabf7',base:'#667'});
+  marker(rocCanvas,rmap,m.fpr,m.tpr,'#4dabf7');
+  const pmap=drawCurve(prCanvas,PR,{type:'pr',xlab:'Recall',ylab:'Precision',
+    stroke:'#ff6b6b',fill:'#ff6b6b',base:'#ffd43b',baseVal:baseVal});
+  marker(prCanvas,pmap,m.rec,m.prec,'#ff6b6b');
+}
+document.getElementById('th').addEventListener('input',render);
+render();
+</script>
+</body>
+</html>

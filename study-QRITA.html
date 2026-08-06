@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Qrita 论文调研报告</title>
+<style>
+  :root {
+    --primary: #2c5aa0;
+    --secondary: #4a7ec1;
+    --accent: #e67e22;
+    --bg: #f7f8fa;
+    --card: #ffffff;
+    --text: #2c3e50;
+    --muted: #6b7280;
+    --border: #e5e7eb;
+    --code-bg: #f3f4f6;
+    --success: #10b981;
+    --warning: #f59e0b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.75;
+    margin: 0;
+    padding: 0;
+  }
+  .container {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 40px 32px 80px;
+  }
+  header {
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    color: #fff;
+    padding: 48px 32px;
+    border-radius: 12px;
+    margin-bottom: 32px;
+    box-shadow: 0 4px 16px rgba(44,90,160,0.15);
+  }
+  header h1 {
+    margin: 0 0 12px;
+    font-size: 28px;
+    line-height: 1.4;
+  }
+  header .subtitle {
+    font-size: 15px;
+    opacity: 0.95;
+    margin-bottom: 16px;
+  }
+  header .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    font-size: 13px;
+    opacity: 0.9;
+  }
+  header .meta span {
+    background: rgba(255,255,255,0.15);
+    padding: 4px 12px;
+    border-radius: 4px;
+  }
+  .card {
+    background: var(--card);
+    border-radius: 10px;
+    padding: 28px 32px;
+    margin-bottom: 24px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    border: 1px solid var(--border);
+  }
+  h2 {
+    color: var(--primary);
+    border-left: 4px solid var(--accent);
+    padding-left: 12px;
+    margin-top: 0;
+    font-size: 22px;
+  }
+  h3 {
+    color: var(--secondary);
+    font-size: 17px;
+    margin-top: 24px;
+  }
+  h4 {
+    color: var(--text);
+    font-size: 15px;
+    margin-top: 20px;
+    margin-bottom: 8px;
+  }
+  p, li { font-size: 14.5px; }
+  code {
+    background: var(--code-bg);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: "SF Mono", Monaco, Consolas, monospace;
+    font-size: 13px;
+    color: #d63384;
+  }
+  pre {
+    background: #1e293b;
+    color: #e2e8f0;
+    padding: 16px;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-size: 12.5px;
+    line-height: 1.55;
+  }
+  pre code {
+    background: transparent;
+    color: inherit;
+    padding: 0;
+  }
+  .tag {
+    display: inline-block;
+    background: #eef2ff;
+    color: var(--primary);
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    margin-right: 6px;
+  }
+  .highlight {
+    background: linear-gradient(120deg, #fff8e1 0%, #fff8e1 100%);
+    padding: 16px 20px;
+    border-left: 4px solid var(--warning);
+    border-radius: 4px;
+    margin: 16px 0;
+  }
+  .success-box {
+    background: #ecfdf5;
+    border-left: 4px solid var(--success);
+    padding: 16px 20px;
+    border-radius: 4px;
+    margin: 16px 0;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    font-size: 13.5px;
+  }
+  th, td {
+    padding: 10px 12px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+  th {
+    background: #f9fafb;
+    color: var(--primary);
+    font-weight: 600;
+  }
+  tr:hover { background: #fafbfc; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 16px;
+    margin: 16px 0;
+  }
+  .grid-item {
+    background: #f9fafb;
+    padding: 16px 20px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+  }
+  .grid-item h4 {
+    margin-top: 0;
+    color: var(--primary);
+  }
+  .flow {
+    background: #f9fafb;
+    padding: 20px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    margin: 16px 0;
+  }
+  .flow-step {
+    display: flex;
+    align-items: flex-start;
+    margin-bottom: 12px;
+  }
+  .flow-num {
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    background: var(--primary);
+    color: #fff;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    margin-right: 12px;
+    font-size: 13px;
+  }
+  .flow-content {
+    flex: 1;
+    padding-top: 4px;
+  }
+  .toc {
+    background: #f9fafb;
+    padding: 16px 24px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    margin-bottom: 24px;
+  }
+  .toc ul {
+    margin: 0;
+    padding-left: 20px;
+  }
+  .toc a {
+    color: var(--primary);
+    text-decoration: none;
+  }
+  .toc a:hover { text-decoration: underline; }
+  .footer {
+    text-align: center;
+    color: var(--muted);
+    font-size: 13px;
+    margin-top: 40px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+  }
+  .metric {
+    display: inline-block;
+    background: var(--accent);
+    color: #fff;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+<header>
+  <h1>Qrita：基于枢轴截断与选择的高性能 GPU Top-k / Top-p 算法</h1>
+  <div class="subtitle">High-performance Top-k and Top-p Algorithm for GPUs using Pivot-based Truncation and Selection</div>
+  <div class="meta">
+    <span>作者：Jongseok Park, Sunga Kim, Alvin Cheung, Ion Stoica</span>
+    <span>机构：UC Berkeley</span>
+    <span>arXiv: 2602.01518</span>
+    <span>发布：2026-02（v1）/ 2026-05（v2）</span>
+  </div>
+</header>
+
+<div class="toc card">
+  <h3 style="margin-top:0">目录</h3>
+  <ul>
+    <li><a href="#tldr">一、TL;DR（一句话总结）</a></li>
+    <li><a href="#background">二、研究背景与问题动机</a></li>
+    <li><a href="#related">三、相关工作与差距</a></li>
+    <li><a href="#design">四、核心算法设计</a></li>
+    <li><a href="#eval">五、实验评估</a></li>
+    <li><a href="#insights">六、关键洞察与工程启示</a></li>
+    <li><a href="#limitations">七、局限性与未来方向</a></li>
+    <li><a href="#conclusion">八、总结</a></li>
+  </ul>
+</div>
+
+<div class="card" id="tldr">
+  <h2>一、TL;DR（一句话总结）</h2>
+  <div class="success-box">
+    Qrita 是一个基于 <b>枢轴搜索（pivot-based search）</b>的 GPU Top-k / Top-p 算法，通过<b>高斯 σ 截断</b>大幅缩小搜索空间、<b>四元枢轴搜索</b>减半迭代次数、<b>重复值处理</b>保证确定性，在保持与排序算法完全一致的严格语义前提下，吞吐比 vLLM / SGLang / FlashInfer 等 SOTA 方案最高提升 <span class="metric">2×</span>，端到端服务吞吐提升 <span class="metric">1.41×</span>，且内存占用仅为一半。<br><br>
+    <b>论文亮点</b>：Qrita 已经被合入 vLLM 主分支，成为其默认的 GPU Top-k / Top-p 采样器。
+  </div>
+  <div>
+    <span class="tag">LLM 推理</span>
+    <span class="tag">Sampling</span>
+    <span class="tag">Top-k / Top-p</span>
+    <span class="tag">Triton</span>
+    <span class="tag">GPU Kernel</span>
+    <span class="tag">系统优化</span>
+  </div>
+</div>
+
+<div class="card" id="background">
+  <h2>二、研究背景与问题动机</h2>
+
+  <h3>2.1 为什么关心 Top-k 和 Top-p？</h3>
+  <p>
+    在 LLM 采样式生成中，Top-k 和 Top-p（nucleus）是控制生成质量与多样性的两大截断算子：
+  </p>
+  <ul>
+    <li><b>Top-k</b>（Fan et al. 2018）：保留 logit 最高的 k 个 token，剪掉长尾低概率 token，避免不连贯输出。</li>
+    <li><b>Top-p</b>（Holtzman et al. 2020）：动态选取累计概率 ≥ p 的最小 token 集，兼顾多样性。</li>
+  </ul>
+
+  <h3>2.2 面临的 GPU 实现挑战</h3>
+  <p>现代 LLM 的词表规模已达 <b>100K ~ 260K</b>（如 Gemma3 词表 262208），Top-k / Top-p 实现存在以下痛点：</p>
+
+  <div class="grid">
+    <div class="grid-item">
+      <h4>排序法（vLLM 等）</h4>
+      <p>对全词表排序。语义精确但计算和内存开销巨大：分块比较导致跨步内存访问、需要大量中间缓冲区，在 GPU 上不友好。</p>
+    </div>
+    <div class="grid-item">
+      <h4>拒绝采样法（FlashInfer / SGLang）</h4>
+      <p>用 Dual Pivot Rejection Sampling 只返回单个 token，属于<b>随机等价</b>而非严格 Top-k / Top-p。无法用于投机解码验证、语义缓存等需要完整候选集的下游任务；prefix-sum 的浮点非结合性还会导致非确定性。</p>
+    </div>
+    <div class="grid-item">
+      <h4>统计截断法（Top-nσ, Min-p）</h4>
+      <p>利用 logit 近似高斯分布做单遍统计切断，非常快但<b>改变了采样输出</b>，生成质量存在争议（Schaeffer 2025 指出 Min-p 存在夸大问题）。</p>
+    </div>
+    <div class="grid-item">
+      <h4>枢轴选择法（RTop-k）</h4>
+      <p>原为 GNN 节点选择设计的二分枢轴搜索。存在两大局限：(1) 仅适合 &lt;1000 元素的小向量，词表 ≥6144 时甚至比 PyTorch 排序还慢；(2) 无重复值处理，遇到相同 logit 会陷入死循环 / 非确定性。</p>
+    </div>
+  </div>
+
+  <div class="highlight">
+    <b>核心矛盾：</b>在生产环境中，Top-k 和 Top-p 仍是主流方案（vLLM、SGLang 默认支持），但目前<b>缺少一个同时具备高性能、严格语义、确定性的 GPU 实现</b>。这就是 Qrita 要填补的空白。
+  </div>
+</div>
+
+<div class="card" id="related">
+  <h2>三、相关工作与差距</h2>
+
+  <table>
+    <thead>
+      <tr>
+        <th>方案</th>
+        <th>类别</th>
+        <th>语义精确</th>
+        <th>返回完整候选集</th>
+        <th>确定性</th>
+        <th>GPU 效率</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>PyTorch sort</td>
+        <td>排序</td>
+        <td>✅</td><td>✅</td><td>✅</td><td>❌ 低</td>
+      </tr>
+      <tr>
+        <td>vLLM 默认</td>
+        <td>排序 / RadixSelect</td>
+        <td>✅</td><td>✅</td><td>✅</td><td>⚠️ 中</td>
+      </tr>
+      <tr>
+        <td>FlashInfer / SGLang</td>
+        <td>拒绝采样</td>
+        <td>❌ 仅随机等价</td><td>❌ 单 token</td><td>❌</td><td>✅ 高</td>
+      </tr>
+      <tr>
+        <td>Top-nσ / Min-p</td>
+        <td>统计截断</td>
+        <td>❌ 改变输出</td><td>✅</td><td>✅</td><td>✅ 高</td>
+      </tr>
+      <tr>
+        <td>RTop-k</td>
+        <td>二分枢轴</td>
+        <td>✅</td><td>✅</td><td>❌ 有重复时失败</td><td>❌ 大词表下低</td>
+      </tr>
+      <tr style="background:#ecfdf5">
+        <td><b>Qrita（本文）</b></td>
+        <td>四元枢轴 + σ 截断</td>
+        <td>✅</td><td>✅</td><td>✅</td><td>✅ 最高</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p>Qrita 相比现有算法有三大优势：</p>
+  <ol>
+    <li>避免全词表排序，内存开销小，GPU 高性能。</li>
+    <li>返回完整的 Top-k / Top-p 候选集（而不是单个采样 token），兼容投机解码、语义缓存等下游任务。</li>
+    <li>保留严格的 Top-k / Top-p 语义与可复现性，不同于统计截断法。</li>
+  </ol>
+</div>
+
+<div class="card" id="design">
+  <h2>四、核心算法设计</h2>
+
+  <h3>4.1 算法总体流程</h3>
+  <div class="flow">
+    <div class="flow-step">
+      <div class="flow-num">1</div>
+      <div class="flow-content"><b>高斯 σ 截断</b>：单遍扫描粗筛掉噪声区（近似高斯分布的低概率 token），得到少量 outlier 集 Z<sub>t</sub>。</div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-num">2</div>
+      <div class="flow-content"><b>截断命中判断</b>：如果 |Z<sub>t</sub>| &gt; k（或概率和 &gt; p），使用 Z<sub>t</sub> 作为搜索集；否则回退到完整词表 Z（保证语义正确）。</div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-num">3</div>
+      <div class="flow-content"><b>四元枢轴搜索</b>：一次迭代评估 25% / 50% / 75% 三个 pivot，找到满足 Top-k / Top-p 的枢轴 τ，并同时跟踪最小超枢轴 logit 及其出现次数。</div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-num">4</div>
+      <div class="flow-content"><b>重复值处理</b>：用累积和 + 掩码运算，精确保留恰好 k 个（或概率恰好 ≥ p 的）token，超出的重复值按原始位置顺序丢弃，实现确定性输出。</div>
+    </div>
+  </div>
+
+  <h3>4.2 关键技术一：高斯 σ 截断（Gaussian σ-truncation）</h3>
+  <p>
+    观察：LLM 词表虽有 100K+，但每一步真正高概率的 token 通常 &lt;100 个，剩余为近似高斯的噪声。
+  </p>
+  <p>
+    <b>做法：</b>抽样 logit 计算均值 μ 与标准差 σ，取截断阈值 <code>t = μ + δ · σ</code>。δ 由目标 k 或 p 通过<b>预计算的查找表</b>获得：
+  </p>
+  <ul>
+    <li>Top-k：<code>δ<sub>k</sub> = Φ<sup>-1</sup>(1 - k/V)</code>（正态分位数函数）</li>
+    <li>Top-p：<code>δ<sub>p</sub> = Φ<sub>p</sub><sup>-1</sup>(p)</code>（基于样本累积 softmax 概率）</li>
+    <li>为保险留 <code>0.2 × |t|</code> 的安全余量，防止漏掉真正的 outlier。</li>
+  </ul>
+  <div class="highlight">
+    <b>效果：</b>在实验中，Top-k=50 时截断后平均只剩 276~2368 个元素（远小于 128K~262K 词表），且<b>命中率 100%</b>，从根源上把搜索空间缩了 2 个数量级。
+  </div>
+
+  <h3>4.3 关键技术二：四元枢轴搜索（Quaternary Pivot Search）</h3>
+  <p>
+    传统 RTop-k 是二分搜索，Qrita 将其扩展为<b>三 pivot 四分区</b>（每次评估 25%、50%、75% 三个位置），单次迭代覆盖信息量翻倍，迭代次数减半。
+  </p>
+
+<pre><code>Algorithm 2  Quaternary Top-k Pivot Search
+Input: 搜索集 Z_s, 目标 k
+Output: τ, z_dup, N_dup
+
+l ← min(Z_s), r ← max(Z_s)
+while (l ≠ r) ∧ (i ≤ 20):
+    for n in {1, 2, 3}:
+        τ_n ← l + (n/4) × (r - l)          # 三个 pivot
+        N_τn  ← |{ z_i | z_i > τ_n }|      # 超过 pivot 的元素数
+        z_mn  ← min({ z_i | z_i > τ_n })   # 超过 pivot 中的最小 logit
+        N_zmn ← |{ z_i | z_i = z_mn }|     # 该最小 logit 出现次数
+
+        # 终止条件：τ_n 满足 k，并且扣除重复后又小于 k
+        if (N_τn ≥ k) ∧ (N_τn - N_zmn &lt; k):
+            return τ_n, z_mn, N_zmn        # 找到含重复的边界
+
+    # 若无 pivot 命中，收缩上下界
+    r ← (N_τ1 &lt; k)? τ_1 : (N_τ2 &lt; k)? τ_2 : (N_τ3 &lt; k)? τ_3 : r
+    l ← (N_τ3 &gt; k)? τ_3 : (N_τ2 &gt; k)? τ_2 : (N_τ1 &gt; k)? τ_1 : l
+</code></pre>
+
+  <h4>核心巧思</h4>
+  <ul>
+    <li>终止条件 <code>(N<sub>τ</sub> ≥ k) ∧ (N<sub>τ</sub> - N<sub>zm</sub> &lt; k)</code> 恰好识别出「τ 之上元素数超 k、但扣掉最小重复层后又不够 k」的关键边界，避免了朴素条件 <code>N<sub>τ</sub> = k</code> 遇到重复值时的死循环。</li>
+    <li>Top-p 用相同结构，但把计数换成累积概率 <code>S<sub>π</sub> = Σ p<sub>i</sub></code>，终止条件相应变为 <code>(S<sub>π</sub> ≥ p) ∧ (S<sub>π</sub> - S<sub>pm</sub> &lt; p)</code>。</li>
+    <li>作者也尝试过更多 pivot（八元等），但寄存器压力抵消了迭代减少的收益，四元是最佳权衡。</li>
+    <li>最多迭代 20 次即达 <code>1/2<sup>40</sup></code> 精度，足以覆盖 fp32 分辨率。</li>
+  </ul>
+
+  <h3>4.4 关键技术三：重复值处理（Duplication Handling）</h3>
+  <p>
+    枢轴搜索结束后可能出现「恰好在边界上有多个相同 logit，但只要保留其中一部分」的情况。Qrita 用并行位运算精确处理：
+  </p>
+<pre><code>Algorithm 3  Top-k Output with Duplication Handling
+M_τ      = 1(Z > τ)                    # 基础掩码：所有超过枢轴的 logit
+N_τ      = Σ M_τ
+N_keep   = N_dup - (N_τ - k)           # 需要保留的重复值个数
+M_zdup   = 1(Z = z_dup)                # 定位所有重复边界值
+C_zdup   = cumsum(M_zdup) ∧ M_zdup     # 记录每个重复值是第几次出现
+M_remv   = 1(C_zdup > N_keep)          # 标记要删掉的多余重复
+M_final  = M_τ ∧ ¬M_remv               # 最终掩码
+O        = Z + (1 - M_final) · (-∞)    # 应用掩码
+</code></pre>
+  <p>
+    通过 <b>cumsum + 掩码</b>并行确定每个重复值的出现顺序，始终保留出现更靠前的元素，从而<b>跨批次、跨硬件完全确定与可复现</b>。这解决了 RTop-k 和拒绝采样法都无法保证的确定性问题。
+  </p>
+
+  <h3>4.5 工程优化：分层 Triton Block Size Autotune</h3>
+  <p>
+    Qrita 的向量算子（min / max / cumsum / mask）作用于两种规模的向量：
+  </p>
+  <ul>
+    <li>全词表向量（10<sup>5</sup> 级别）</li>
+    <li>截断后向量（10<sup>2</sup> ~ 10<sup>3</sup> 级别）</li>
+  </ul>
+  <p>
+    使用同一 block size 会导致小向量 padding 浪费 / 大向量迭代过多。作者引入<b>分层 block size</b>，用 Triton Autotune 让编译器为大小向量分别选择最优 block，实测消融显示<b>此项优化贡献 ~30% 延迟改善</b>。
+  </p>
+</div>
+
+<div class="card" id="eval">
+  <h2>五、实验评估</h2>
+
+  <h3>5.1 实验设置</h3>
+  <ul>
+    <li><b>硬件：</b>NVIDIA H100（主）、RTX 4090（消费级）、AMD MI355X（跨平台）。</li>
+    <li><b>模型（词表大小）：</b>R1-Distill-Llama-8B (128256)、Qwen3-8B (151936)、GPT-OSS-20B (201088)、Gemma3-4B (262208)。</li>
+    <li><b>数据：</b>WikiText-2 生成的真实 logits。</li>
+    <li><b>基线：</b>PyTorch sort、vLLM 默认、FlashInfer、SGLang。</li>
+  </ul>
+
+  <h3>5.2 吞吐性能</h3>
+  <div class="success-box">
+    <ul style="margin:0">
+      <li><b>H100：</b>Qrita 在几乎所有配置下均领先，即使对比语义更弱的 FlashInfer / SGLang 仍有优势；吞吐随 batch 线性扩展至 128 后趋缓（受限于 132 SM 数）。</li>
+      <li><b>RTX 4090：</b>相比基线最高 <span class="metric">2×</span> 吞吐，在内存带宽受限的消费级卡上优势更明显。</li>
+      <li><b>AMD MI355X：</b>Qrita 依赖 Triton 具备跨平台能力，性能碾压 PyTorch / vLLM；FlashInfer / SGLang 因仅支持 CUDA 而不可用。</li>
+    </ul>
+  </div>
+
+  <h3>5.3 端到端服务吞吐（vLLM 集成）</h3>
+  <table>
+    <thead><tr><th>模型</th><th>配置</th><th>vLLM 基线 (KTok/s)</th><th>Qrita (KTok/s)</th><th>加速比</th></tr></thead>
+    <tbody>
+      <tr><td>R1-Llama-8B</td><td>256→1024</td><td>14.22</td><td>12.39</td><td>1.15×</td></tr>
+      <tr><td>Qwen3-8B</td><td>256→1024</td><td>13.57</td><td>11.57</td><td>1.16×</td></tr>
+      <tr><td><b>GPT-OSS-20B</b></td><td>256→1024</td><td>26.43</td><td>19.32</td><td><b>1.41×</b></td></tr>
+      <tr><td>Gemma3-4B</td><td>256→1024</td><td>15.27</td><td>11.51</td><td>1.31×</td></tr>
+    </tbody>
+  </table>
+  <p>
+    <b>关键结论：</b>Qrita 端到端可达 <b>1.41×</b>，且经常达到「跳过采样内核」理论最大值的 95% 以上。加速比与「活跃参数 / 词表规模」比值相关，MoE 模型（如 GPT-OSS-20B 仅 3B 激活）与大词表模型（Gemma3）受益最大。作者预测 Qwen3-Next-80B-A3B 类模型可获得约 40% 端到端提升。
+  </p>
+
+  <h3>5.4 截断命中率与内存</h3>
+  <table>
+    <thead><tr><th>模型</th><th>k=50 平均截断集大小</th><th>k=50 命中率</th><th>p=0.9 概率和</th><th>p=0.9 命中率</th></tr></thead>
+    <tbody>
+      <tr><td>R1-Llama-8B</td><td>276</td><td>1.00</td><td>0.984</td><td>0.985</td></tr>
+      <tr><td>Qwen3-8B</td><td>399</td><td>1.00</td><td>0.967</td><td>0.901</td></tr>
+      <tr><td>GPT-OSS-20B</td><td>286</td><td>1.00</td><td>0.952</td><td>0.938</td></tr>
+      <tr><td>Gemma3-4B</td><td>2368</td><td>1.00</td><td>0.999</td><td>1.00</td></tr>
+    </tbody>
+  </table>
+  <p>
+    <b>观察：</b>Top-k 截断保守但 100% 命中，头空充裕；Top-p 由于 outlier 强烈影响 softmax，命中率略低（0.90 ~ 1.00），作者建议未来对每个模型 profiling 定制 δ 表。<br>
+    <b>内存：</b>Qrita 通常仅为基线的一半；仅在 Top-k 上略高于 vLLM 的 RadixSelect（因需 σ 截断的 buffer），但可通过关闭截断实现零额外内存（换取性能）。
+  </p>
+
+  <h3>5.5 消融实验</h3>
+  <table>
+    <thead><tr><th>配置</th><th>说明</th><th>时间 (ms)</th></tr></thead>
+    <tbody>
+      <tr style="background:#ecfdf5"><td>Run A</td><td>完整 Qrita（含所有优化）</td><td><b>0.919</b></td></tr>
+      <tr><td>Run B</td><td>去掉分层 Autotune</td><td>1.354（+47%）</td></tr>
+      <tr><td>Run C</td><td>再去掉重复值处理</td><td>1.308（-3.5%）</td></tr>
+      <tr><td>Run D</td><td>不命中截断，回退全词表</td><td>5.373（5.8×）</td></tr>
+      <tr><td>Run E</td><td>完全禁用 σ 截断</td><td>4.931（5.4×）</td></tr>
+      <tr><td>Run F</td><td>二元 pivot（RTop-k 风格）</td><td>1.281（+39%）</td></tr>
+      <tr><td>Run I</td><td>用 Sort 代替 pivot 搜索</td><td>2.099（2.3×）</td></tr>
+      <tr><td>Run J</td><td>无截断 + Sort</td><td>16.487（18×）</td></tr>
+    </tbody>
+  </table>
+  <p>
+    结论：<b>σ 截断贡献最大（~5×）、四元 pivot 优于二元（~30%）、Autotune 是关键（~30%）</b>，重复值处理仅约 3.5% 开销即换来确定性保证，性价比极高。
+  </p>
+</div>
+
+<div class="card" id="insights">
+  <h2>六、关键洞察与工程启示</h2>
+
+  <div class="grid">
+    <div class="grid-item">
+      <h4>洞察 1：LLM logits 的准高斯性质是可利用的物理先验</h4>
+      <p>不是把统计截断当作最终答案（会改变语义），而是作为「精确算法的搜索空间预筛」，鱼与熊掌可以兼得。</p>
+    </div>
+    <div class="grid-item">
+      <h4>洞察 2：确定性 ≠ 性能牺牲</h4>
+      <p>基于 cumsum 掩码的重复值处理，仅增加 ~3.5% 开销，就把非确定性问题彻底解决。对投机解码、RL 训练、复现实验非常关键。</p>
+    </div>
+    <div class="grid-item">
+      <h4>洞察 3：算法设计与硬件资源需平衡</h4>
+      <p>更多 pivot 理论上迭代更少，但寄存器压力上升会抵消收益。四元是权衡出的甜点。</p>
+    </div>
+    <div class="grid-item">
+      <h4>洞察 4：完整候选集接口的价值</h4>
+      <p>FlashInfer / SGLang 为速度牺牲了接口通用性（只返回单 token），阻断了下游许多重要用例。Qrita 保住了接口。</p>
+    </div>
+    <div class="grid-item">
+      <h4>洞察 5：Triton 的可移植性红利</h4>
+      <p>使用 Triton 使 Qrita 天然可跑在 AMD GPU 上，而 FlashInfer / SGLang 的手写 CUDA 无法迁移，这是长期战略优势。</p>
+    </div>
+    <div class="grid-item">
+      <h4>洞察 6：把算法真的推到生产</h4>
+      <p>Qrita 不仅是学术工作，其三元版本已经成为 vLLM 主分支的默认采样器，说明工程可用性和易于集成。</p>
+    </div>
+  </div>
+</div>
+
+<div class="card" id="limitations">
+  <h2>七、局限性与未来方向</h2>
+  <ul>
+    <li><b>Batch 维度扩展性瓶颈：</b>当前每 Triton Program 处理一个 batch，H100 上 batch &gt; 132（SM 数）后线性扩展性下降。作者提出未来让单个 Program 处理多个 batch。</li>
+    <li><b>Top-p 命中率仍有波动：</b>由于 softmax 对 outlier 高度敏感，Top-p 的高斯建模不如 Top-k 精准。作者建议引入 <b>per-model profiling</b> 建立定制 δ 表。</li>
+    <li><b>额外 buffer：</b>σ 截断需要词表大小的 buffer；虽然可用截断集大小（几千）代替全词表来进一步降低占用，但当前实现尚未优化。</li>
+    <li><b>Top-k 截断阈值仍偏保守：</b>头空数百 logit 有优化空间，但作者认为对当前 GPU 而言收益有限，仅在多 batch 场景下值得进一步收紧。</li>
+  </ul>
+</div>
+
+<div class="card" id="conclusion">
+  <h2>八、总结</h2>
+  <div class="success-box">
+    <p style="margin:0"><b>Qrita 的核心贡献</b>可以概括为三点：</p>
+    <ol style="margin:8px 0 0">
+      <li>把面向小向量的 <b>RTop-k 枢轴搜索</b>成功扩展到 LLM 大词表场景，靠<b>高斯 σ 截断</b>缩小 100× 搜索空间。</li>
+      <li>提出<b>四元枢轴搜索 + 重复值精确处理</b>，同时兼顾迭代效率与严格确定性。</li>
+      <li>用 <b>Triton</b> 实现完整算法，跨 NVIDIA / AMD 平台可用，端到端集成 vLLM 后成为其默认采样器，达到 <b>2× kernel 加速、1.41× 端到端加速、内存减半</b>。</li>
+    </ol>
+  </div>
+
+  <p style="margin-top:16px">
+    这篇论文的价值不仅在于一个更快的算子，更展示了一条<b>「用统计先验降低搜索空间，然后用精确算法完成最后一步」</b>的通用思路，对其它 LLM 推理阶段的算子设计（如注意力稀疏化、KV cache 选择、投机解码 draft 阶段）都有借鉴意义。特别对于处于 <b>LLM Serving / 推理系统</b>方向的团队，Qrita 是一个近乎「即插即用」的性能提升点，其思路也适合作为算子级优化的教科书案例。
+  </p>
+</div>
+
+<div class="footer">
+  报告基于论文 arXiv:2602.01518v2（2026 年 5 月更新版）整理 · Qrita 项目开源实现见 vLLM 主分支 <code>vllm/v1/sample/ops/topk_topp_triton.py</code>
+</div>
+
+</div>
+</body>
+</html>

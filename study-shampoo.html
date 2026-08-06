@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Shampoo 优化器数学原理调研报告</title>
+<script>
+  window.MathJax = {
+    tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']] },
+    svg: { fontCache: 'global' }
+  };
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+<style>
+  :root {
+    --bg: #0f1117;
+    --panel: #171a23;
+    --panel2: #1e222d;
+    --border: #2a2f3d;
+    --text: #d7dbe4;
+    --muted: #9aa3b5;
+    --accent: #6ea8fe;
+    --accent2: #7bd88f;
+    --warn: #ffcc66;
+    --code-bg: #11141c;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    line-height: 1.75;
+    font-size: 16px;
+  }
+  .layout { display: flex; max-width: 1240px; margin: 0 auto; }
+  nav.toc {
+    position: sticky;
+    top: 0;
+    align-self: flex-start;
+    width: 260px;
+    height: 100vh;
+    overflow-y: auto;
+    padding: 28px 18px;
+    border-right: 1px solid var(--border);
+    font-size: 14px;
+  }
+  nav.toc h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin: 0 0 14px; }
+  nav.toc a { display: block; color: var(--muted); text-decoration: none; padding: 4px 8px; border-radius: 6px; margin-bottom: 2px; }
+  nav.toc a:hover { color: var(--text); background: var(--panel2); }
+  nav.toc a.sub { padding-left: 20px; font-size: 13px; }
+  main { flex: 1; min-width: 0; padding: 40px 48px 120px; }
+  header.hero {
+    padding: 28px 32px;
+    background: linear-gradient(135deg, #1b2740, #14181f);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    margin-bottom: 36px;
+  }
+  header.hero h1 { margin: 0 0 10px; font-size: 30px; line-height: 1.3; }
+  header.hero p { margin: 4px 0; color: var(--muted); font-size: 15px; }
+  .tag { display: inline-block; font-size: 12px; padding: 3px 10px; border-radius: 999px; background: var(--panel2); border: 1px solid var(--border); color: var(--accent); margin-right: 8px; }
+  h2.section { font-size: 24px; margin: 48px 0 16px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 19px; margin: 32px 0 12px; color: #eef1f7; }
+  h4 { font-size: 16px; margin: 22px 0 8px; color: var(--accent2); }
+  p { margin: 12px 0; }
+  ul, ol { padding-left: 24px; }
+  li { margin: 6px 0; }
+  code { background: var(--code-bg); padding: 2px 6px; border-radius: 5px; font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 13.5px; color: #e5b8ff; }
+  pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px; overflow-x: auto; font-size: 13.5px; line-height: 1.6; }
+  pre code { background: none; padding: 0; color: #c7d0e0; }
+  .callout { border-left: 4px solid var(--accent); background: var(--panel); padding: 14px 18px; border-radius: 0 10px 10px 0; margin: 18px 0; }
+  .callout.key { border-left-color: var(--accent2); }
+  .callout.warn { border-left-color: var(--warn); }
+  .callout .label { font-weight: 700; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--accent); }
+  .callout.key .label { color: var(--accent2); }
+  .callout.warn .label { color: var(--warn); }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 20px 24px; margin: 18px 0; }
+  table { width: 100%; border-collapse: collapse; margin: 18px 0; font-size: 14.5px; }
+  th, td { border: 1px solid var(--border); padding: 10px 14px; text-align: left; vertical-align: top; }
+  th { background: var(--panel2); color: #eef1f7; }
+  tr:nth-child(even) td { background: rgba(255,255,255,0.015); }
+  .mathblock { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 6px 20px; margin: 18px 0; overflow-x: auto; }
+  .ref { font-size: 14px; }
+  .ref li { margin: 10px 0; }
+  a.link { color: var(--accent); }
+  .footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--border); color: var(--muted); font-size: 13px; }
+  .badge-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; margin: 18px 0; }
+  .badge { background: var(--panel2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+  .badge .t { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+  .badge .v { font-size: 15px; margin-top: 4px; color: #eef1f7; }
+  @media (max-width: 900px) {
+    nav.toc { display: none; }
+    main { padding: 24px 18px 80px; }
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+  <nav class="toc">
+    <h2>目录</h2>
+    <a href="#intro">1. 引言与动机</a>
+    <a href="#precond">2. 预条件梯度法背景</a>
+    <a href="#whiten" class="sub">2.1 白化与曲率均衡</a>
+    <a href="#diagada" class="sub">2.1.4 对角 AdaGrad 的局限</a>
+    <a href="#fulladagrad" class="sub">2.2 全矩阵 AdaGrad</a>
+    <a href="#regret" class="sub">2.2.1 在线学习后悔界</a>
+    <a href="#core">3. Shampoo 核心构造</a>
+    <a href="#matrixcase" class="sub">3.1 矩阵情形</a>
+    <a href="#kron" class="sub">3.2 Kronecker 因子分解</a>
+    <a href="#bound" class="sub">3.3 关键上界引理</a>
+    <a href="#tensor">4. 张量一般化</a>
+    <a href="#convergence">5. 收敛性分析</a>
+    <a href="#roots">6. 矩阵根与计算</a>
+    <a href="#newtonschulz" class="sub">6.1 Newton–Schulz 迭代</a>
+    <a href="#practical">7. 工程实现要点</a>
+    <a href="#hessian">8. 与 Hessian 的联系</a>
+    <a href="#relations">9. 与其他优化器的关系</a>
+    <a href="#summary">10. 总结</a>
+    <a href="#refs">参考文献</a>
+  </nav>
+  <main>
+    <header class="hero">
+      <div>
+        <span class="tag">二阶优化</span>
+        <span class="tag">Kronecker 预条件</span>
+        <span class="tag">自适应梯度</span>
+      </div>
+      <h1>Shampoo 优化器的数学原理调研报告</h1>
+      <p>结构感知的预条件随机张量优化算法 &mdash; 从全矩阵 AdaGrad 到 Kronecker 因子近似</p>
+      <p>Gupta, Koren &amp; Singer (ICML 2018) 及后续理论进展</p>
+    </header>
+
+    <section id="intro">
+      <h2 class="section">1. 引言与动机</h2>
+      <p>
+        深度学习长期以 SGD、Adam 等<strong>一阶方法</strong>为主，它们计算与内存开销低、易于扩展。
+        另一类更强大的算法是<strong>预条件梯度法 (preconditioned gradient methods)</strong>：
+        它们维护一个矩阵（预条件子，preconditioner）来变换梯度后再更新参数。
+        牛顿法用 Hessian 作预条件子，拟牛顿法、以及在线学习中的 AdaGrad
+        用累积梯度的协方差矩阵作预条件子。
+      </p>
+      <p>
+        预条件法收敛更快，但<strong>维度诅咒</strong>使全矩阵预条件在实际中不可行：对 $d$ 个参数，
+        全预条件子需要 $O(d^2)$ 存储与 $O(d^3)$ 的矩阵求逆/开方。现代神经网络的 $d$ 动辄上亿，
+        直接使用全矩阵不现实。因此实践中普遍退化为<strong>对角近似</strong>（如对角 AdaGrad、Adam），
+        牺牲了梯度各坐标间的相关性信息。
+      </p>
+      <div class="callout key">
+        <div class="label">Shampoo 的核心思想</div>
+        神经网络参数天然是<strong>矩阵/张量</strong>结构。Shampoo 不把参数拉平成一个大向量，
+        而是<strong>沿每个维度维护一个中等规模的满秩预条件矩阵</strong>，
+        通过 Kronecker 乘积隐式地逼近全矩阵 AdaGrad 的预条件子，
+        在 $O(m^2+n^2)$ 存储与 $O(m^3+n^3)$ 计算下获得接近二阶方法的效果。
+      </div>
+      <div class="badge-grid">
+        <div class="badge"><div class="t">全矩阵存储</div><div class="v">$m^2 n^2$</div></div>
+        <div class="badge"><div class="t">Shampoo 存储</div><div class="v">$m^2 + n^2$</div></div>
+        <div class="badge"><div class="t">全矩阵计算</div><div class="v">$O(m^3 n^3)$</div></div>
+        <div class="badge"><div class="t">Shampoo 计算</div><div class="v">$O(m^3 + n^3)$</div></div>
+      </div>
+    </section>
+
+    <section id="precond">
+      <h2 class="section">2. 预条件梯度法背景</h2>
+      <p>
+        一般的预条件梯度更新形式为：
+      </p>
+      <div class="mathblock">
+        $$ \theta_{t+1} = \theta_t - \eta\, H_t^{-1}\, g_t $$
+      </div>
+      <p>
+        其中 $g_t = \nabla f_t(\theta_t)$ 是梯度，$H_t$ 是（对称正定的）预条件子。
+        取 $H_t$ 为 Hessian 即牛顿法；取为 Fisher 信息矩阵即自然梯度法。
+        预条件子的作用可以用<strong>"白化 (whitening)"</strong>来理解：它对梯度空间做坐标重标度，
+        使各方向的曲率被均衡，从而显著改善病态 (ill-conditioned) 问题的收敛。下面给出定量推导。
+      </p>
+
+      <h3 id="whiten">2.1 为什么预条件能改善病态：白化与曲率均衡</h3>
+      <h4>2.1.1 病态问题：条件数如何主宰收敛速度</h4>
+      <p>
+        以凸二次目标为最简模型（任意光滑函数在极小点附近都可用它近似）：
+      </p>
+      <div class="mathblock">
+        $$ f(\theta) = \tfrac12\,\theta^{\top} A\,\theta - b^{\top}\theta,
+           \qquad A\succ 0\ \text{对称正定（即 Hessian）}, $$
+      </div>
+      <p>
+        梯度 $g=\nabla f(\theta)=A\theta-b$，最优解 $\theta^\star=A^{-1}b$。
+        对普通梯度下降 $\theta_{t+1}=\theta_t-\eta g_t$，记误差 $e_t=\theta_t-\theta^\star$，则：
+      </p>
+      <div class="mathblock">
+        $$ e_{t+1} = \theta_{t+1}-\theta^\star = e_t - \eta A e_t = (I-\eta A)\,e_t
+           \;\;\Longrightarrow\;\; e_t = (I-\eta A)^t e_0. $$
+      </div>
+      <p>
+        将 $A$ 特征分解 $A=Q\Lambda Q^{\top}$（$\lambda_i>0$），则每个特征方向上误差按因子
+        $|1-\eta\lambda_i|$ 独立收缩。要全局收敛需 $\max_i|1-\eta\lambda_i|<1$；
+        最优步长 $\eta^\star=\dfrac{2}{\lambda_{\max}+\lambda_{\min}}$ 下的收敛率为：
+      </p>
+      <div class="mathblock">
+        $$ \rho = \frac{\lambda_{\max}-\lambda_{\min}}{\lambda_{\max}+\lambda_{\min}}
+                = \frac{\kappa-1}{\kappa+1},
+           \qquad \kappa = \frac{\lambda_{\max}}{\lambda_{\min}}\ \text{为条件数}. $$
+      </div>
+      <div class="callout warn">
+        <div class="label">病态的根源</div>
+        当 $\kappa\gg1$（病态）时 $\rho\to1$，收敛极慢。本质矛盾在于：
+        步长 $\eta$ 必须小到让<strong>最陡方向</strong> $\lambda_{\max}$ 不发散，
+        这就使<strong>最平坦方向</strong> $\lambda_{\min}$ 上的更新慢如爬行。
+        单一学习率无法同时照顾曲率悬殊的各个方向。
+      </div>
+
+      <h4>2.1.2 预条件 = 坐标变换，实现"白化"</h4>
+      <p>
+        引入预条件更新 $\theta_{t+1}=\theta_t-\eta\,P^{-1}g_t$（$P\succ0$），误差递推变为：
+      </p>
+      <div class="mathblock">
+        $$ e_{t+1} = (I-\eta\,P^{-1}A)\,e_t, $$
+      </div>
+      <p>
+        收敛不再由 $A$ 而由 $P^{-1}A$ 的谱决定。为看清"白化"，做变量替换 $\phi = P^{1/2}\theta$，
+        在新坐标下目标 $\tilde f(\phi)=f(P^{-1/2}\phi)$ 的梯度与 Hessian 为：
+      </p>
+      <div class="mathblock">
+        $$ \nabla_\phi \tilde f = P^{-1/2} g, \qquad
+           \nabla^2_\phi \tilde f = \tilde A = P^{-1/2} A\, P^{-1/2}. $$
+      </div>
+      <p>
+        对 $\phi$ 做<strong>普通</strong>梯度下降 $\phi_{t+1}=\phi_t-\eta P^{-1/2}g$，
+        换回 $\theta=P^{-1/2}\phi$ 恰好还原成上面的预条件更新。也就是说，
+        <strong>预条件下降 = 在被 $P^{1/2}$ 拉伸过的新坐标系里做普通下降</strong>，
+        而新坐标系里的曲率矩阵是 $\tilde A=P^{-1/2}AP^{-1/2}$。特别地：
+      </p>
+      <div class="mathblock">
+        $$ P = A \;\Longrightarrow\; \tilde A = A^{-1/2} A\, A^{-1/2} = I,
+           \qquad \kappa(\tilde A)=1. $$
+      </div>
+      <p>
+        此时所有方向曲率都等于 1（这正是牛顿法），等高线由细长椭球变为<strong>正球面（各向同性）</strong>，
+        取 $\eta=1$ 即<strong>一步收敛</strong>，与原问题多病态无关。这就是"曲率被均衡"的确切含义：
+        预条件把 $P^{-1}A$ 的条件数压向 1，消除了 §2.1.1 中的步长矛盾。
+      </p>
+      <div class="callout key">
+        <div class="label">"白化"一词的由来</div>
+        名称类比自统计学：若随机向量协方差为 $\Sigma$，用 $\Sigma^{-1/2}$ 变换后协方差变为单位阵 $I$，
+        即各分量去相关且方差归一（"白噪声"）。预条件对梯度做同样的事——
+        用 $P^{-1/2}$ 把曲率/梯度协方差归一化，使梯度空间变得<strong>各向同性</strong>。
+      </div>
+
+      <h4>2.1.3 与 AdaGrad / Shampoo 的联系</h4>
+      <p>
+        真实问题中 Hessian $A$ 未知且随时间变化，于是用<strong>累积梯度二阶矩</strong>
+        $H_t=\sum_{s\le t} g_s g_s^{\top}$ 来估计曲率/梯度协方差，取 $P=H_t^{1/2}$，
+        更新即 $\theta_{t+1}=\theta_t-\eta\,H_t^{-1/2}g_t$。
+        $H_t^{-1/2}$ 对梯度做近似白化：累积梯度大的方向被压缩、小的方向被放大，
+        使各方向的<strong>实效步长</strong>在整个谱上均衡——这正是全矩阵 AdaGrad（见 §2.2）。
+        Shampoo 则用 Kronecker 因子 $L_t^{-1/4}(\cdot)\,R_t^{-1/4}$ <strong>高效地近似同一个白化算子</strong>，
+        这也是它能加速病态深度网络训练的根本原因。
+      </p>
+
+      <h4 id="diagada">2.1.4 对角 AdaGrad 也能白化吗？——预条件结构的天花板</h4>
+      <p>
+        一个自然的问题：广泛使用的<strong>对角 AdaGrad / Adam</strong> 是否也具备上述白化能力？
+        答案是<strong>部分具备，但受其对角结构的严格限制</strong>。对角方法取
+        $P=\operatorname{diag}(H_t)^{1/2}$，只保留 $H_t$ 的对角线，因此只能做
+        <strong>逐坐标的轴向缩放</strong>，无法处理坐标之间的相关/旋转耦合。
+        代入 §2.1.2 的框架，白化后的曲率矩阵为（这正是经典的 <strong>Jacobi 预条件</strong>）：
+      </p>
+      <div class="mathblock">
+        $$ \tilde A = D^{-1/2} A\, D^{-1/2}, \qquad D=\operatorname{diag}(A). $$
+      </div>
+      <p>能否把 $\kappa(\tilde A)$ 压到 1，完全取决于病态的<strong>来源</strong>：</p>
+      <p><strong>情形一：病态来自各坐标尺度不同（轴对齐）。</strong> 若 $A$ 本身近似对角，例如</p>
+      <div class="mathblock">
+        $$ A=\begin{pmatrix}10^4 & 0\\[2pt] 0 & 1\end{pmatrix},\ \kappa=10^4
+           \;\Longrightarrow\; D=A,\ \tilde A=D^{-1/2}AD^{-1/2}=I,\ \kappa(\tilde A)=1. $$
+      </div>
+      <p>
+        此时对角 AdaGrad 与全矩阵一样完美白化。这解释了为何 Adam/AdaGrad 在特征尺度悬殊
+        （如 NLP 稀疏特征）时非常有效。
+      </p>
+      <p><strong>情形二：病态藏在坐标间的相关/旋转（非对角元）。</strong> 例如</p>
+      <div class="mathblock">
+        $$ A=\begin{pmatrix}1 & 0.99\\[2pt] 0.99 & 1\end{pmatrix},\ \kappa=\tfrac{1.99}{0.01}=199
+           \;\Longrightarrow\; D=I,\ \tilde A=A,\ \kappa(\tilde A)=199\ \text{（毫无改善）}. $$
+      </div>
+      <p>
+        对角线为单位阵，预条件对这种"旋转型"病态<strong>完全无能为力</strong>——
+        要均衡它必须用非对角预条件子去对齐 $A$ 的特征向量方向。
+      </p>
+      <div class="card">
+        <table>
+          <thead>
+            <tr><th>病态类型</th><th>对角 AdaGrad / Adam</th><th>全矩阵 AdaGrad / Shampoo</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>坐标尺度差异（轴对齐）</td><td>有效，可近似白化</td><td>有效</td></tr>
+            <tr><td>坐标间相关 / 旋转耦合</td><td>基本无效</td><td>有效（含跨坐标信息）</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout">
+        <div class="label">理论天花板（van der Sluis 定理）</div>
+        对角（Jacobi）预条件在所有对角预条件中"近似最优"：能把条件数压到不超过最优值的
+        $n$ 倍。但它的表达能力<strong>上限就是对角线所能刻画的部分</strong>——旋转型病态超出其能力范围。
+      </div>
+      <p>
+        这正是 Shampoo 相对 Adam 的价值所在：神经网络各层梯度的二阶矩通常存在显著的
+        <strong>跨坐标（行/列）相关</strong>，属于情形二。对角方法丢弃了这些非对角信息，
+        而 Shampoo 用 Kronecker 因子 $L_t^{-1/4}(\cdot)\,R_t^{-1/4}$ 保留了行、列两个方向上的
+        满秩相关结构，从而能处理对角方法处理不了的那部分病态。
+      </p>
+
+      <h3 id="fulladagrad">2.2 全矩阵 AdaGrad：Shampoo 的理论基准</h3>
+      <p>
+        全矩阵 AdaGrad 维护累积梯度外积作为预条件子，参数 $\theta_t\in\mathbb{R}^d$，
+        梯度 $g_t\in\mathbb{R}^d$：
+      </p>
+      <div class="mathblock">
+        $$ H_t = \sum_{s=1}^{t} g_s g_s^{\top} \;\in\; \mathbb{R}^{d\times d}, \qquad
+           \theta_{t+1} = \theta_t - \eta\, H_t^{-1/2}\, g_t $$
+      </div>
+      <p>
+        注意这里用的是<strong>逆平方根</strong> $H_t^{-1/2}$ 而非 $H_t^{-1}$，
+        这源自 AdaGrad 的在线学习后悔界分析（Duchi et al. 2011）。
+        全矩阵 AdaGrad 拥有优良的后悔界，但 $H_t$ 是 $d\times d$ 稠密矩阵，
+        对深度学习完全不可行。Shampoo 的目标正是<strong>高效、可证明地隐式逼近这个 $H_t^{-1/2}$</strong>。
+      </p>
+
+      <h4 id="regret">2.2.1 在线学习后悔界的详细分析</h4>
+      <p>
+        AdaGrad 的理论根基是<strong>在线凸优化 (Online Convex Optimization, OCO)</strong>。
+        设每一步对手给出凸损失 $f_t$，学习者先出决策 $\theta_t\in\mathcal{K}$（$\mathcal{K}$ 为凸紧集），
+        再遭受损失 $f_t(\theta_t)$。衡量性能的指标是<strong>后悔 (regret)</strong>——
+        与事后最优的固定决策 $\theta^\star$ 之差的累积：
+      </p>
+      <div class="mathblock">
+        $$ \operatorname{Regret}_T = \sum_{t=1}^{T} f_t(\theta_t) - \min_{\theta^\star\in\mathcal{K}}
+           \sum_{t=1}^{T} f_t(\theta^\star). $$
+      </div>
+      <p>
+        目标是让 $\operatorname{Regret}_T = o(T)$（次线性），即<strong>平均后悔趋于 0</strong>。
+        由凸性 $f_t(\theta_t)-f_t(\theta^\star)\le g_t^{\top}(\theta_t-\theta^\star)$，
+        只需对<strong>线性化后悔</strong> $\sum_t g_t^{\top}(\theta_t-\theta^\star)$ 上界即可。
+      </p>
+
+      <h4>把 AdaGrad 看作自适应度量下的镜像下降</h4>
+      <p>
+        固定一个正定矩阵 $H$，考虑用 Mahalanobis 范数 $\|x\|_H^2=x^{\top}Hx$ 度量的
+        投影梯度（镜像）下降 $\theta_{t+1}=\Pi_{\mathcal{K}}^{H}\!\big(\theta_t-\eta H^{-1}g_t\big)$。
+        标准分析给出与度量 $H$ 相关的后悔界：
+      </p>
+      <div class="mathblock">
+        $$ \sum_{t=1}^{T} g_t^{\top}(\theta_t-\theta^\star)
+           \;\le\; \frac{1}{2\eta}\,\|\theta_1-\theta^\star\|_H^2
+                 + \frac{\eta}{2}\sum_{t=1}^{T} \|g_t\|_{H^{-1}}^2 . $$
+      </div>
+      <p>
+        AdaGrad 的精髓在于<strong>不固定 $H$，而是在所有正定矩阵上求最优度量</strong>。
+        令域直径 $D=\max_\theta\|\theta-\theta^\star\|_2$，则第一项 $\le\tfrac{D^2}{2\eta}\lambda_{\max}(H)$，
+        问题转化为在 $\{H\succ0\}$ 上最小化第二项之和 $\sum_t g_t^{\top}H^{-1}g_t=\operatorname{tr}\!\big(H^{-1}\sum_t g_tg_t^{\top}\big)$。
+      </p>
+
+      <h4>迹优化：为何最优度量是 $H\propto G_T^{1/2}$</h4>
+      <p>
+        记累积外积 $G_T=\sum_{t=1}^{T} g_tg_t^{\top}$。带迹约束的凸优化
+      </p>
+      <div class="mathblock">
+        $$ \min_{H\succ 0}\ \operatorname{tr}\!\big(H^{-1}G_T\big)
+           \quad \text{s.t.}\quad \operatorname{tr}(H)\le c $$
+      </div>
+      <p>
+        的解由矩阵 Cauchy–Schwarz（或 Lagrange 乘子）给出：
+      </p>
+      <div class="mathblock">
+        $$ H^\star = \frac{c}{\operatorname{tr}(G_T^{1/2})}\,G_T^{1/2},
+           \qquad \min_{H}\operatorname{tr}(H^{-1}G_T)\cdot\operatorname{tr}(H)
+                  = \big(\operatorname{tr}(G_T^{1/2})\big)^2. $$
+      </div>
+      <p>
+        这就<strong>从优化角度解释了 §2.2 中出现的 $H_t^{-1/2}$</strong>：
+        最优自适应度量正比于累积梯度外积的平方根 $G_T^{1/2}$，其逆恰为预条件子 $H_t^{-1/2}$。
+        代回并对 $\eta$ 取最优，得到全矩阵 AdaGrad 的后悔界：
+      </p>
+      <div class="mathblock">
+        $$ \boxed{\ \operatorname{Regret}_T \;\le\; \sqrt{2}\,D\,
+           \operatorname{tr}\!\Big(\big(\textstyle\sum_{t=1}^{T} g_tg_t^{\top}\big)^{1/2}\Big)
+           \;=\; \sqrt{2}\,D\,\operatorname{tr}(G_T^{1/2}). \ } $$
+      </div>
+      <div class="callout key">
+        <div class="label">与 Shampoo 的桥梁</div>
+        这个界的<strong>唯一"大小"来源就是 $\operatorname{tr}(G_T^{1/2})$</strong>。
+        §3.3 将证明 Kronecker 因子从上方主导 $G_T\preceq L_T^{1/2}\otimes R_T^{1/2}$，
+        再由算子单调性得 $\operatorname{tr}(G_T^{1/2})\le\operatorname{tr}\!\big((L_T^{1/2}\otimes R_T^{1/2})^{1/2}\big)$，
+        于是这条后悔界几乎原封不动地迁移到 Shampoo（见 §5）。
+      </div>
+
+      <h4>与对角 AdaGrad、$\sqrt{T}$ 速率的关系</h4>
+      <p>
+        若把可行度量限制为对角矩阵 $H=\operatorname{diag}(s)$，同样的迹优化给出对角 AdaGrad 的界
+        $\operatorname{Regret}_T\le\sqrt{2}\,D_\infty\sum_{i=1}^{d}\sqrt{\sum_t g_{t,i}^2}$，
+        即实践中常用的逐坐标 $H_{t,ii}=\sqrt{\sum_{s\le t} g_{s,i}^2}$。
+        无论全矩阵还是对角，由 $\|g_t\|\le G$ 可得 $\operatorname{tr}(G_T^{1/2})=O(\sqrt{T})$，
+        故 $\operatorname{Regret}_T=O(D\sqrt{T})$，平均后悔 $O(1/\sqrt{T})\to 0$。
+        在梯度稀疏或谱快速衰减时，$\operatorname{tr}(G_T^{1/2})$ 远小于最坏情形，这正是 AdaGrad 类方法自适应加速的来源。
+      </p>
+      <div class="callout warn">
+        <div class="label">凸 vs 非凸</div>
+        上述保证严格成立于<strong>在线凸</strong>设定。深度学习是非凸的，后悔界不直接给出全局收敛，
+        但它解释了预条件子的<strong>设计原理</strong>（最优自适应度量 $\propto G_T^{1/2}$），
+        并在实践中与观察到的加速高度吻合。
+      </div>
+    </section>
+
+    <section id="core">
+      <h2 class="section">3. Shampoo 核心构造</h2>
+
+      <h3 id="matrixcase">3.1 矩阵情形</h3>
+      <p>
+        考虑一层参数为矩阵 $W\in\mathbb{R}^{m\times n}$，第 $t$ 步的梯度为 $G_t\in\mathbb{R}^{m\times n}$。
+        Shampoo 维护两个<strong>小型满秩</strong>预条件矩阵：
+      </p>
+      <div class="mathblock">
+        $$
+        \underbrace{L_t = \epsilon I_m + \sum_{s=1}^{t} G_s G_s^{\top}}_{m\times m,\ \text{行（左）协方差}}
+        \qquad
+        \underbrace{R_t = \epsilon I_n + \sum_{s=1}^{t} G_s^{\top} G_s}_{n\times n,\ \text{列（右）协方差}}
+        $$
+      </div>
+      <p>
+        其中 $\epsilon>0$ 是数值稳定项。参数更新为<strong>左乘 + 右乘</strong>两个矩阵根的逆：
+      </p>
+      <div class="mathblock">
+        $$ \boxed{\; W_{t+1} = W_t - \eta\, L_t^{-1/4}\, G_t\, R_t^{-1/4} \;} $$
+      </div>
+      <div class="callout">
+        <div class="label">为什么是 1/4 次幂</div>
+        $L_t^{-1/4}$ 与 $R_t^{-1/4}$ 各贡献"半个"逆平方根。它们在 Kronecker 意义下合成后
+        恰好等价于对拉平梯度施加一次逆平方根（见 §3.2），
+        从而整体产生 $O(1/\sqrt{t})$ 的步长衰减，与随机优化的标准做法一致。
+      </div>
+
+      <h3 id="kron">3.2 Kronecker 因子分解：更新的向量化等价</h3>
+      <p>
+        设 $g_t=\operatorname{vec}(G_t)$ 为按列拉平的梯度向量（$\in\mathbb{R}^{mn}$）。
+        利用向量化恒等式 $\operatorname{vec}(AXB)=(B^{\top}\otimes A)\operatorname{vec}(X)$，
+        Shampoo 的矩阵更新可等价写成对拉平梯度的<strong>全预条件更新</strong>：
+      </p>
+      <div class="mathblock">
+        $$
+        \operatorname{vec}\!\big(L_t^{-1/4} G_t R_t^{-1/4}\big)
+        = \big(R_t^{-1/4}\otimes L_t^{-1/4}\big)\, g_t
+        = \big(R_t^{1/2}\otimes L_t^{1/2}\big)^{-1/2} g_t .
+        $$
+      </div>
+      <p>
+        换言之，Shampoo 隐式使用的<strong>等效预条件子</strong>为
+      </p>
+      <div class="mathblock">
+        $$ \widehat{H}_t^{\text{Shampoo}} = \big(R_t^{1/2}\otimes L_t^{1/2}\big)^{1/2},
+           \qquad \theta_{t+1}=\theta_t - \eta\,\big(\widehat{H}_t^{\text{Shampoo}}\big)^{-1}\!g_t . $$
+      </div>
+      <p>
+        它是一个 $mn\times mn$ 矩阵，但从不显式构造：算法只操作 $m\times m$ 和 $n\times n$ 的因子。
+        这正是"结构感知"的精髓——用两个小因子的 Kronecker 乘积表达一个巨大的隐式预条件子。
+      </p>
+
+      <h3 id="bound">3.3 关键上界引理</h3>
+      <p>
+        Shampoo 之所以是全矩阵 AdaGrad 的合理代理，源于以下 <strong>Loewner 序（半正定序）上界</strong>
+        （Gupta et al. 2018, Lemma 8）。记全矩阵 AdaGrad 预条件子 $\widehat H_t=\sum_{s\le t} g_s g_s^{\top}$，则：
+      </p>
+      <div class="mathblock">
+        $$ \sum_{s=1}^{t} g_s g_s^{\top} \;\preceq\; L_t^{1/2}\otimes R_t^{1/2}, $$
+      </div>
+      <p>
+        即 Kronecker 乘积因子<strong>从上方主导（dominates）</strong>全矩阵 AdaGrad 的累积矩阵。
+        由于矩阵的 $x\mapsto x^{1/2}$ 是<strong>算子单调（operator monotone）</strong>函数，
+        对上式两边取 $1/2$ 次幂保持半正定序：
+      </p>
+      <div class="mathblock">
+        $$ \widehat H_t^{1/2} \;\preceq\; \big(L_t^{1/2}\otimes R_t^{1/2}\big)^{1/2}
+           = \widehat H_t^{\text{Shampoo}} . $$
+      </div>
+      <div class="callout key">
+        <div class="label">核心结论</div>
+        Shampoo 的等效预条件子是全矩阵 AdaGrad 理想预条件子 $\widehat H_t^{1/2}$ 的一个
+        <strong>可证明的上界（Kronecker 因子化上界）</strong>。
+        这一"上界"性质正是把全矩阵 AdaGrad 的后悔界分析迁移到 Shampoo 上的关键杠杆。
+      </div>
+      <div class="callout warn">
+        <div class="label">易被误解的一点（Morwani et al. 2024）</div>
+        Shampoo 常被说成"逼近 Hessian/AdaGrad 矩阵"，但严格意义上它是一个<strong>上界</strong>而非最优近似。
+        更精确地：<em>Shampoo 预条件子的平方</em> $R_t\otimes L_t$ 才近似等于对 $\widehat H$
+        做一次幂迭代得到的<strong>最优 Kronecker 因子近似</strong>。因此实践中常见的
+        "Shampoo²"变体（指数取 $1/2$ 而非 $1/4$）在近似 Hessian 意义上更紧。
+      </div>
+    </section>
+
+    <section id="tensor">
+      <h2 class="section">4. 张量一般化</h2>
+      <p>
+        对于 $k$ 阶张量参数 $\mathcal{W}\in\mathbb{R}^{n_1\times n_2\times\cdots\times n_k}$
+        （例如 CNN 卷积核是 4 阶张量），Shampoo 为<strong>每一个维度（mode）</strong>维护一个预条件子
+        $H_t^{(i)}\in\mathbb{R}^{n_i\times n_i}$。设梯度张量为 $\mathcal{G}_t$，将其按第 $i$ 维展开（矩阵化）为
+        $G_t^{(i)}$，则：
+      </p>
+      <div class="mathblock">
+        $$ H_t^{(i)} = H_{t-1}^{(i)} + G_t^{(i)} \big(G_t^{(i)}\big)^{\top}, \qquad i=1,\dots,k. $$
+      </div>
+      <p>
+        更新时沿每个 mode 用 $-1/(2k)$ 次幂做张量-矩阵收缩（mode product $\times_i$）：
+      </p>
+      <div class="mathblock">
+        $$ \mathcal{W}_{t+1} = \mathcal{W}_t - \eta\;
+           \mathcal{G}_t \times_1 \big(H_t^{(1)}\big)^{-\frac{1}{2k}}
+                        \times_2 \big(H_t^{(2)}\big)^{-\frac{1}{2k}}
+                        \cdots
+                        \times_k \big(H_t^{(k)}\big)^{-\frac{1}{2k}} . $$
+      </div>
+      <p>
+        指数 $\tfrac{1}{2k}$ 是矩阵情形 $\tfrac14$（$k=2$）的自然推广，
+        保证 $k$ 个因子的 Kronecker 乘积合成后等效于一次逆平方根。
+        等效预条件子为 $\big(H_t^{(1)}\big)^{1/2}\!\otimes\cdots\otimes\big(H_t^{(k)}\big)^{1/2}$ 的平方根。
+      </p>
+    </section>
+
+    <section id="convergence">
+      <h2 class="section">5. 收敛性分析</h2>
+      <p>
+        Shampoo 的理论保证建立在<strong>在线凸优化 (OCO)</strong> 框架下，
+        采用自适应正则化 / 镜像下降的分析范式，通过<strong>矩阵迹不等式</strong>
+        （包括 Ando 不等式、Löwner 单调性定理）得到后悔界（regret bound）。
+      </p>
+      <p>
+        设决策域直径为 $D$（即 $\max\|W - W^\star\|\le D$），$T$ 为总步数。
+        矩阵情形下 Shampoo 的后悔界形如：
+      </p>
+      <div class="mathblock">
+        $$ \operatorname{Regret}_T
+           = \sum_{t=1}^{T}\big(f_t(W_t)-f_t(W^\star)\big)
+           \;\le\; \sqrt{2}\, D\,\operatorname{tr}\!\Big(\big(L_T^{1/2}\otimes R_T^{1/2}\big)^{1/2}\Big). $$
+      </div>
+      <p>
+        关键推理链条是：
+      </p>
+      <ol>
+        <li>标准全矩阵 AdaGrad 的后悔界正比于 $\operatorname{tr}(\widehat H_T^{1/2})$；</li>
+        <li>由 §3.3 的上界与算子单调性，$\operatorname{tr}(\widehat H_T^{1/2}) \le \operatorname{tr}\big((L_T^{1/2}\otimes R_T^{1/2})^{1/2}\big)$；</li>
+        <li>因此 Shampoo 继承了 AdaGrad 类 $O(\sqrt{T})$ 的后悔界，在凸情形下保证收敛。</li>
+      </ol>
+      <div class="callout">
+        <div class="label">后续理论进展</div>
+        Xie et al. (2025, <em>Structured Preconditioners: A Unified Analysis</em>) 给出了统一分析框架，
+        并证明一个更简单的<strong>单边 Shampoo (one-sided Shampoo)</strong>（只保留左或右一个因子）
+        反而能获得<strong>比原始 Shampoo 与全矩阵 AdaGrad 更优的后悔界</strong>。
+        这颠覆了"越接近全矩阵越好"的直觉：更结构化的预条件子在固定步数预算下有时表现更佳。
+      </div>
+    </section>
+
+    <section id="roots">
+      <h2 class="section">6. 矩阵根与计算</h2>
+      <p>
+        Shampoo 每步需要计算矩阵的<strong>逆 $p$ 次根</strong>（$p=4$ 或 $2k$）。
+        对对称正定矩阵 $H$，通过特征分解 $H = U\Lambda U^{\top}$ 直接得到：
+      </p>
+      <div class="mathblock">
+        $$ H^{-1/p} = U\,\Lambda^{-1/p}\,U^{\top}
+           = U\,\operatorname{diag}\!\big(\lambda_i^{-1/p}\big)\,U^{\top}. $$
+      </div>
+      <p>
+        这就是 $O(m^3 + n^3)$ 计算量的来源（对每个因子做一次 $O(n_i^3)$ 的特征分解），
+        远低于全矩阵方法的 $O(m^3 n^3)$。但特征分解 (SVD/eigendecomposition) 在 GPU 上并行差、
+        常需 CPU 或 fp64 精度，成为实际瓶颈。工程实现中因此普遍改用
+        <strong>Newton–Schulz 迭代</strong>——一种只用矩阵乘法的迭代法（见 §6.1）。
+      </p>
+      <table>
+        <thead>
+          <tr><th>方法</th><th>预条件子类型</th><th>存储</th><th>每步计算</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>SGD / Momentum</td><td>无（单位阵）</td><td>$O(mn)$</td><td>$O(mn)$</td></tr>
+          <tr><td>对角 AdaGrad / Adam</td><td>逐参数对角</td><td>$O(mn)$</td><td>$O(mn)$</td></tr>
+          <tr><td>全矩阵 AdaGrad</td><td>稠密 $mn\times mn$</td><td>$O(m^2n^2)$</td><td>$O(m^3n^3)$</td></tr>
+          <tr><td><strong>Shampoo</strong></td><td>Kronecker 因子</td><td>$O(m^2+n^2)$</td><td>$O(m^3+n^3)$</td></tr>
+        </tbody>
+      </table>
+
+      <h3 id="newtonschulz">6.1 Newton–Schulz 迭代</h3>
+      <p>
+        Newton–Schulz 迭代是一种<strong>只用矩阵乘法</strong>近似计算矩阵函数
+        （逆、逆平方根、以及正交化 / 极分解）的方法。它避免了特征分解，
+        因此在 GPU 上极其高效——这正是现代 Shampoo、Muon 等优化器青睐它的原因。
+      </p>
+
+      <h4>6.1.1 基本形式：矩阵求逆</h4>
+      <p>
+        要求 $X=A^{-1}$，构造迭代
+      </p>
+      <div class="mathblock">
+        $$ X_{k+1} = X_k\,(2I - A X_k). $$
+      </div>
+      <p>
+        记残差 $E_k = I - A X_k$，则
+      </p>
+      <div class="mathblock">
+        $$ E_{k+1} = I - A X_{k+1} = (I - A X_k)^2 = E_k^2
+           \;\;\Longrightarrow\;\; \|E_{k+1}\| = \|E_k\|^2 . $$
+      </div>
+      <p>
+        只要初值满足 $\|I - A X_0\|<1$，误差便以 $\|E_0\|^{2^k}$ <strong>二次收敛</strong>地坍缩，
+        几步迭代即足够精确。
+      </p>
+
+      <h4>6.1.2 优化器真正用到的版本：逆平方根与正交化</h4>
+      <p>
+        Shampoo 需要 $H^{-1/4}$，Muon 需要把梯度矩阵<strong>正交化</strong>
+        （即极分解的正交因子 $UV^{\top}$，等价于 $(GG^{\top})^{-1/2}G$）。
+        计算 $A^{1/2}$ 与 $A^{-1/2}$ 的耦合 Newton–Schulz 迭代（Higham 标准形式）为：
+      </p>
+      <div class="mathblock">
+        $$ Y_{k+1} = \tfrac12\,Y_k(3I - Z_k Y_k), \qquad
+           Z_{k+1} = \tfrac12\,(3I - Z_k Y_k)Z_k, $$
+      </div>
+      <p>
+        初值 $Y_0 = A,\ Z_0 = I$，则 $Y_k\to A^{1/2}$、$Z_k\to A^{-1/2}$。
+        Muon 则使用为正交化专门调过系数的五次多项式变体：
+      </p>
+      <div class="mathblock">
+        $$ X_{k+1} = a\,X_k + b\,(X_k X_k^{\top})X_k + c\,(X_k X_k^{\top})^2 X_k, $$
+      </div>
+      <p>
+        典型系数 $a\approx3.4445,\ b\approx-4.7750,\ c\approx2.0315$；先令 $X_0=G/\|G\|_F$ 归一化，
+        约 5 次迭代即可把所有奇异值推向 1，得到近似正交矩阵。系数被特意调成"激进但收敛"，
+        以在低精度 (bf16) 下用最少步数完成正交化。
+      </p>
+
+      <h4>6.1.3 为何优化器青睐它</h4>
+      <table>
+        <thead>
+          <tr><th>特性</th><th>Newton–Schulz</th><th>特征分解 / SVD</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>基本运算</td><td><strong>仅矩阵乘法 (GEMM)</strong></td><td>需特征求解</td></tr>
+          <tr><td>GPU 友好度</td><td>极好（GEMM 密集、可批处理）</td><td>差（难并行、常需 CPU/fp64）</td></tr>
+          <tr><td>精度需求</td><td>可在 bf16 / fp16 下工作</td><td>常需 fp32 / fp64</td></tr>
+          <tr><td>收敛</td><td>二次收敛，几步即可</td><td>直接精确</td></tr>
+          <tr><td>代价</td><td>每步 $O(n^3)$，常数小</td><td>$O(n^3)$，常数大</td></tr>
+        </tbody>
+      </table>
+      <div class="callout warn">
+        <div class="label">使用注意</div>
+        <ul style="margin:6px 0">
+          <li><strong>谱范围预处理</strong>：收敛要求 $\|I-AX_0\|<1$（正交化版则要奇异值落入收敛域），
+            故通常先用 $A/\|A\|$ 或 $A/\operatorname{tr}(A)$ 归一化。</li>
+          <li><strong>近似性</strong>：给出的是近似根，迭代步数是"精度 vs 成本"的旋钮；
+            常与延迟更新（§7）配合，用少量迭代摊薄开销。</li>
+        </ul>
+      </div>
+      <div class="callout key">
+        <div class="label">一句话</div>
+        Newton–Schulz 用几轮矩阵乘法<strong>二次收敛地逼近矩阵的逆 / 逆平方根 / 正交因子</strong>，
+        是把 Shampoo 类二阶方法真正搬上 GPU 的关键数值工具。
+      </div>
+    </section>
+
+    <section id="practical">
+      <h2 class="section">7. 工程实现要点</h2>
+      <p>
+        原始论文与 Google/Meta 的 Distributed Shampoo 实现引入了若干启发式，
+        使其在大规模训练中真正可用：
+      </p>
+      <ul>
+        <li><strong>延迟预条件更新 (stale/delayed preconditioning)</strong>：
+          矩阵根很贵，因此每 20&ndash;100 步才重新计算一次 $H^{-1/p}$，
+          中间步复用旧的根。对精度几乎无影响，却显著摊薄每步成本。</li>
+        <li><strong>动量 (momentum)</strong>：对梯度做指数滑动平均
+          $\bar G_t = \alpha \bar G_{t-1} + (1-\alpha)G_t$（如 $\alpha=0.9$）再预条件，改善收敛。</li>
+        <li><strong>学习率嫁接 (learning-rate grafting)</strong>：
+          用另一个优化器（如 Adam/SGD）的更新<strong>幅值（norm）</strong>来标定 Shampoo 更新的<strong>方向</strong>，
+          绕开 Shampoo 步长难以调节的问题。这是 AlgoPerf 夺冠实现的关键技巧之一。</li>
+        <li><strong>$\epsilon$ 正则与阻尼</strong>：$H_t = \epsilon I + \sum GG^\top$ 保证正定与数值稳定。</li>
+        <li><strong>分块 / 大层拆分 (blocking)</strong>：对超大层，将维度切成若干块分别预条件，
+          进一步控制 $m,n$ 的规模，限制 $O(n^3)$ 开销。</li>
+        <li><strong>低精度存储</strong>：如 4-bit Shampoo，压缩预条件子状态以省显存。</li>
+      </ul>
+      <div class="card">
+        <h4 style="margin-top:0">矩阵版 Shampoo 伪代码</h4>
+<pre><code>初始化: L₀ = εI_m,  R₀ = εI_n,  W₀
+for t = 1, 2, ... do
+    G_t = ∇f_t(W_t)                      # 当前梯度 (m×n)
+    L_t = L_{t-1} + G_t G_tᵀ             # 更新左因子 (m×m)
+    R_t = R_{t-1} + G_tᵀ G_t             # 更新右因子 (n×n)
+    if t mod τ == 0:                     # 延迟更新矩阵根
+        L_inv = L_t^(-1/4)               # 特征分解 O(m³)
+        R_inv = R_t^(-1/4)               # 特征分解 O(n³)
+    W_t = W_{t-1} - η · L_inv · G_t · R_inv
+end for</code></pre>
+      </div>
+    </section>
+
+    <section id="hessian">
+      <h2 class="section">8. 与 Hessian / Gauss–Newton 的联系</h2>
+      <p>
+        除 AdaGrad 视角外，Shampoo 也可从<strong>曲率近似</strong>角度理解。
+        对协方差型矩阵 $H=\mathbb{E}[gg^\top]$（Gauss–Newton 分量可写成此形式），
+        存在其"最优 Kronecker 乘积近似"（Frobenius 范数下），可用幂迭代数值求得。
+        Morwani et al. (2024) 证明：
+      </p>
+      <div class="mathblock">
+        $$ \text{Shampoo 近似的平方} \;\approx\; \mathbb{E}[GG^\top]\otimes\mathbb{E}[G^\top G]
+           \;=\; \text{一轮幂迭代得到的最优 Kronecker 近似}. $$
+      </div>
+      <p>
+        即 $\mathbb{E}[GG^\top]^{1/2}\otimes\mathbb{E}[G^\top G]^{1/2}$（Shampoo）
+        对应于对最优近似 $\mathbb{E}[GG^\top]\otimes\mathbb{E}[G^\top G]$ 取平方根。
+        这解释了为何在把 Shampoo 当作二阶（Hessian）方法时，
+        使用指数 $1/2$（"Shampoo²"）比原始的 $1/4$ 在曲率意义上更准确——
+        而 $1/4$ 则更贴合 AdaGrad 的在线学习后悔界推导。两种视角对应不同的"最优"目标。
+      </p>
+    </section>
+
+    <section id="relations">
+      <h2 class="section">9. 与其他优化器的关系</h2>
+      <table>
+        <thead>
+          <tr><th>算法</th><th>预条件子结构</th><th>与 Shampoo 的关系</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>全矩阵 AdaGrad</strong></td><td>稠密 $\sum gg^\top$</td><td>Shampoo 是其 Kronecker 因子化的高效上界代理</td></tr>
+          <tr><td><strong>对角 AdaGrad / Adam</strong></td><td>逐坐标对角</td><td>更极端的结构化近似；Shampoo 保留了跨坐标相关性</td></tr>
+          <tr><td><strong>K-FAC</strong></td><td>Fisher 矩阵的 Kronecker 近似</td><td>同为 Kronecker 因子化；K-FAC 基于概率模型的 Fisher，Shampoo 基于梯度二阶矩</td></tr>
+          <tr><td><strong>SOAP</strong></td><td>Shampoo 特征基下的 Adafactor</td><td>在 Shampoo 预条件子的特征基里跑 Adam，纠正特征值</td></tr>
+          <tr><td><strong>Muon</strong></td><td>梯度的正交化（谱范数）</td><td>受 Shampoo 启发的非对角一阶方法，用 Newton–Schulz 正交化</td></tr>
+          <tr><td><strong>CASPR / KrADagrad</strong></td><td>改进的 Kronecker 组合</td><td>直接以 Shampoo 为基线的后续改进</td></tr>
+        </tbody>
+      </table>
+      <p>
+        2023&ndash;2025 年 Distributed Shampoo 在 AlgoPerf 神经网络训练竞赛外部调参赛道夺冠，
+        重新点燃了社区对<strong>非对角（Kronecker 因子化）预条件</strong>的兴趣，
+        直接催生了 Muon、SOAP 等新一代方法。
+      </p>
+    </section>
+
+    <section id="summary">
+      <h2 class="section">10. 总结</h2>
+      <div class="callout key">
+        <div class="label">一句话概括</div>
+        Shampoo = 用<strong>每维度一个满秩小矩阵的 Kronecker 乘积</strong>，
+        高效且可证明地逼近<strong>全矩阵 AdaGrad</strong> 的逆平方根预条件子，
+        从而在接近一阶方法的开销下获得二阶方法的加速。
+      </div>
+      <p>核心数学要点回顾：</p>
+      <ol>
+        <li><strong>构造</strong>：$L_t=\sum G_sG_s^\top$，$R_t=\sum G_s^\top G_s$，更新 $W_{t+1}=W_t-\eta\,L_t^{-1/4}G_t R_t^{-1/4}$。</li>
+        <li><strong>等价性</strong>：向量化后等效预条件子为 $(R_t^{1/2}\otimes L_t^{1/2})^{1/2}$，从不显式构造。</li>
+        <li><strong>上界引理</strong>：$\sum g_s g_s^\top \preceq L_t^{1/2}\otimes R_t^{1/2}$，配合算子单调性把 AdaGrad 后悔界迁移过来。</li>
+        <li><strong>收敛性</strong>：凸情形下 $O(\sqrt T)$ 后悔界，基于矩阵迹不等式。</li>
+        <li><strong>张量推广</strong>：$k$ 阶张量每维一个预条件子，指数取 $-1/(2k)$。</li>
+        <li><strong>计算</strong>：矩阵根经特征分解，$O(m^3+n^3)$；配合延迟更新、动量、嫁接等启发式落地。</li>
+        <li><strong>再认识</strong>：Shampoo 是全矩阵 AdaGrad 的<em>上界</em>而非最优近似；"平方"后才对应最优 Kronecker 曲率近似。</li>
+      </ol>
+    </section>
+
+    <section id="refs">
+      <h2 class="section">参考文献</h2>
+      <ol class="ref">
+        <li>Gupta, V., Koren, T., &amp; Singer, Y. (2018). <em>Shampoo: Preconditioned Stochastic Tensor Optimization.</em> ICML 2018.
+          <a class="link" href="https://arxiv.org/abs/1802.09568">arXiv:1802.09568</a></li>
+        <li>Duchi, J., Hazan, E., &amp; Singer, Y. (2011). <em>Adaptive Subgradient Methods for Online Learning and Stochastic Optimization (AdaGrad).</em> JMLR.</li>
+        <li>Anil, R., Gupta, V., Koren, T., et al. (2020). <em>Scalable Second Order Optimization for Deep Learning (Distributed Shampoo).</em></li>
+        <li>Shi, H-J. M., et al. (2023). <em>A Distributed Data-Parallel PyTorch Implementation of the Distributed Shampoo Optimizer.</em></li>
+        <li>Morwani, D., et al. (2024). <em>A New Perspective on Shampoo's Preconditioner.</em>
+          <a class="link" href="https://arxiv.org/abs/2406.17748">arXiv:2406.17748</a></li>
+        <li>Xie, S., Wang, T., Reddi, S., Kumar, S., &amp; Li, Z. (2025). <em>Structured Preconditioners in Adaptive Optimization: A Unified Analysis.</em>
+          <a class="link" href="https://arxiv.org/pdf/2503.10537">arXiv:2503.10537</a></li>
+        <li>Eschenhagen, R., Defazio, A., Lee, T-H., Turner, R. E., &amp; Shi, H-J. M. (2025). <em>Purifying Shampoo: Investigating Shampoo's Heuristics by Decomposing its Preconditioner.</em> NeurIPS 2025.</li>
+        <li>Vyas, N., et al. (2025). <em>SOAP: Improving and Stabilizing Shampoo using Adam.</em></li>
+        <li>Jordan, K., Bernstein, J., et al. (2024). <em>Muon: An optimizer for hidden layers in neural networks.</em></li>
+        <li>Martens, J., &amp; Grosse, R. (2015). <em>Optimizing Neural Networks with Kronecker-factored Approximate Curvature (K-FAC).</em> ICML.</li>
+      </ol>
+      <div class="footer">
+        本报告为技术调研整理，数学表述以 Gupta et al. (2018) 原文及后续理论工作为准。
+        公式使用 MathJax 渲染，需联网加载。生成日期：2026-08-03。
+      </div>
+    </section>
+  </main>
+</div>
+</body>
+</html>

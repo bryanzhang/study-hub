@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fisher 信息矩阵系统调研报告</title>
+<script>
+  MathJax = {
+    tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$','$$'],['\\[','\\]']], tags: 'ams' },
+    svg: { fontCache: 'global' }
+  };
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js" id="MathJax-script" async></script>
+<style>
+  :root{
+    --bg:#0f1220; --panel:#171b2e; --panel2:#1e2440; --ink:#e8ecf5; --muted:#9aa4c0;
+    --accent:#6ea8fe; --accent2:#7ee0c0; --warn:#ffd166; --pink:#f78fb2; --line:#2a3150;
+    --code:#0b0e1a;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0; background:linear-gradient(180deg,#0c0f1c,#0f1220 40%); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    line-height:1.75; font-size:16px;
+  }
+  a{color:var(--accent); text-decoration:none}
+  a:hover{text-decoration:underline}
+  .layout{display:flex; max-width:1500px; margin:0 auto}
+  /* sidebar */
+  nav.toc{
+    position:sticky; top:0; align-self:flex-start; height:100vh; overflow-y:auto;
+    width:300px; flex:0 0 300px; padding:26px 18px; border-right:1px solid var(--line);
+    background:rgba(12,15,28,.6); backdrop-filter:blur(6px);
+  }
+  nav.toc h2{font-size:14px; letter-spacing:.12em; color:var(--muted); text-transform:uppercase; margin:18px 0 8px}
+  nav.toc a{display:block; color:var(--muted); padding:4px 10px; border-radius:8px; font-size:14px}
+  nav.toc a:hover{background:var(--panel2); color:var(--ink); text-decoration:none}
+  nav.toc a.sub{padding-left:24px; font-size:13px; opacity:.85}
+  .brand{font-weight:800; font-size:18px; background:linear-gradient(90deg,var(--accent),var(--accent2)); -webkit-background-clip:text; background-clip:text; color:transparent}
+  main{flex:1; min-width:0; padding:40px 54px 120px}
+  header.hero{
+    padding:46px 40px; border-radius:22px; margin-bottom:40px;
+    background:radial-gradient(1200px 400px at 10% -10%,rgba(110,168,254,.25),transparent),
+               radial-gradient(900px 400px at 90% 10%,rgba(126,224,192,.18),transparent),
+               var(--panel);
+    border:1px solid var(--line);
+  }
+  header.hero h1{margin:0 0 12px; font-size:34px; line-height:1.2}
+  header.hero p{margin:6px 0; color:var(--muted); max-width:70ch}
+  .tags{margin-top:18px; display:flex; gap:8px; flex-wrap:wrap}
+  .tag{font-size:12px; padding:5px 12px; border-radius:999px; background:var(--panel2); border:1px solid var(--line); color:var(--accent2)}
+  section{margin:0 0 54px; scroll-margin-top:20px}
+  h2.sec{font-size:26px; margin:0 0 6px; padding-bottom:10px; border-bottom:2px solid var(--line); display:flex; align-items:center; gap:12px}
+  h2.sec .num{font-size:15px; color:#0b0e1a; background:linear-gradient(90deg,var(--accent),var(--accent2)); border-radius:8px; padding:3px 10px; font-weight:800}
+  h3{font-size:20px; margin:30px 0 8px; color:#dfe6f7}
+  h4{font-size:17px; margin:22px 0 6px; color:var(--accent2)}
+  p{margin:12px 0}
+  ul,ol{margin:12px 0; padding-left:26px}
+  li{margin:6px 0}
+  .lead{color:var(--muted)}
+  code{background:var(--code); padding:2px 6px; border-radius:6px; font-family:"SF Mono",Consolas,Menlo,monospace; font-size:.9em; color:#c7d2fe}
+  pre{background:var(--code); border:1px solid var(--line); border-radius:12px; padding:16px 18px; overflow:auto; font-family:"SF Mono",Consolas,Menlo,monospace; font-size:13.5px; line-height:1.6}
+  .card{background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:22px 26px; margin:20px 0}
+  .note{border-left:4px solid var(--accent); background:var(--panel2); padding:14px 18px; border-radius:0 12px 12px 0; margin:18px 0}
+  .warn{border-left:4px solid var(--warn); background:rgba(255,209,102,.08); padding:14px 18px; border-radius:0 12px 12px 0; margin:18px 0}
+  .key{border-left:4px solid var(--accent2); background:rgba(126,224,192,.08); padding:14px 18px; border-radius:0 12px 12px 0; margin:18px 0}
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:20px}
+  @media(max-width:1100px){.grid2{grid-template-columns:1fr} nav.toc{display:none} main{padding:24px}}
+  figure{margin:26px 0; text-align:center}
+  figure svg{max-width:100%; height:auto; background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:10px}
+  figcaption{color:var(--muted); font-size:13.5px; margin-top:10px}
+  table{border-collapse:collapse; width:100%; margin:18px 0; font-size:14.5px}
+  th,td{border:1px solid var(--line); padding:10px 12px; text-align:left; vertical-align:top}
+  th{background:var(--panel2); color:var(--accent2)}
+  tr:nth-child(even) td{background:rgba(255,255,255,.02)}
+  .pill{display:inline-block; font-size:12px; padding:2px 8px; border-radius:6px; background:var(--panel2); color:var(--accent); margin-right:6px}
+  .mjx-container{overflow-x:auto; overflow-y:hidden; max-width:100%}
+  .foot{color:var(--muted); font-size:13px; border-top:1px solid var(--line); padding-top:20px; margin-top:40px}
+  .step{counter-reset:none; background:var(--panel2); border:1px solid var(--line); border-radius:12px; padding:6px 14px; display:inline-block; font-size:13px; color:var(--accent2); margin:4px 0}
+  svg text{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif}
+  details.deriv{margin:18px 0; border:1px solid var(--line); border-radius:14px; background:var(--panel); overflow:hidden}
+  details.deriv>summary{cursor:pointer; list-style:none; padding:14px 20px; font-weight:700; color:var(--accent2); background:var(--panel2); user-select:none; position:relative}
+  details.deriv>summary::-webkit-details-marker{display:none}
+  details.deriv>summary::before{content:"▶"; display:inline-block; margin-right:10px; font-size:11px; color:var(--accent); transition:transform .2s}
+  details.deriv[open]>summary::before{transform:rotate(90deg)}
+  details.deriv>summary:hover{background:#232a4a}
+  .deriv-body{padding:6px 24px 20px}
+  .deriv-body h4{color:var(--accent); border-bottom:1px dashed var(--line); padding-bottom:4px}
+</style>
+</head>
+<body>
+<div class="layout">
+<nav class="toc">
+  <div class="brand">Fisher 信息矩阵</div>
+  <div style="color:var(--muted);font-size:12px;margin-top:4px">系统调研报告</div>
+  <h2>目录</h2>
+  <a href="#intro">0. 阅读指南与全景</a>
+  <a href="#basic">1. 单参数 Fisher 信息</a>
+  <a href="#score" class="sub">1.1 得分函数</a>
+  <a href="#twoforms" class="sub">1.2 两种等价定义</a>
+  <a href="#geom-curv" class="sub">1.3 曲率直觉</a>
+  <a href="#matrix">2. Fisher 信息矩阵（多参数）</a>
+  <a href="#props" class="sub">2.1 性质</a>
+  <a href="#examples" class="sub">2.2 典型例子</a>
+  <a href="#stat">3. 统计学意义</a>
+  <a href="#crb" class="sub">3.1 Cramér–Rao 下界</a>
+  <a href="#mle" class="sub">3.2 MLE 渐近正态性</a>
+  <a href="#infogeo">4. 信息几何视角</a>
+  <a href="#kl" class="sub">4.1 KL 散度的二阶展开</a>
+  <a href="#metric" class="sub">4.2 Fisher 作为黎曼度量</a>
+  <a href="#hessian">5. 与 Hessian / GGN 的关系</a>
+  <a href="#empirical" class="sub">5.1 真 Fisher vs 经验 Fisher</a>
+  <a href="#ggn" class="sub">5.2 GGN 与 Fisher 等价</a>
+  <a href="#natgrad">6. 自然梯度与二阶优化器</a>
+  <a href="#nat" class="sub">6.1 自然梯度下降</a>
+  <a href="#kfac" class="sub">6.2 K-FAC / Shampoo</a>
+  <a href="#adam" class="sub">6.3 Adam 的 Fisher 视角</a>
+  <a href="#ln">7. Layer Normalization 数学原理</a>
+  <a href="#ln-def" class="sub">7.1 定义与前向</a>
+  <a href="#ln-grad" class="sub">7.2 反向传播雅可比</a>
+  <a href="#ln-fisher" class="sub">7.3 与 Fisher / 自然梯度联系</a>
+  <a href="#summary">8. 总结与学习路线</a>
+  <a href="#refs">参考文献</a>
+</nav>
+
+<main>
+<header class="hero">
+  <h1>Fisher 信息矩阵：从统计基础到深度学习二阶优化</h1>
+  <p>本报告面向已有<strong>线性代数、高等数学、概率论、凸优化</strong>基础的读者，系统梳理 Fisher 信息矩阵（Fisher Information Matrix, FIM）的定义、几何、统计意义，并落脚到两个应用目标：<strong>深度学习二阶优化器</strong>（自然梯度、K-FAC）与 <strong>Layer Normalization 的数学原理</strong>。</p>
+  <p class="lead">阅读方式：公式由 MathJax 渲染，配有手绘 SVG 示意图。建议按目录顺序阅读，第 1–4 节是地基，第 5–7 节是应用。</p>
+  <div class="tags">
+    <span class="tag">得分函数</span><span class="tag">Cramér–Rao</span><span class="tag">KL 散度</span>
+    <span class="tag">信息几何</span><span class="tag">自然梯度</span><span class="tag">K-FAC</span>
+    <span class="tag">GGN</span><span class="tag">LayerNorm</span>
+  </div>
+</header>
+
+<!-- ============ 0 ============ -->
+<section id="intro">
+  <h2 class="sec"><span class="num">0</span>阅读指南与全景</h2>
+  <p>Fisher 信息矩阵是一个横跨<strong>统计推断、信息几何、优化</strong>三个领域的核心对象。它同时有三副面孔，理解它们的等价性是掌握全部内容的钥匙：</p>
+  <div class="grid2">
+    <div class="card">
+      <h4>① 统计学面孔</h4>
+      <p>它度量"一次观测中数据 $x$ 携带了多少关于参数 $\theta$ 的信息"。信息越大，估计越精确——这就是 <strong>Cramér–Rao 下界</strong>。</p>
+    </div>
+    <div class="card">
+      <h4>② 几何学面孔</h4>
+      <p>它是概率分布流形上的<strong>黎曼度量张量</strong>，衡量参数微小变化引起分布"实质变化"（KL 散度）的大小。</p>
+    </div>
+    <div class="card">
+      <h4>③ 优化学面孔</h4>
+      <p>它是负对数似然（损失）的<strong>期望曲率</strong>，是自然梯度、Gauss–Newton、K-FAC 等二阶优化器的预条件矩阵。</p>
+    </div>
+    <div class="card">
+      <h4>④ 深度学习落点</h4>
+      <p>二阶优化器用 FIM 做预条件；而 <strong>LayerNorm</strong> 可以理解为一种廉价的、隐式的 Fisher 白化（whitening），改善损失曲面的条件数。</p>
+    </div>
+  </div>
+
+  <figure>
+  <svg viewBox="0 0 900 340" width="900">
+    <defs>
+      <marker id="arr" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#6ea8fe"/></marker>
+      <linearGradient id="g1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6ea8fe"/><stop offset="1" stop-color="#7ee0c0"/></linearGradient>
+    </defs>
+    <rect x="330" y="120" width="240" height="90" rx="14" fill="url(#g1)"/>
+    <text x="450" y="155" text-anchor="middle" fill="#0b0e1a" font-size="20" font-weight="700">Fisher 信息矩阵</text>
+    <text x="450" y="182" text-anchor="middle" fill="#0b0e1a" font-size="15">$I(\theta)$</text>
+
+    <g font-size="14" fill="#e8ecf5">
+      <rect x="40" y="30" width="210" height="70" rx="12" fill="#1e2440" stroke="#2a3150"/>
+      <text x="145" y="58" text-anchor="middle">得分函数的方差</text>
+      <text x="145" y="80" text-anchor="middle" fill="#9aa4c0">Var[∇log p]</text>
+
+      <rect x="650" y="30" width="210" height="70" rx="12" fill="#1e2440" stroke="#2a3150"/>
+      <text x="755" y="58" text-anchor="middle">负对数似然的曲率</text>
+      <text x="755" y="80" text-anchor="middle" fill="#9aa4c0">E[−∇²log p]</text>
+
+      <rect x="40" y="240" width="210" height="70" rx="12" fill="#1e2440" stroke="#2a3150"/>
+      <text x="145" y="268" text-anchor="middle">KL 散度的 Hessian</text>
+      <text x="145" y="290" text-anchor="middle" fill="#9aa4c0">分布流形的度量</text>
+
+      <rect x="650" y="240" width="210" height="70" rx="12" fill="#1e2440" stroke="#2a3150"/>
+      <text x="755" y="268" text-anchor="middle">自然梯度 / K-FAC</text>
+      <text x="755" y="290" text-anchor="middle" fill="#9aa4c0">预条件矩阵</text>
+    </g>
+    <g stroke="#6ea8fe" stroke-width="2" fill="none" marker-end="url(#arr)">
+      <path d="M250 70 C 300 90, 320 120, 345 135"/>
+      <path d="M650 70 C 600 90, 580 120, 555 135"/>
+      <path d="M250 270 C 300 250, 320 220, 345 195"/>
+      <path d="M650 270 C 600 250, 580 220, 555 195"/>
+    </g>
+  </svg>
+  <figcaption>图 0. Fisher 信息矩阵的"一体四面"：同一对象在不同语境下的四种等价刻画。</figcaption>
+  </figure>
+</section>
+
+<!-- ============ 1 ============ -->
+<section id="basic">
+  <h2 class="sec"><span class="num">1</span>单参数 Fisher 信息</h2>
+  <p>先从最简单的一维参数出发。设有一族由标量参数 $\theta\in\mathbb{R}$ 决定的概率密度（或质量）函数 $p(x;\theta)$，我们观测到随机变量 $X\sim p(\cdot;\theta)$。</p>
+
+  <h3 id="score">1.1 得分函数（Score Function）</h3>
+  <p><strong>对数似然</strong>为 $\ell(\theta;x)=\log p(x;\theta)$。它对参数的导数称为<strong>得分函数</strong>（score）：</p>
+  $$ s(\theta;x) \;=\; \frac{\partial}{\partial\theta}\log p(x;\theta) \;=\; \frac{1}{p(x;\theta)}\frac{\partial p(x;\theta)}{\partial\theta}. $$
+  <p>得分函数刻画了"当参数发生微小扰动时，观测 $x$ 的对数似然变化得有多快"。一个关键事实是——<strong>得分函数在真实参数处的期望为零</strong>：</p>
+  $$ \mathbb{E}_{X\sim p(\cdot;\theta)}\!\left[s(\theta;X)\right] \;=\; \int \frac{\partial_\theta p(x;\theta)}{p(x;\theta)}\,p(x;\theta)\,dx \;=\; \partial_\theta \!\int p(x;\theta)\,dx \;=\; \partial_\theta 1 \;=\; 0. $$
+  <div class="note">这里用到了<strong>可交换微分与积分</strong>（正则性条件）。这一条件在指数族等"良好"分布上成立，但在支撑集依赖 $\theta$ 的分布（如 $\mathrm{Unif}(0,\theta)$）上不成立，Cramér–Rao 理论也随之失效。</div>
+
+  <details class="deriv">
+    <summary>推导详解：为什么 $\mathbb{E}[s]=0$（逐步拆解，含微积分知识点）</summary>
+    <div class="deriv-body">
+      <h4>前置事实</h4>
+      <p><strong>事实 A（归一化条件）。</strong> 对任意 $\theta$，$p(\cdot;\theta)$ 都是合法密度，故对样本空间积分恒为 1：</p>
+      $$ \int p(x;\theta)\,dx = 1. \tag{$\star$} $$
+      <p>右边是常数，<strong>与 $\theta$ 无关</strong>——这是整个证明的核心杠杆。</p>
+      <p><strong>事实 B（对数求导 + 链式法则）。</strong> 由 $\frac{d}{du}\log u=\frac1u$ 得 $\partial_\theta\log p=\frac{1}{p}\,\partial_\theta p$。两边乘 $p$ 反写成后面要用的恒等式：</p>
+      $$ \partial_\theta p(x;\theta) = p(x;\theta)\,\partial_\theta\log p(x;\theta) = p(x;\theta)\,s(\theta;x). \tag{$\dagger$} $$
+
+      <h4>主推导（四步）</h4>
+      <p><strong>第 1 步 · 期望定义</strong>（函数乘密度再积分）：</p>
+      $$ \mathbb{E}[s] = \int s(\theta;x)\,p(x;\theta)\,dx = \int\big(\partial_\theta\log p\big)\,p\,dx. $$
+      <p><strong>第 2 步 · 用 $(\dagger)$ 化简被积函数</strong>，把 $(\partial_\theta\log p)\,p$ 换回 $\partial_\theta p$：</p>
+      $$ \mathbb{E}[s] = \int \partial_\theta p(x;\theta)\,dx. $$
+      <p><strong>第 3 步 · 交换微分与积分</strong>（对 $x$ 积、对 $\theta$ 导，用 <em>Leibniz 含参积分求导法则</em>）：</p>
+      $$ \int \partial_\theta p\,dx = \partial_\theta \int p\,dx. $$
+      <p><strong>第 4 步 · 代入 $(\star)$ 收尾</strong>：括号内恒为 1，常数求导为 0：</p>
+      $$ \mathbb{E}[s] = \partial_\theta\!\int p\,dx = \partial_\theta(1) = 0. \qquad\blacksquare $$
+      <div class="key" style="margin-top:14px"><strong>直觉：</strong>密度曲线下的总面积永远是 1，无论 $\theta$ 怎么变。得分均值衡量"参数微动时概率质量往哪流动"，但总质量被钉死在 1，故净流动为零。</div>
+
+      <h4>第 3 步的技术条件（唯一有门槛处）</h4>
+      <p>交换 $\int$ 与 $\partial_\theta$ 需满足 <strong>Leibniz 法则</strong>，直观要求：(1) $\partial_\theta p(x;\theta)$ 存在；(2) 存在与 $\theta$ 无关的可积控制函数 $g(x)$ 使 $|\partial_\theta p|\le g$ 且 $\int g\,dx<\infty$（控制收敛条件）。满足者称<strong>正则族</strong>，指数族（高斯、伯努利、泊松……）皆满足。</p>
+      <div class="warn" style="margin-top:12px"><strong>反例：</strong> $X\sim\mathrm{Unif}(0,\theta)$，$p(x;\theta)=\frac1\theta\mathbf 1_{\{0<x<\theta\}}$，支撑集端点依赖 $\theta$，积分上限随 $\theta$ 变，Leibniz 边界项不为零，第 3 步失效——这类<strong>非正则</strong>分布上 Fisher / Cramér–Rao 理论不能直接套用。</div>
+
+      <h4>副产品：曲率形式 $I=-\mathbb{E}[\partial_\theta^2\log p]$</h4>
+      <p>对已证等式 $\int(\partial_\theta\log p)\,p\,dx=0$ <strong>再对 $\theta$ 求一次导</strong>（乘积法则 + 再次 Leibniz 交换）：</p>
+      $$ 0 = \int(\partial_\theta^2\log p)\,p\,dx + \int(\partial_\theta\log p)(\partial_\theta p)\,dx. $$
+      <p>第二项里代入 $(\dagger)$：$\int(\partial_\theta\log p)^2 p\,dx=\mathbb{E}[s^2]=I(\theta)$，于是 $0=\mathbb{E}[\partial_\theta^2\log p]+I(\theta)$，即 $I(\theta)=-\mathbb{E}[\partial_\theta^2\log p]$。两种定义的等价性由此贯通。</p>
+    </div>
+  </details>
+
+  <h3 id="twoforms">1.2 两种等价定义</h3>
+  <p><strong>定义（方差形式）。</strong> Fisher 信息是得分函数的方差（因均值为 0，即二阶矩）：</p>
+  $$ I(\theta) \;=\; \mathrm{Var}\!\left[s(\theta;X)\right] \;=\; \mathbb{E}\!\left[\left(\frac{\partial}{\partial\theta}\log p(X;\theta)\right)^{\!2}\right]. $$
+  <p><strong>等价形式（曲率形式）。</strong> 在正则性条件下，还可写成负的对数似然二阶导的期望：</p>
+  $$ I(\theta) \;=\; -\,\mathbb{E}\!\left[\frac{\partial^2}{\partial\theta^2}\log p(X;\theta)\right]. $$
+  <p><strong>推导。</strong> 对 $\mathbb{E}[s]=\int (\partial_\theta \log p)\,p\,dx = 0$ 两边再对 $\theta$ 求导：</p>
+  $$ 0=\frac{\partial}{\partial\theta}\int (\partial_\theta\log p)\,p\,dx=\int (\partial_\theta^2\log p)\,p\,dx+\int(\partial_\theta\log p)\,(\partial_\theta p)\,dx. $$
+  <p>第二项里把 $\partial_\theta p = (\partial_\theta\log p)\,p$ 代回，得 $\int (\partial_\theta\log p)^2 p\,dx=\mathbb{E}[s^2]$。于是</p>
+  $$ \mathbb{E}[\partial_\theta^2\log p] + \mathbb{E}[s^2] = 0 \;\Longrightarrow\; I(\theta)=\mathbb{E}[s^2]=-\mathbb{E}[\partial_\theta^2\log p]. $$
+  <div class="key"><strong>直觉：</strong>方差形式说"得分抖动越大，信息越多"；曲率形式说"对数似然峰越尖锐，信息越多"。两者是同一件事的两面，正是这个等式在深度学习里被反复利用（见第 5 节）。</div>
+
+  <h3 id="geom-curv">1.3 曲率直觉：尖峰 vs 平台</h3>
+  <p>把对数似然 $\ell(\theta)$ 看成关于 $\theta$ 的函数。若似然在最大值附近<strong>非常尖锐</strong>，说明数据强烈地"锁定"了参数值，信息量大；若似然<strong>平坦</strong>，说明数据几乎无法区分不同参数，信息量小。$I(\theta)$ 正是这个峰的负曲率的平均。</p>
+  <figure>
+  <svg viewBox="0 0 820 320" width="820">
+    <defs><marker id="ax" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#9aa4c0"/></marker></defs>
+    <!-- axes left -->
+    <g stroke="#9aa4c0" stroke-width="1.5" marker-end="url(#ax)">
+      <line x1="60" y1="270" x2="380" y2="270"/>
+      <line x1="70" y1="285" x2="70" y2="40"/>
+    </g>
+    <text x="360" y="292" fill="#9aa4c0" font-size="13">θ</text>
+    <text x="30" y="55" fill="#9aa4c0" font-size="13">ℓ(θ)</text>
+    <path d="M90 260 C 180 -40, 260 -40, 350 260" fill="none" stroke="#7ee0c0" stroke-width="3"/>
+    <line x1="220" y1="270" x2="220" y2="60" stroke="#7ee0c0" stroke-dasharray="4 4" stroke-width="1"/>
+    <text x="150" y="120" fill="#7ee0c0" font-size="14">尖峰 → 大 I(θ)</text>
+    <text x="120" y="300" fill="#9aa4c0" font-size="12">估计精确</text>
+
+    <!-- axes right -->
+    <g stroke="#9aa4c0" stroke-width="1.5" marker-end="url(#ax)">
+      <line x1="440" y1="270" x2="760" y2="270"/>
+      <line x1="450" y1="285" x2="450" y2="40"/>
+    </g>
+    <text x="740" y="292" fill="#9aa4c0" font-size="13">θ</text>
+    <text x="410" y="55" fill="#9aa4c0" font-size="13">ℓ(θ)</text>
+    <path d="M470 250 C 560 150, 640 150, 730 250" fill="none" stroke="#f78fb2" stroke-width="3"/>
+    <text x="520" y="140" fill="#f78fb2" font-size="14">平台 → 小 I(θ)</text>
+    <text x="500" y="300" fill="#9aa4c0" font-size="12">估计模糊</text>
+  </svg>
+  <figcaption>图 1. Fisher 信息 = 对数似然峰的平均尖锐度。左：高信息；右：低信息。</figcaption>
+  </figure>
+
+  <div class="card">
+    <h4>可加性：$n$ 个独立观测</h4>
+    <p>若 $X_1,\dots,X_n$ i.i.d.，联合对数似然是求和，得分也求和，且独立项协方差为零，因此</p>
+    $$ I_n(\theta) = n\,I_1(\theta). $$
+    <p>这正是"样本越多信息越多、方差按 $1/n$ 下降"的根源。</p>
+  </div>
+</section>
+
+<!-- ============ 2 ============ -->
+<section id="matrix">
+  <h2 class="sec"><span class="num">2</span>Fisher 信息矩阵（多参数）</h2>
+  <p>当参数是向量 $\theta=(\theta_1,\dots,\theta_d)^\top\in\mathbb{R}^d$（深度学习里 $d$ 可达上亿），得分变成<strong>梯度向量</strong>，Fisher 信息变成 $d\times d$ <strong>矩阵</strong>。</p>
+  $$ s(\theta;x)=\nabla_\theta \log p(x;\theta)\in\mathbb{R}^d. $$
+  $$ \boxed{\;I(\theta)=\mathbb{E}\!\left[\,s\,s^\top\right]=\mathbb{E}\!\left[\nabla_\theta\log p\,(\nabla_\theta\log p)^\top\right]=-\,\mathbb{E}\!\left[\nabla_\theta^2\log p\right].\;} $$
+  <p>即矩阵元 $I_{ij}(\theta)=\mathbb{E}\!\left[\partial_{\theta_i}\log p\;\partial_{\theta_j}\log p\right]=-\mathbb{E}\!\left[\partial_{\theta_i}\partial_{\theta_j}\log p\right]$。它是得分向量的<strong>协方差矩阵</strong>（因均值为 0）。</p>
+
+  <h3 id="props">2.1 基本性质</h3>
+  <ul>
+    <li><strong>对称半正定</strong>：$I(\theta)=\mathbb{E}[ss^\top]\succeq 0$。对任意 $v$，$v^\top I v=\mathbb{E}[(v^\top s)^2]\ge 0$。</li>
+    <li><strong>可加性</strong>：i.i.d. 样本 $I_n=nI_1$；独立参数块对角。</li>
+    <li><strong>重参数化协变性</strong>：若 $\eta=g(\theta)$ 是光滑可逆变换，$J=\partial\theta/\partial\eta$，则 $I_\eta=J^\top I_\theta J$。这正是"张量"的变换法则，是把它当作几何度量的依据（第 4 节）。</li>
+    <li><strong>与 Hessian 的关系</strong>：在期望意义下 FIM 等于负对数似然的期望 Hessian，但注意期望是对<strong>模型分布</strong> $p(\cdot;\theta)$ 取的，不是数据分布（第 5 节的关键区别）。</li>
+  </ul>
+  <div class="warn"><strong>易错点：</strong> $I(\theta)\succeq0$ 恒成立，而真实损失的 Hessian 在非最优点可能不定（有负特征值）。这正是为何用 FIM 代替 Hessian 做预条件在深度学习里更稳定——它天然半正定，避免了负曲率方向导致的发散。</div>
+
+  <h3 id="examples">2.2 典型例子</h3>
+  <div class="grid2">
+    <div class="card">
+      <h4>高斯（已知方差，估计均值）</h4>
+      <p>$p(x;\mu)=\mathcal N(\mu,\sigma^2)$，$\log p=-\frac{(x-\mu)^2}{2\sigma^2}+C$。</p>
+      $$ s=\frac{x-\mu}{\sigma^2},\quad I(\mu)=\mathbb{E}\Big[\tfrac{(X-\mu)^2}{\sigma^4}\Big]=\frac{1}{\sigma^2}. $$
+      <p>噪声越小（$\sigma^2$ 越小），信息越大，符合直觉。</p>
+    </div>
+    <div class="card">
+      <h4>高斯（同时估计 $\mu,\sigma^2$）</h4>
+      <p>交叉项期望为 0，得对角阵：</p>
+      $$ I(\mu,\sigma^2)=\begin{pmatrix}\frac{1}{\sigma^2}&0\\[4pt]0&\frac{1}{2\sigma^4}\end{pmatrix}. $$
+      <p>均值与方差的估计"信息上正交"。</p>
+    </div>
+    <div class="card">
+      <h4>伯努利 $\mathrm{Bern}(p)$</h4>
+      $$ I(p)=\frac{1}{p(1-p)}. $$
+      <p>$p\to0$ 或 $1$ 时信息发散——极端概率下一次观测极具区分力。</p>
+    </div>
+    <div class="card">
+      <h4>指数族的普适结论</h4>
+      <p>对 $p(x;\theta)=h(x)\exp(\theta^\top T(x)-A(\theta))$（自然参数），</p>
+      $$ I(\theta)=\nabla^2 A(\theta)=\mathrm{Cov}[T(X)]. $$
+      <p>FIM 恰是对数配分函数 $A$ 的 Hessian，也即充分统计量的协方差。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 3 ============ -->
+<section id="stat">
+  <h2 class="sec"><span class="num">3</span>统计学意义</h2>
+
+  <h3 id="crb">3.1 Cramér–Rao 下界（CRB）</h3>
+  <p>Fisher 信息的头号应用：它给出<strong>任何无偏估计量方差的下界</strong>。设 $\hat\theta(X)$ 是 $\theta$ 的无偏估计（$\mathbb{E}[\hat\theta]=\theta$），则</p>
+  $$ \mathrm{Var}(\hat\theta)\;\ge\;\frac{1}{I(\theta)}\qquad(\text{标量});\qquad \mathrm{Cov}(\hat\theta)\;\succeq\;I(\theta)^{-1}\quad(\text{向量，Loewner 序}). $$
+  <p><strong>证明骨架（标量）。</strong>由无偏性 $\int(\hat\theta-\theta)p\,dx=0$ 求导得 $\mathbb{E}[(\hat\theta-\theta)s]=1$。对随机变量 $\hat\theta-\theta$ 与 $s$ 用 Cauchy–Schwarz：</p>
+  $$ 1=\big(\mathbb{E}[(\hat\theta-\theta)s]\big)^2\le \mathrm{Var}(\hat\theta)\cdot\mathbb{E}[s^2]=\mathrm{Var}(\hat\theta)\,I(\theta). $$
+  <div class="key"><strong>信息 = 精度的倒数上界。</strong> $I(\theta)$ 越大，可达到的估计方差越小。达到下界的估计量称为<strong>有效估计量</strong>（efficient）。这解释了为什么 $I^{-1}$ 会以"协方差"的身份反复出现——它是估计不确定性的自然尺度。</div>
+
+  <figure>
+  <svg viewBox="0 0 780 300" width="780">
+    <defs><marker id="ax2" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#9aa4c0"/></marker></defs>
+    <g stroke="#9aa4c0" stroke-width="1.5" marker-end="url(#ax2)">
+      <line x1="70" y1="250" x2="720" y2="250"/>
+      <line x1="80" y1="265" x2="80" y2="30"/>
+    </g>
+    <text x="700" y="272" fill="#9aa4c0" font-size="13">θ̂</text>
+    <text x="40" y="45" fill="#9aa4c0" font-size="13">密度</text>
+    <!-- sharp -->
+    <path d="M300 250 C 360 -30, 440 -30, 500 250" fill="none" stroke="#7ee0c0" stroke-width="3"/>
+    <!-- flat -->
+    <path d="M180 250 C 320 120, 480 120, 620 250" fill="none" stroke="#f78fb2" stroke-width="3"/>
+    <line x1="400" y1="250" x2="400" y2="40" stroke="#9aa4c0" stroke-dasharray="4 4"/>
+    <text x="405" y="55" fill="#9aa4c0" font-size="12">真值 θ</text>
+    <text x="510" y="90" fill="#7ee0c0" font-size="13">大 I → 小方差（有效估计）</text>
+    <text x="500" y="175" fill="#f78fb2" font-size="13">小 I → 大方差</text>
+  </svg>
+  <figcaption>图 2. Cramér–Rao 下界：无偏估计量的抽样分布，其"胖瘦"被 $1/I(\theta)$ 从下方限制。</figcaption>
+  </figure>
+
+  <h3 id="mle">3.2 极大似然估计的渐近正态性</h3>
+  <p>Fisher 信息还决定了 MLE 的大样本行为。在正则条件下，MLE $\hat\theta_n$ 满足</p>
+  $$ \sqrt{n}\,(\hat\theta_n-\theta_0)\;\xrightarrow{d}\;\mathcal N\!\big(0,\;I_1(\theta_0)^{-1}\big). $$
+  <p>即 MLE <strong>渐近无偏、渐近有效</strong>，其协方差矩阵恰为单样本 Fisher 信息的逆。直观推导：对得分方程 $\sum_i s(\hat\theta;x_i)=0$ 在 $\theta_0$ 处一阶泰勒展开，</p>
+  $$ 0\approx \sum_i s(\theta_0;x_i)+\Big(\sum_i \nabla s(\theta_0;x_i)\Big)(\hat\theta-\theta_0). $$
+  <p>由大数定律 $\frac1n\sum\nabla s\to -I_1$，由中心极限定理 $\frac1{\sqrt n}\sum s\to\mathcal N(0,I_1)$，整理即得上式。</p>
+  <div class="note">这一结论把 FIM 与"置信区间、假设检验"直接挂钩，也是后面把 $I^{-1}$ 解释为参数空间中"自然的不确定度椭球"的统计根据。</div>
+</section>
+
+<!-- ============ 4 ============ -->
+<section id="infogeo">
+  <h2 class="sec"><span class="num">4</span>信息几何视角：Fisher 作为度量</h2>
+  <p>这一节把 FIM 从"统计量"升格为"几何对象"，是理解自然梯度的核心桥梁。核心思想：把每个参数 $\theta$ 对应的分布 $p(\cdot;\theta)$ 看成一个高维<strong>流形</strong>上的点，FIM 就是这个流形上的<strong>黎曼度量张量</strong>。</p>
+
+  <h3 id="kl">4.1 KL 散度的二阶展开</h3>
+  <p>衡量两个分布"差多远"的自然工具是 KL 散度 $D_{\mathrm{KL}}(p_\theta\,\|\,p_{\theta+\delta})$。考察参数微扰 $\delta$ 很小时的行为，做泰勒展开：</p>
+  $$ D_{\mathrm{KL}}\big(p_\theta\,\|\,p_{\theta+\delta}\big)=\underbrace{D_{\mathrm{KL}}(p_\theta\|p_\theta)}_{0}+\underbrace{\nabla_\delta D_{\mathrm{KL}}\big|_{0}^{\!\top}\delta}_{0}+\tfrac12\,\delta^\top\big(\nabla_\delta^2 D_{\mathrm{KL}}\big|_{0}\big)\,\delta+o(\|\delta\|^2). $$
+  <p>零阶项显然为 0；一阶项也为 0（$\theta$ 是 KL 关于第二参数的极小点）。<strong>关键：二阶项的 Hessian 恰好就是 Fisher 信息矩阵：</strong></p>
+  $$ \boxed{\;D_{\mathrm{KL}}\big(p_\theta\,\|\,p_{\theta+\delta}\big)\;\approx\;\tfrac12\,\delta^\top I(\theta)\,\delta.\;} $$
+  <p><strong>验证。</strong> $\nabla^2_\delta D_{\mathrm{KL}}=\nabla^2_\delta\,\mathbb{E}_{p_\theta}[\log p_\theta-\log p_{\theta+\delta}]=-\mathbb{E}_{p_\theta}[\nabla^2\log p_{\theta+\delta}]\big|_{\delta=0}=-\mathbb{E}_{p_\theta}[\nabla^2\log p_\theta]=I(\theta).$</p>
+  <div class="key"><strong>这条公式是全篇的枢纽。</strong>它说：参数空间的欧氏距离 $\|\delta\|^2$ 毫无意义（依赖于参数化），真正有意义的"分布距离"是 $\delta^\top I(\theta)\delta$。FIM 把"参数差"翻译成"分布差"。</div>
+
+  <h3 id="metric">4.2 Fisher 作为黎曼度量张量</h3>
+  <p>于是我们把参数流形上两个邻近点的<strong>平方线元</strong>定义为</p>
+  $$ ds^2 = \sum_{i,j} I_{ij}(\theta)\,d\theta_i\,d\theta_j = d\theta^\top I(\theta)\,d\theta. $$
+  <p>这是一个随位置 $\theta$ 变化的内积（度量），使参数空间成为<strong>黎曼流形</strong>。前面 2.1 提到的协变变换律 $I_\eta=J^\top I_\theta J$ 正是度量张量在坐标变换下应满足的规律——这保证了 $ds^2$ 与如何参数化无关。</p>
+
+  <figure>
+  <svg viewBox="0 0 860 360" width="860">
+    <defs>
+      <radialGradient id="mf" cx="50%" cy="40%" r="70%"><stop offset="0" stop-color="#26325c"/><stop offset="1" stop-color="#141a30"/></radialGradient>
+      <marker id="a3" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#7ee0c0"/></marker>
+      <marker id="a4" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#f78fb2"/></marker>
+    </defs>
+    <!-- manifold surface -->
+    <path d="M60 210 C 220 90, 420 90, 560 150 C 700 210, 800 200, 820 250 C 700 330, 400 330, 220 300 C 120 285, 70 260, 60 210 Z" fill="url(#mf)" stroke="#2a3150"/>
+    <!-- grid curves -->
+    <g stroke="#37406b" fill="none" stroke-width="1">
+      <path d="M140 250 C 300 200, 520 190, 700 230"/>
+      <path d="M180 290 C 340 250, 540 245, 730 270"/>
+      <path d="M250 150 C 280 210, 300 270, 320 310"/>
+      <path d="M450 130 C 470 200, 490 260, 500 315"/>
+      <path d="M630 165 C 640 220, 650 265, 655 300"/>
+    </g>
+    <!-- point and ellipse (metric) -->
+    <circle cx="400" cy="220" r="5" fill="#7ee0c0"/>
+    <ellipse cx="400" cy="220" rx="70" ry="30" fill="none" stroke="#7ee0c0" stroke-width="2" transform="rotate(-18 400 220)"/>
+    <text x="415" y="212" fill="#7ee0c0" font-size="13">θ</text>
+    <text x="300" y="180" fill="#7ee0c0" font-size="12">度量椭球 δᵀI(θ)δ = const</text>
+    <!-- tangent vectors -->
+    <line x1="400" y1="220" x2="470" y2="200" stroke="#f78fb2" stroke-width="2.5" marker-end="url(#a4)"/>
+    <text x="748" y="245" fill="#e8ecf5" font-size="14">分布流形 { p(·;θ) }</text>
+    <text x="120" y="60" fill="#9aa4c0" font-size="13">每个点 = 一个概率分布；两点间"距离" ≈ √(2·KL)</text>
+  </svg>
+  <figcaption>图 3. 信息几何图景：参数空间弯曲成流形，FIM 定义了每点处度量椭球。等 KL 面在参数坐标下是随位置旋转/拉伸的椭球，而非等半径的圆。</figcaption>
+  </figure>
+
+  <div class="card">
+    <h4>为什么这对深度学习重要？</h4>
+    <p>普通梯度下降 $\theta\leftarrow\theta-\eta\nabla L$ 隐含假设"参数空间是平坦欧氏空间"，对所有方向一视同仁。但从信息几何看，不同方向上"走同样的参数距离"引起的<strong>分布改变量天差地别</strong>。若某方向 $I$ 很大（分布敏感），就应该走小步；反之走大步。<strong>自然梯度</strong>（第 6 节）正是用 $I^{-1}$ 修正梯度，使每一步在"分布距离"意义下等价，从而摆脱对参数化的依赖。</p>
+  </div>
+</section>
+
+<!-- ============ 5 ============ -->
+<section id="hessian">
+  <h2 class="sec"><span class="num">5</span>与 Hessian / Gauss–Newton 的关系</h2>
+  <p>深度学习里的损失通常是负对数似然 $L(\theta)=\frac1N\sum_n -\log p(y_n\mid x_n;\theta)$。要做二阶优化，理论上需要 Hessian $\nabla^2 L$，但它太大、且可能不定。FIM 提供了一个半正定的近似。要正确使用，必须厘清三个矩阵的区别。</p>
+
+  <h3 id="empirical">5.1 真 Fisher vs 经验 Fisher vs Hessian</h3>
+  <table>
+    <tr><th>矩阵</th><th>定义</th><th>期望取自</th><th>标签来源</th><th>性质</th></tr>
+    <tr>
+      <td><strong>真 Fisher</strong> $F$</td>
+      <td>$\mathbb{E}_{x\sim\mathcal D}\,\mathbb{E}_{y\sim p_\theta(\cdot\mid x)}[\nabla\log p\,\nabla\log p^\top]$</td>
+      <td>模型分布 $p_\theta$</td>
+      <td>从<strong>模型</strong>采样标签 $y$</td>
+      <td>半正定；等于期望 Hessian</td>
+    </tr>
+    <tr>
+      <td><strong>经验 Fisher</strong> $\tilde F$</td>
+      <td>$\frac1N\sum_n \nabla\log p(y_n\mid x_n)\,\nabla\log p(y_n\mid x_n)^\top$</td>
+      <td>数据分布</td>
+      <td>用<strong>真实</strong>标签 $y_n$</td>
+      <td>半正定；但一般 $\neq$ Hessian</td>
+    </tr>
+    <tr>
+      <td><strong>Hessian</strong> $H$</td>
+      <td>$\nabla^2_\theta L$</td>
+      <td>数据分布</td>
+      <td>真实标签</td>
+      <td>可能不定（有负特征值）</td>
+    </tr>
+  </table>
+  <div class="warn"><strong>常见误解澄清：</strong>很多实现（包括一些"自然梯度"代码）实际用的是<strong>经验 Fisher</strong> $\tilde F$，因为它无需从模型采样、直接用真实标签即可。但 $\tilde F$ 只有在模型完美拟合数据（残差为 0）时才 $\approx F$。在训练早期两者差别很大，用错会显著影响效果。Kunstner 等人（2019）专门讨论了这个陷阱。</div>
+
+  <h3 id="ggn">5.2 广义 Gauss–Newton（GGN）与 Fisher 的等价</h3>
+  <p>设网络输出 $z=f_\theta(x)$，损失 $L=\ell(z,y)$。链式法则给出 Hessian 分解：</p>
+  $$ \nabla^2_\theta L = \underbrace{J_f^\top\,(\nabla^2_z\ell)\,J_f}_{\text{GGN 矩阵 }G} \;+\; \underbrace{\sum_k (\nabla_z\ell)_k\,\nabla^2_\theta f_k}_{\text{与网络二阶导有关，常被丢弃}}, $$
+  <p>其中 $J_f=\partial z/\partial\theta$ 是输出对参数的雅可比。丢掉第二项（在最优点附近或模型接近数据时它较小）得到 <strong>GGN 矩阵</strong> $G=J_f^\top(\nabla^2_z\ell)J_f\succeq0$（因 $\ell$ 关于 $z$ 通常是凸的，如交叉熵、平方误差）。</p>
+
+  <details class="deriv">
+    <summary>推导详解：Hessian 分解从何而来（复合函数二阶链式法则）</summary>
+    <div class="deriv-body">
+      <p>损失是复合 $L(\theta)=\ell\big(f(\theta),y\big)$，其中 $z=f(\theta)\in\mathbb{R}^m$ 是网络输出，$\ell:\mathbb{R}^m\to\mathbb{R}$ 是输出层损失。用<strong>分量下标</strong>推最清楚。</p>
+
+      <h4>记号</h4>
+      <ul>
+        <li>参数 $\theta\in\mathbb{R}^p$，分量 $\theta_a,\theta_b$；输出 $z\in\mathbb{R}^m$，分量 $z_k,z_l$。</li>
+        <li>雅可比 $(J_f)_{ka}=\dfrac{\partial z_k}{\partial\theta_a}\in\mathbb{R}^{m\times p}$。</li>
+        <li>输出层梯度 $(\nabla_z\ell)_k=\dfrac{\partial\ell}{\partial z_k}$；输出层 Hessian $(\nabla_z^2\ell)_{kl}=\dfrac{\partial^2\ell}{\partial z_k\partial z_l}$。</li>
+      </ul>
+
+      <h4>第 1 步 · 一阶导（普通链式法则）</h4>
+      <p>$L$ 通过 $z$ 依赖 $\theta$，对所有输出分量 $k$ 求和：</p>
+      $$ \frac{\partial L}{\partial\theta_a}=\sum_{k=1}^m\frac{\partial\ell}{\partial z_k}\frac{\partial z_k}{\partial\theta_a}=\sum_k(\nabla_z\ell)_k\,(J_f)_{ka}. $$
+
+      <h4>第 2 步 · 对 $\theta_b$ 再求一次导（乘积法则）</h4>
+      <p>被求导对象是求和的乘积 $\sum_k(\nabla_z\ell)_k\cdot(J_f)_{ka}$，对每项用乘积法则：</p>
+      $$ \frac{\partial^2 L}{\partial\theta_a\partial\theta_b}=\sum_k\Big[\underbrace{\tfrac{\partial}{\partial\theta_b}(\nabla_z\ell)_k\cdot(J_f)_{ka}}_{\text{(I)}}+\underbrace{(\nabla_z\ell)_k\cdot\tfrac{\partial}{\partial\theta_b}(J_f)_{ka}}_{\text{(II)}}\Big]. $$
+
+      <h4>第 3 步 · 处理 (I)（又一次链式法则）</h4>
+      <p>$(\nabla_z\ell)_k$ 也通过 $z$ 依赖 $\theta$，对 $\theta_b$ 求导需再链式，对分量 $l$ 求和：</p>
+      $$ \frac{\partial}{\partial\theta_b}(\nabla_z\ell)_k=\sum_l(\nabla_z^2\ell)_{kl}\,(J_f)_{lb}. $$
+      <p>代回并按矩阵乘法收拢（注意 $(J_f)_{ka}=(J_f^\top)_{ak}$）：</p>
+      $$ \text{(I)}=\sum_{k,l}(J_f)_{ka}(\nabla_z^2\ell)_{kl}(J_f)_{lb}=\big(J_f^\top\,\nabla_z^2\ell\,J_f\big)_{ab}. $$
+
+      <h4>第 4 步 · 处理 (II)</h4>
+      <p>$\dfrac{\partial}{\partial\theta_b}(J_f)_{ka}=\dfrac{\partial^2 z_k}{\partial\theta_a\partial\theta_b}=(\nabla_\theta^2 f_k)_{ab}$，即第 $k$ 个输出关于参数的 Hessian，于是</p>
+      $$ \text{(II)}=\sum_k(\nabla_z\ell)_k\,(\nabla_\theta^2 f_k)_{ab}. $$
+
+      <h4>合并 → 矩阵形式</h4>
+      $$ \nabla_\theta^2 L=\underbrace{J_f^\top(\nabla_z^2\ell)J_f}_{G\ (\text{GGN})}+\underbrace{\sum_{k}(\nabla_z\ell)_k\,\nabla_\theta^2 f_k}_{\text{残差}\times\text{网络二阶导}}. $$
+
+      <div class="key" style="margin-top:14px"><strong>为什么丢第二项：</strong>它含因子 $(\nabla_z\ell)_k$（输出残差）。当 (1) 模型拟合良好 $\nabla_z\ell\to0$，或 (2) 网络近似线性 $\nabla_\theta^2 f_k\approx0$ 时该项变小。剩下的 $G=J_f^\top(\nabla_z^2\ell)J_f$ 只要 $\ell$ 关于 $z$ 凸（$\nabla_z^2\ell\succeq0$）就<strong>恒半正定</strong>——而完整 Hessian 因第二项可能带负特征值。这正是二阶优化器偏爱 GGN/Fisher 的原因。</div>
+    </div>
+  </details>
+
+  <div class="key"><strong>核心结论：</strong>当损失是与<strong>指数族输出分布</strong>匹配的负对数似然（softmax+交叉熵、线性+平方误差等）时，
+  $$ G \;=\; F \quad(\text{GGN 矩阵} = \text{真 Fisher}). $$
+  因为此时 $\nabla^2_z\ell$ 恰好等于输出分布在 $z$ 处的 Fisher 信息。这就把"二阶优化用 Hessian"与"用 Fisher"两条线统一了：K-FAC 等方法既可从 GGN 推、也可从 Fisher 推。</div>
+
+  <figure>
+  <svg viewBox="0 0 860 260" width="860">
+    <defs><marker id="a5" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#6ea8fe"/></marker></defs>
+    <g font-size="14" fill="#e8ecf5" text-anchor="middle">
+      <rect x="40" y="100" width="150" height="60" rx="12" fill="#1e2440" stroke="#2a3150"/>
+      <text x="115" y="126">参数 θ</text><text x="115" y="146" font-size="11" fill="#9aa4c0">上亿维</text>
+      <rect x="280" y="100" width="150" height="60" rx="12" fill="#1e2440" stroke="#2a3150"/>
+      <text x="355" y="126">网络输出 z</text><text x="355" y="146" font-size="11" fill="#9aa4c0">logits</text>
+      <rect x="520" y="100" width="150" height="60" rx="12" fill="#1e2440" stroke="#2a3150"/>
+      <text x="595" y="126">分布 p(y|z)</text><text x="595" y="146" font-size="11" fill="#9aa4c0">softmax</text>
+      <rect x="720" y="100" width="110" height="60" rx="12" fill="#1e2440" stroke="#2a3150"/>
+      <text x="775" y="132">损失 ℓ</text>
+    </g>
+    <g stroke="#6ea8fe" stroke-width="2" marker-end="url(#a5)" fill="none">
+      <line x1="190" y1="130" x2="272" y2="130"/><line x1="430" y1="130" x2="512" y2="130"/><line x1="670" y1="130" x2="712" y2="130"/>
+    </g>
+    <text x="230" y="90" fill="#7ee0c0" font-size="12">Jᶠ</text>
+    <text x="470" y="90" fill="#7ee0c0" font-size="12">∇²ℓ = 输出 Fisher</text>
+    <text x="355" y="215" fill="#f78fb2" font-size="14">G = Jᶠᵀ (∇²_z ℓ) Jᶠ  =  F</text>
+    <text x="355" y="238" fill="#9aa4c0" font-size="12">把小的 z 空间的 Fisher，通过雅可比"拉回"到大的 θ 空间</text>
+  </svg>
+  <figcaption>图 4. GGN = Fisher 的机制：输出层的小 Fisher 经雅可比 $J_f$ 拉回参数空间。</figcaption>
+  </figure>
+</section>
+
+<!-- ============ 6 ============ -->
+<section id="natgrad">
+  <h2 class="sec"><span class="num">6</span>自然梯度与二阶优化器</h2>
+
+  <h3 id="nat">6.1 自然梯度下降（Natural Gradient Descent）</h3>
+  <p>普通梯度下降解的是"欧氏信赖域"里的最速下降：</p>
+  $$ \delta^\star=\arg\min_\delta\; \nabla L^\top\delta \;\;\text{s.t.}\;\; \tfrac12\|\delta\|_2^2\le\epsilon \;\Rightarrow\; \delta^\star\propto -\nabla L. $$
+  <p>自然梯度把约束换成<strong>KL 信赖域</strong>（即 §4.1 的分布距离）：</p>
+  $$ \delta^\star=\arg\min_\delta\; \nabla L^\top\delta \;\;\text{s.t.}\;\; \tfrac12\,\delta^\top F\,\delta\le\epsilon. $$
+  <p>用拉格朗日乘子求解，立即得到<strong>自然梯度</strong>方向：</p>
+  $$ \boxed{\;\tilde\nabla L = F^{-1}\nabla L,\qquad \theta\leftarrow\theta-\eta\,F^{-1}\nabla L.\;} $$
+  <div class="key"><strong>为什么强大：</strong>自然梯度对参数化<strong>不变</strong>——无论你用什么坐标表示网络，它给出的分布更新轨迹相同。它自动对"敏感方向"走小步、"迟钝方向"走大步，等价于在损失曲面上做了预条件，极大改善病态条件数。当损失=NLL 时，$F=G\approx H$，所以自然梯度 $\approx$ 阻尼牛顿法。</div>
+
+  <figure>
+  <svg viewBox="0 0 860 340" width="860">
+    <defs>
+      <marker id="gg" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#f78fb2"/></marker>
+      <marker id="nn" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#7ee0c0"/></marker>
+    </defs>
+    <!-- elongated contours (ill-conditioned) -->
+    <g fill="none" stroke="#37406b" stroke-width="1.5">
+      <ellipse cx="430" cy="180" rx="330" ry="70"/>
+      <ellipse cx="430" cy="180" rx="250" ry="52"/>
+      <ellipse cx="430" cy="180" rx="170" ry="35"/>
+      <ellipse cx="430" cy="180" rx="90" ry="18"/>
+    </g>
+    <circle cx="430" cy="180" r="5" fill="#e8ecf5"/><text x="440" y="176" fill="#e8ecf5" font-size="12">最优 θ*</text>
+    <!-- start point -->
+    <circle cx="120" cy="120" r="5" fill="#ffd166"/><text x="80" y="110" fill="#ffd166" font-size="12">起点</text>
+    <!-- gradient descent zig-zag -->
+    <polyline points="120,120 200,220 270,120 330,220 380,150" fill="none" stroke="#f78fb2" stroke-width="2.5" marker-end="url(#gg)"/>
+    <text x="150" y="255" fill="#f78fb2" font-size="13">梯度下降：垂直窄轴方向震荡</text>
+    <!-- natural gradient straight -->
+    <line x1="120" y1="120" x2="425" y2="178" stroke="#7ee0c0" stroke-width="2.5" marker-end="url(#nn)"/>
+    <text x="150" y="95" fill="#7ee0c0" font-size="13">自然梯度：F⁻¹拉直坐标，直奔最优</text>
+  </svg>
+  <figcaption>图 5. 病态（狭长）损失谷中，普通梯度来回震荡；自然梯度用 $F^{-1}$ 把等高线"圆化"后近乎直线收敛。</figcaption>
+  </figure>
+
+  <h3 id="kfac">6.2 实用二阶优化器：K-FAC / Shampoo</h3>
+  <p>难点：$F$ 是 $d\times d$，$d$ 上亿，无法存储更无法求逆。工程上全靠<strong>结构化近似</strong>。</p>
+  <div class="grid2">
+    <div class="card">
+      <h4>K-FAC（Kronecker-Factored Approximate Curvature）</h4>
+      <p>对每一层全连接 $z=Wa$，该层参数梯度是 $\mathrm{vec}$ 形式的外积 $g=\delta a^\top$（$a$ 为输入激活，$\delta$ 为输出误差）。其 Fisher 块</p>
+      $$ F_\ell=\mathbb{E}[gg^\top]=\mathbb{E}[(a a^\top)\otimes(\delta\delta^\top)]\approx \underbrace{\mathbb{E}[aa^\top]}_{A}\otimes\underbrace{\mathbb{E}[\delta\delta^\top]}_{B}. $$
+      <p>约等号来自"积的期望≈期望的积"，其成立条件是假定激活 $a$ 与误差 $\delta$ 统计独立（详见下方推导框）。由 $(A\otimes B)^{-1}=A^{-1}\otimes B^{-1}$，求逆只需分别对两个<strong>小矩阵</strong>求逆，成本从 $O(d^3)$ 降到可接受。</p>
+    </div>
+    <div class="card">
+      <h4>相关方法谱系</h4>
+      <ul>
+        <li><strong>对角近似</strong>：只保留 $F$ 的对角（如 Adagrad/RMSProp/Adam 的思想雏形）。</li>
+        <li><strong>K-FAC</strong>：块对角 + 每块 Kronecker 分解，捕捉层内相关。</li>
+        <li><strong>Shampoo</strong>：对每个权重张量的各"模式"分别预条件，与 K-FAC 精神相通，近年在大模型上（如 SOAP、Muon 的思想源流）很活跃。</li>
+        <li><strong>EKFAC / TNT / TRACE</strong>：在特征基上加特征值缩放，提高近似精度。</li>
+      </ul>
+    </div>
+  </div>
+
+  <details class="deriv">
+    <summary>推导详解：那个约等号（$\approx$）为什么成立？——K-FAC 的核心假设</summary>
+    <div class="deriv-body">
+      <p>约等号前的两步其实是<strong>精确</strong>的，只有最后一步是近似。分清"哪步精确、哪步近似"是理解 K-FAC 的关键。</p>
+
+      <h4>第 1 步（精确）· 梯度写成 Kronecker 积</h4>
+      <p>层运算 $z=Wa$，$a\in\mathbb{R}^{n_{\text{in}}}$ 为输入激活，$\delta=\partial L/\partial z\in\mathbb{R}^{n_{\text{out}}}$ 为输出侧误差。由反向传播，权重梯度是外积 $\nabla_W L=\delta a^\top$。用 vec 恒等式 $\mathrm{vec}(\delta a^\top)=a\otimes\delta$，把梯度拉直成向量：</p>
+      $$ g:=\mathrm{vec}(\nabla_W L)=a\otimes\delta. $$
+
+      <h4>第 2 步（精确）· Fisher 块是 Kronecker 积的期望</h4>
+      <p>用混合积性质 $(a\otimes\delta)(a\otimes\delta)^\top=(aa^\top)\otimes(\delta\delta^\top)$：</p>
+      $$ F_\ell=\mathbb{E}\big[gg^\top\big]=\mathbb{E}\big[(aa^\top)\otimes(\delta\delta^\top)\big]. $$
+      <p>到这里都还是<strong>等号</strong>，没有任何近似。</p>
+
+      <h4>第 3 步（近似）· 把"积的期望"换成"期望的积"</h4>
+      <p>逐元素看，左边的 $(i,j,k,l)$ 元素是<strong>四阶矩</strong> $\mathbb{E}[a_i a_j\,\delta_k\delta_l]$，而想要的右边是二阶矩之积 $\mathbb{E}[a_i a_j]\,\mathbb{E}[\delta_k\delta_l]$。约等号成立当且仅当</p>
+      $$ \mathbb{E}[a_i a_j\,\delta_k\delta_l]\;\approx\;\mathbb{E}[a_i a_j]\;\mathbb{E}[\delta_k\delta_l], $$
+      <p>即<strong>激活的二阶统计量 $aa^\top$ 与误差的二阶统计量 $\delta\delta^\top$ 不相关（可因子分解）</strong>。这一步<strong>不是恒等式</strong>，它依赖一个建模假设。</p>
+
+      <div class="key" style="margin-top:12px"><strong>K-FAC 的核心假设（IAD）：</strong>假定同一层的输入激活 $a$ 与反向误差 $\delta$ <strong>统计独立</strong>（Independence of Activations and Derivatives）。若 $a\perp\delta$，则 $\mathbb{E}[(aa^\top)\otimes(\delta\delta^\top)]=\mathbb{E}[aa^\top]\otimes\mathbb{E}[\delta\delta^\top]$ 变成<strong>严格等号</strong>。于是记 $A=\mathbb{E}[aa^\top]$、$B=\mathbb{E}[\delta\delta^\top]$，得 $F_\ell\approx A\otimes B$。</div>
+
+      <h4>为什么这个近似"划算"</h4>
+      <p>$A$ 是 $n_{\text{in}}\times n_{\text{in}}$、$B$ 是 $n_{\text{out}}\times n_{\text{out}}$，都远小于 $F_\ell$（$n_{\text{in}}n_{\text{out}}\times n_{\text{in}}n_{\text{out}}$）。由 Kronecker 逆性质</p>
+      $$ (A\otimes B)^{-1}=A^{-1}\otimes B^{-1}, $$
+      <p>只需对两个<strong>小矩阵</strong>各求一次逆，自然梯度更新 $F_\ell^{-1}g$ 也能借 $\mathrm{vec}$ 恒等式化为 $B^{-1}(\nabla_W L)A^{-1}$ 两次小矩阵乘法，成本从 $O\!\big((n_{\text{in}}n_{\text{out}})^3\big)$ 骤降到 $O(n_{\text{in}}^3+n_{\text{out}}^3)$。</p>
+
+      <div class="warn" style="margin-top:12px"><strong>严谨性提示：</strong>$a\perp\delta$ 一般<strong>并不严格成立</strong>（同一次前向/反向里两者显然相关）。它是一个为了可计算性而做的近似假设；实践中 K-FAC 效果好，说明该近似在训练中足够有用，但它是"工程近似"而非数学定理。EKFAC 等改进正是为了修正这一步引入的误差。</div>
+    </div>
+  </details>
+
+  <h3 id="adam">6.3 从 Fisher 看 Adam：一个统一视角</h3>
+  <p>Adam 的更新 $\theta\leftarrow\theta-\eta\,\hat m/(\sqrt{\hat v}+\epsilon)$ 中，$\hat v$ 是梯度平方的滑动平均，即 $\mathrm{diag}(\mathbb{E}[g\odot g])$。注意 $\mathbb{E}[gg^\top]$ 恰是（经验）Fisher！所以：</p>
+  $$ \text{Adam 预条件}\;\approx\;\big(\mathrm{diag}(\tilde F)\big)^{-1/2}. $$
+  <div class="note">因此 Adam 可看作"<strong>对角经验 Fisher 的平方根</strong>预条件"。这解释了它的两大特性：(1) 半正定、稳定；(2) 用 $\tilde F$（真实标签）而非真 Fisher，且取 $-1/2$ 次幂而非 $-1$ 次幂（更保守）。理解 FIM 后，Adam、RMSProp、自然梯度、K-FAC 就落在同一张"预条件矩阵近似谱"上，只是<strong>用哪种 Fisher、保留多少结构、取几次幂</strong>不同。</div>
+
+  <table>
+    <tr><th>优化器</th><th>预条件矩阵</th><th>结构</th><th>幂次</th></tr>
+    <tr><td>SGD</td><td>$I$（单位阵）</td><td>无</td><td>—</td></tr>
+    <tr><td>Adam/RMSProp</td><td>$\mathrm{diag}(\tilde F)$</td><td>对角</td><td>$-1/2$</td></tr>
+    <tr><td>自然梯度</td><td>$F$（真 Fisher）</td><td>稠密</td><td>$-1$</td></tr>
+    <tr><td>K-FAC</td><td>$A\otimes B$</td><td>块 + Kronecker</td><td>$-1$</td></tr>
+    <tr><td>（阻尼）牛顿</td><td>$H+\lambda I$</td><td>稠密</td><td>$-1$</td></tr>
+  </table>
+</section>
+
+<!-- ============ 7 ============ -->
+<section id="ln">
+  <h2 class="sec"><span class="num">7</span>Layer Normalization 的数学原理</h2>
+  <p>目标：从数学上说清 LN 做了什么、反向梯度长什么样，以及它与 Fisher / 自然梯度"改善曲率"的深层联系。</p>
+
+  <h3 id="ln-def">7.1 定义与前向传播</h3>
+  <p>给定某一层某个样本的输入向量 $x\in\mathbb{R}^H$（$H$ 为特征/隐藏维度），LayerNorm 在<strong>特征维</strong>上做标准化（与 BatchNorm 在批维不同）：</p>
+  $$ \mu=\frac1H\sum_{i=1}^H x_i,\qquad \sigma^2=\frac1H\sum_{i=1}^H (x_i-\mu)^2, $$
+  $$ \hat x_i=\frac{x_i-\mu}{\sqrt{\sigma^2+\epsilon}},\qquad y_i=\gamma_i\,\hat x_i+\beta_i. $$
+  <p>其中 $\gamma,\beta\in\mathbb{R}^H$ 是可学习的缩放与平移。核心操作是把输入向量投影到"<strong>零均值、单位方差</strong>"的球面上，再仿射变换。</p>
+  <figure>
+  <svg viewBox="0 0 820 250" width="820">
+    <g font-size="13" fill="#e8ecf5" text-anchor="middle">
+      <rect x="30" y="90" width="120" height="60" rx="10" fill="#1e2440" stroke="#2a3150"/><text x="90" y="118">输入 x</text><text x="90" y="138" font-size="11" fill="#9aa4c0">分布任意</text>
+      <rect x="210" y="90" width="140" height="60" rx="10" fill="#1e2440" stroke="#2a3150"/><text x="280" y="114">减均值 μ</text><text x="280" y="134" font-size="11" fill="#9aa4c0">中心化</text>
+      <rect x="410" y="90" width="150" height="60" rx="10" fill="#1e2440" stroke="#2a3150"/><text x="485" y="114">除标准差 σ</text><text x="485" y="134" font-size="11" fill="#9aa4c0">尺度归一 x̂</text>
+      <rect x="620" y="90" width="170" height="60" rx="10" fill="#26325c" stroke="#6ea8fe"/><text x="705" y="114">仿射 γx̂+β</text><text x="705" y="134" font-size="11" fill="#9aa4c0">恢复表达力</text>
+    </g>
+    <g stroke="#6ea8fe" stroke-width="2" fill="none" marker-end="url(#a5)">
+      <line x1="150" y1="120" x2="205" y2="120"/><line x1="350" y1="120" x2="405" y2="120"/><line x1="560" y1="120" x2="615" y2="120"/>
+    </g>
+    <text x="410" y="50" fill="#7ee0c0" font-size="13">几何：投影到 {Σxᵢ=0} 超平面 ∩ 半径√H 的球面</text>
+  </svg>
+  <figcaption>图 6. LN 前向：中心化 → 尺度归一 → 仿射。前两步把激活约束到一个球面上。</figcaption>
+  </figure>
+
+  <h3 id="ln-grad">7.2 反向传播：雅可比结构</h3>
+  <p>LN 的精髓在其<strong>反向雅可比</strong>。记归一化算子 $\hat x=N(x)$，可推出（略去 $\gamma$，令 $s=\sqrt{\sigma^2+\epsilon}$）：</p>
+  $$ \frac{\partial \hat x_i}{\partial x_j}=\frac{1}{s}\Big(\delta_{ij}-\underbrace{\frac1H}_{\text{减均值}}-\underbrace{\frac1H\,\hat x_i\hat x_j}_{\text{除方差}}\Big). $$
+  <p>写成矩阵形式，设 $\mathbf 1$ 为全一向量，则雅可比</p>
+  $$ J_N=\frac{\partial\hat x}{\partial x}=\frac1s\Big(I-\tfrac1H\mathbf 1\mathbf 1^\top-\tfrac1H\hat x\hat x^\top\Big). $$
+  <p>因此对上游梯度 $g$，回传梯度为</p>
+  $$ \frac{\partial L}{\partial x}=\frac{\gamma}{s}\Big(g-\underbrace{\overline{g}\,\mathbf 1}_{\text{去均值}}-\underbrace{\hat x\,(\overline{g\odot\hat x})}_{\text{去与}\hat x\text{相关分量}}\Big),\quad \overline{g}=\tfrac1H\textstyle\sum_i g_i. $$
+  <div class="key"><strong>两个投影的几何意义：</strong>雅可比 $J_N$ 里的两项 $\tfrac1H\mathbf 1\mathbf 1^\top$ 和 $\tfrac1H\hat x\hat x^\top$ 是两个<strong>正交投影</strong>，分别把梯度中"沿 $\mathbf 1$（整体平移）"和"沿 $\hat x$（整体缩放）"的分量<strong>投影掉</strong>。也就是说，LN 让损失对输入的<strong>整体平移和整体缩放不敏感</strong>——这正是它稳定训练的数学根源。除以 $s$ 则自动把梯度尺度归一，缓解梯度爆炸/消失。</div>
+
+  <h3 id="ln-fisher">7.3 与 Fisher / 自然梯度的联系</h3>
+  <p>这是本报告把两个主题串起来的关键。有多条线索表明 LN 本质上在做<strong>廉价的曲率预条件</strong>：</p>
+  <ol>
+    <li><strong>白化视角。</strong>标准化 $\hat x=(x-\mu)/\sigma$ 是对激活的一阶+二阶矩归一，等价于用激活的（对角/各向同性）二阶统计量做<strong>白化</strong>。回忆 K-FAC 中层 Fisher 因子 $A=\mathbb{E}[aa^\top]$ 正是激活的二阶矩——归一化激活相当于把 $A$ 部分地"变白"，从而 $F\approx A\otimes B$ 的条件数下降。LN 因此可看作一种<strong>隐式、逐样本的 Fisher 预条件</strong>，但代价极低（无需求逆）。</li>
+    <li><strong>去除退化方向。</strong>§7.2 说 LN 的雅可比投影掉了 $\mathbf 1$ 与 $\hat x$ 方向。这两个方向恰是损失曲面上"病态/退化"的曲率方向（整体平移、整体缩放不改变归一化输出）。移除它们等于消掉了 Hessian/Fisher 里若干接近零或极大的特征值，<strong>压缩了条件数</strong>，效果与自然梯度"拉直等高线"同向。</li>
+    <li><strong>尺度不变性 → 隐式学习率自适应。</strong>由于 $y$ 对 $x$ 的整体缩放不变，权重 $W$ 的整体范数不再影响输出，梯度对 $W$ 的<strong>径向分量</strong>被消去。这与在权重范数方向上做归一化（如 WeightNorm）、乃至自然梯度对不同方向自适应步长的效果一致——都在"抹平"参数化带来的虚假曲率。</li>
+  </ol>
+  <figure>
+  <svg viewBox="0 0 860 300" width="860">
+    <defs><marker id="a6" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#7ee0c0"/></marker></defs>
+    <!-- before: elongated -->
+    <g fill="none" stroke="#f78fb2" stroke-width="1.8">
+      <ellipse cx="200" cy="150" rx="150" ry="30" transform="rotate(-25 200 150)"/>
+      <ellipse cx="200" cy="150" rx="100" ry="20" transform="rotate(-25 200 150)"/>
+      <ellipse cx="200" cy="150" rx="50" ry="10" transform="rotate(-25 200 150)"/>
+    </g>
+    <text x="200" y="250" fill="#f78fb2" font-size="13" text-anchor="middle">LN 前：病态、狭长</text>
+    <text x="200" y="270" fill="#9aa4c0" font-size="11" text-anchor="middle">条件数大，梯度震荡</text>
+    <!-- arrow -->
+    <line x1="380" y1="150" x2="470" y2="150" stroke="#7ee0c0" stroke-width="2.5" marker-end="url(#a6)"/>
+    <text x="425" y="138" fill="#7ee0c0" font-size="12" text-anchor="middle">LN / 白化</text>
+    <!-- after: round -->
+    <g fill="none" stroke="#7ee0c0" stroke-width="1.8">
+      <circle cx="650" cy="150" r="90"/><circle cx="650" cy="150" r="60"/><circle cx="650" cy="150" r="30"/>
+    </g>
+    <text x="650" y="270" fill="#7ee0c0" font-size="13" text-anchor="middle">LN 后：近各向同性</text>
+    <text x="650" y="252" fill="#9aa4c0" font-size="11" text-anchor="middle">条件数小，收敛快</text>
+  </svg>
+  <figcaption>图 7. LN 与自然梯度的共同目标：把病态（狭长、高条件数）的损失等高线"圆化"，只是 LN 用廉价的激活归一化近似实现，而自然梯度用 $F^{-1}$ 精确实现。</figcaption>
+  </figure>
+  <div class="warn"><strong>严谨性提示：</strong>"LN = Fisher 预条件"是一种富有启发性的<strong>类比/近似解释</strong>，帮助建立直觉，而非严格恒等。学术上更精确的说法见 Santurkar 等（2018，"How Does Batch Norm Help Optimization?"，指出其平滑了损失曲面/Lipschitz 常数）与 Xu 等（2019，LN 反向的均值/方差再中心化分析）。建议把它当作"同一大方向下的不同实现"来理解。</div>
+</section>
+
+<!-- ============ 8 ============ -->
+<section id="summary">
+  <h2 class="sec"><span class="num">8</span>总结与学习路线</h2>
+  <div class="card">
+    <h4>一句话总结每节</h4>
+    <ol>
+      <li>Fisher 信息 = 得分方差 = 负对数似然曲率（两式等价）。</li>
+      <li>多参数下它是得分向量的协方差矩阵，对称半正定、可加、协变。</li>
+      <li>统计上它是估计精度的上界（Cramér–Rao）与 MLE 渐近协方差之逆。</li>
+      <li>几何上它是分布流形的黎曼度量：$D_{\mathrm{KL}}\approx\frac12\delta^\top I\delta$。</li>
+      <li>优化上它 $\approx$ 期望 Hessian（且半正定）；GGN=Fisher；注意真/经验 Fisher 之别。</li>
+      <li>自然梯度 $F^{-1}\nabla L$ 是 KL 信赖域下的最速下降；K-FAC/Adam 是其可行近似。</li>
+      <li>LayerNorm 通过激活白化 + 投影掉退化方向，实现廉价的隐式曲率改善。</li>
+    </ol>
+  </div>
+  <div class="grid2">
+    <div class="note">
+      <h4>推荐学习顺序（面向你的目标）</h4>
+      <ol>
+        <li>吃透 §1–§4（尤其 §4.1 的 KL≈½δᵀIδ）。</li>
+        <li>读 §5 弄清 Fisher/GGN/Hessian 三者关系——这是二阶优化论文的通用语言。</li>
+        <li>精读 Amari 自然梯度 + Martens & Grosse 的 K-FAC 论文。</li>
+        <li>用 §6.3 的表把 Adam 重新理解一遍，代码上验证 $\hat v\approx\mathrm{diag}(\tilde F)$。</li>
+        <li>回到 §7，结合 LN 源码手推一遍反向雅可比 $J_N$。</li>
+      </ol>
+    </div>
+    <div class="key">
+      <h4>动手验证建议</h4>
+      <ul>
+        <li>小网络上数值计算 $F$、$\tilde F$、$H$，对比谱（特征值分布）。</li>
+        <li>实现对角自然梯度，观察在病态问题上对 SGD 的加速。</li>
+        <li>对同一层加/不加 LN，打印梯度范数与损失 Hessian 的条件数变化。</li>
+        <li>用 <code>torch.autograd.functional.jacobian</code> 验证 §7.2 的 $J_N$ 公式。</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="refs">
+  <h2 class="sec"><span class="num">★</span>参考文献与延伸阅读</h2>
+  <ul>
+    <li>Fisher, R.A. (1922). <em>On the mathematical foundations of theoretical statistics.</em> —— 概念起源。</li>
+    <li>Rao, C.R. (1945). <em>Information and accuracy attainable in the estimation of statistical parameters.</em> —— Cramér–Rao 下界。</li>
+    <li>Amari, S. (1998). <em>Natural Gradient Works Efficiently in Learning.</em> Neural Computation. —— 自然梯度奠基。</li>
+    <li>Amari, S. (2016). <em>Information Geometry and Its Applications.</em> —— 信息几何系统教材。</li>
+    <li>Martens, J. (2020). <em>New Insights and Perspectives on the Natural Gradient Method.</em> JMLR. —— Fisher/GGN/自然梯度权威综述，强烈推荐。</li>
+    <li>Martens, J. &amp; Grosse, R. (2015). <em>Optimizing Neural Networks with Kronecker-factored Approximate Curvature (K-FAC).</em> ICML.</li>
+    <li>Kunstner, F. et al. (2019). <em>Limitations of the Empirical Fisher Approximation.</em> NeurIPS. —— 真/经验 Fisher 之别。</li>
+    <li>Ba, J., Kiros, J.R., Hinton, G. (2016). <em>Layer Normalization.</em> —— LN 原始论文。</li>
+    <li>Santurkar, S. et al. (2018). <em>How Does Batch Normalization Help Optimization?</em> NeurIPS. —— 归一化平滑损失曲面的分析。</li>
+    <li>Xu, J. et al. (2019). <em>Understanding and Improving Layer Normalization.</em> NeurIPS. —— LN 反向梯度的均值/方差机制分析。</li>
+    <li>Gupta, V. et al. (2018). <em>Shampoo: Preconditioned Stochastic Tensor Optimization.</em> ICML.</li>
+  </ul>
+  <div class="foot">
+    本报告为学习调研用途，图示均为帮助理解的示意图（非精确数值绘制）。公式已尽力核对；如需严格证明细节，请回溯上述原始文献。<br>
+    生成于本地文件 <code>study-fisher.html</code> · 使用 MathJax 3 渲染公式 · 建议用现代浏览器打开。
+  </div>
+</section>
+
+</main>
+</div>
+</body>
+</html>
