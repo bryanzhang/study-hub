@@ -1,0 +1,1359 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Transformers are RNNs：线性注意力系统调研</title>
+<script>
+  MathJax = {
+    tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$','$$'],['\\[','\\]']], tags: 'ams' },
+    svg: { fontCache: 'global' }
+  };
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js" id="MathJax-script" async></script>
+<style>
+  :root{
+    --bg:#0f1220; --panel:#171b2e; --panel2:#1e2440; --ink:#e8ecf5; --muted:#9aa4c0;
+    --accent:#6ea8fe; --accent2:#7ee0c0; --warn:#ffd166; --pink:#f78fb2; --line:#2a3150;
+    --code:#0b0e1a;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0; background:linear-gradient(180deg,#0c0f1c,#0f1220 40%); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    line-height:1.75; font-size:16px;
+  }
+  a{color:var(--accent); text-decoration:none}
+  a:hover{text-decoration:underline}
+  .layout{display:flex; max-width:1500px; margin:0 auto}
+  nav.toc{
+    position:sticky; top:0; align-self:flex-start; height:100vh; overflow-y:auto;
+    width:300px; flex:0 0 300px; padding:26px 18px; border-right:1px solid var(--line);
+    background:rgba(12,15,28,.6); backdrop-filter:blur(6px);
+  }
+  nav.toc h2{font-size:14px; letter-spacing:.12em; color:var(--muted); text-transform:uppercase; margin:18px 0 8px}
+  nav.toc a{display:block; color:var(--muted); padding:4px 10px; border-radius:8px; font-size:14px}
+  nav.toc a:hover{background:var(--panel2); color:var(--ink); text-decoration:none}
+  nav.toc a.sub{padding-left:24px; font-size:13px; opacity:.85}
+  .brand{font-weight:800; font-size:18px; background:linear-gradient(90deg,var(--accent),var(--accent2)); -webkit-background-clip:text; background-clip:text; color:transparent}
+  main{flex:1; min-width:0; padding:40px 54px 120px}
+  header.hero{
+    padding:46px 40px; border-radius:22px; margin-bottom:40px;
+    background:radial-gradient(1200px 400px at 10% -10%,rgba(110,168,254,.25),transparent),
+               radial-gradient(900px 400px at 90% 10%,rgba(126,224,192,.18),transparent),
+               var(--panel);
+    border:1px solid var(--line);
+  }
+  header.hero h1{margin:0 0 12px; font-size:34px; line-height:1.2}
+  header.hero p{margin:6px 0; color:var(--muted); max-width:76ch}
+  .meta{margin-top:20px; font-size:13px; color:var(--muted); border-top:1px dashed var(--line); padding-top:14px; display:flex; flex-wrap:wrap; gap:10px 22px}
+  .meta b{color:var(--accent2); font-weight:600}
+  .tags{margin-top:18px; display:flex; gap:8px; flex-wrap:wrap}
+  .tag{font-size:12px; padding:5px 12px; border-radius:999px; background:var(--panel2); border:1px solid var(--line); color:var(--accent2)}
+  section{margin:0 0 54px; scroll-margin-top:20px}
+  h2.sec{font-size:26px; margin:0 0 6px; padding-bottom:10px; border-bottom:2px solid var(--line); display:flex; align-items:center; gap:12px}
+  h2.sec .num{font-size:15px; color:#0b0e1a; background:linear-gradient(90deg,var(--accent),var(--accent2)); border-radius:8px; padding:3px 10px; font-weight:800}
+  h3{font-size:20px; margin:30px 0 8px; color:#dfe6f7}
+  h4{font-size:17px; margin:22px 0 6px; color:var(--accent2)}
+  p{margin:12px 0}
+  ul,ol{margin:12px 0; padding-left:26px}
+  li{margin:6px 0}
+  .lead{color:var(--muted)}
+  code{background:var(--code); padding:2px 6px; border-radius:6px; font-family:"SF Mono",Consolas,Menlo,monospace; font-size:.9em; color:#c7d2fe}
+  pre{background:var(--code); border:1px solid var(--line); border-radius:12px; padding:16px 18px; overflow:auto; font-family:"SF Mono",Consolas,Menlo,monospace; font-size:13.5px; line-height:1.6}
+  pre code{background:none; padding:0; color:#d7dcf0}
+  .card{background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:22px 26px; margin:20px 0}
+  .note{border-left:4px solid var(--accent); background:var(--panel2); padding:14px 18px; border-radius:0 12px 12px 0; margin:18px 0}
+  .warn{border-left:4px solid var(--warn); background:rgba(255,209,102,.08); padding:14px 18px; border-radius:0 12px 12px 0; margin:18px 0}
+  .key{border-left:4px solid var(--accent2); background:rgba(126,224,192,.08); padding:14px 18px; border-radius:0 12px 12px 0; margin:18px 0}
+  .bad{border-left:4px solid var(--pink); background:rgba(247,143,178,.08); padding:14px 18px; border-radius:0 12px 12px 0; margin:18px 0}
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:20px}
+  .grid3{display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px}
+  @media(max-width:1100px){.grid2,.grid3{grid-template-columns:1fr} nav.toc{display:none} main{padding:24px}}
+  figure{margin:26px 0; text-align:center}
+  figure svg{max-width:100%; height:auto; background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:10px}
+  figcaption{color:var(--muted); font-size:13.5px; margin-top:10px}
+  table{border-collapse:collapse; width:100%; margin:18px 0; font-size:14.5px}
+  th,td{border:1px solid var(--line); padding:10px 12px; text-align:left; vertical-align:top}
+  th{background:var(--panel2); color:var(--accent2)}
+  tr:nth-child(even) td{background:rgba(255,255,255,.02)}
+  .pill{display:inline-block; font-size:12px; padding:2px 8px; border-radius:6px; background:var(--panel2); color:var(--accent); margin-right:6px}
+  .mjx-container{overflow-x:auto; overflow-y:hidden; max-width:100%}
+  .foot{color:var(--muted); font-size:13px; border-top:1px solid var(--line); padding-top:20px; margin-top:40px}
+  svg text{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif}
+  details.deriv{margin:18px 0; border:1px solid var(--line); border-radius:14px; background:var(--panel); overflow:hidden}
+  details.deriv>summary{cursor:pointer; list-style:none; padding:14px 20px; font-weight:700; color:var(--accent2); background:var(--panel2); user-select:none}
+  details.deriv>summary::-webkit-details-marker{display:none}
+  details.deriv>summary::before{content:"▶"; display:inline-block; margin-right:10px; font-size:11px; color:var(--accent); transition:transform .2s}
+  details.deriv[open]>summary::before{transform:rotate(90deg)}
+  details.deriv .body{padding:8px 22px 18px}
+</style>
+</head>
+<body>
+<div class="layout">
+
+<nav class="toc">
+  <div class="brand">Transformers are RNNs</div>
+  <h2>目录</h2>
+  <a href="#intro">0 · 一页纸速览</a>
+  <a href="#problem">1 · 问题：二次复杂度与自回归解码</a>
+  <a href="#kernel">2 · 第一步：注意力其实是核方法</a>
+  <a href="#assoc">3 · 第二步：结合律 → O(N)</a>
+  <a href="#phi">4 · 特征映射 φ 怎么选</a>
+  <a href="#rnn">5 · 第三步：因果掩码 → 前缀和 → RNN</a>
+  <a href="#grad">6 · 常数内存的反向传播</a>
+  <a href="#duality">7 · 训练并行 / 推理常数</a>
+  <a href="#exp">8 · 论文实验结果</a>
+  <a href="#whyrnn">9 · 为什么它"是" RNN</a>
+  <a href="#limits">10 · 局限：忘不掉、记不下、找不回</a>
+  <a href="#forms">11 · 三种计算形式</a>
+  <a href="#lineage">12 · 后续演进族谱 2021–2026</a>
+  <a href="#theory">13 · 表达能力的理论边界</a>
+  <a href="#code">14 · 亲手实现与等价性验证</a>
+  <a href="#faq">15 · 常见误解 FAQ</a>
+  <a href="#refs">16 · 学习路径与参考文献</a>
+</nav>
+
+<main>
+
+<header class="hero">
+  <h1>Transformers are RNNs<br><span style="font-size:20px;color:var(--muted);font-weight:500">线性注意力：从核方法到 2026 年的混合架构</span></h1>
+  <p>本报告精读 Katharopoulos, Vyas, Pappas, Fleuret 的 ICML 2020 论文 <em>Transformers are RNNs: Fast Autoregressive Transformers with Linear Attention</em>（arXiv:2006.16236），把它的三步推导拆到最细，然后沿着这条线索一路梳理到 2026 年的 Gated DeltaNet / Kimi Linear / Mamba-3。</p>
+  <p class="lead">预备知识：矩阵乘法与结合律、softmax 注意力机制、RNN 的基本形式。公式由 MathJax 渲染。建议顺序读 1→7 打地基，8→13 是理解"为什么这条路走了六年还没走完"的关键，14 节有可直接运行的代码。</p>
+  <div class="tags">
+    <span class="tag">线性注意力</span><span class="tag">核方法</span><span class="tag">矩阵结合律</span>
+    <span class="tag">因果掩码</span><span class="tag">前缀和</span><span class="tag">Fast Weight</span>
+    <span class="tag">DeltaNet</span><span class="tag">Mamba</span><span class="tag">混合架构</span>
+  </div>
+  <div class="meta">
+    <span><b>首次生成日期：</b>2026-08-08</span>
+    <span><b>最后更新日期：</b>2026-08-08</span>
+    <span><b>模型：</b>Claude Opus 5</span>
+    <span><b>模式：</b>xhigh</span>
+  </div>
+</header>
+
+<!-- ============ 0 ============ -->
+<section id="intro">
+  <h2 class="sec"><span class="num">0</span>一页纸速览</h2>
+
+  <div class="key">
+    <p style="margin-top:0"><strong>论文的全部内容可以压缩成一行代数恒等式：</strong></p>
+    $$\underbrace{\left(\phi(Q)\,\phi(K)^{\!\top}\right)V}_{\text{先算 }N\times N\text{ 的注意力矩阵}} \;=\; \underbrace{\phi(Q)\left(\phi(K)^{\!\top}V\right)}_{\text{先算 }C\times M\text{ 的小矩阵}}$$
+    <p style="margin-bottom:0">左边是 $\mathcal{O}(N^2)$，右边是 $\mathcal{O}(N)$。这是矩阵乘法的<strong>结合律</strong>，不是近似，不是采样，不是稀疏化。唯一的代价是：为了能把 $Q,K$ 分离出来，必须先把 softmax 里那个不可分解的 $\exp(q^\top k)$ 换成一个<strong>可分解的核</strong> $\phi(q)^\top\phi(k)$。</p>
+  </div>
+
+  <p>然后是第二个观察：把上式加上<strong>因果掩码</strong>（第 $i$ 个位置只能看到 $j\le i$），求和上界从 $N$ 变成 $i$，于是 $\sum_{j=1}^{i}\phi(K_j)V_j^\top$ 变成一个<strong>前缀和</strong>。前缀和天然可以增量维护：</p>
+  $$S_i = S_{i-1} + \phi(K_i)V_i^\top$$
+  <p>——这就是一个隐状态为<strong>矩阵</strong>的 RNN。于是标题成立：加了因果掩码的线性 Transformer <em>就是</em> 一个 RNN。推理时每步 $\mathcal{O}(1)$ 时间、$\mathcal{O}(1)$ 内存，不需要 KV cache。论文实测自回归生成最高快 <strong>4000×</strong>。</p>
+
+  <div class="grid3">
+    <div class="card">
+      <h4>① 它解决了什么</h4>
+      <p style="margin-bottom:0">长序列训练的 $N^2$ 显存/算力墙，以及自回归解码时 KV cache 随长度线性增长、每步代价随长度线性增长的问题。</p>
+    </div>
+    <div class="card">
+      <h4>② 它没解决什么</h4>
+      <p style="margin-bottom:0">固定大小的状态 $S\in\mathbb{R}^{D\times M}$ 装不下任意长的历史。加法式写入永远不遗忘，注意力被稀释。<strong>检索/复制类任务显著弱于 softmax</strong>。</p>
+    </div>
+    <div class="card">
+      <h4>③ 它启动了什么</h4>
+      <p style="margin-bottom:0">整条"线性 RNN"研究线：加衰减（RetNet/Mamba-2）、加门控（GLA/RWKV）、加 delta 规则（DeltaNet）、加两者（Gated DeltaNet），最终落到 2025–2026 的<strong>混合架构</strong>。</p>
+    </div>
+  </div>
+
+  <div class="warn">
+    <strong>先说结论，避免误解：</strong>这篇论文<em>不是</em>说"softmax Transformer 等价于 RNN"。它说的是"<strong>如果</strong>你把 softmax 换成可分解核，<strong>那么</strong>因果 Transformer 就是 RNN"。softmax 本身对应的特征映射是无穷维的，无法精确线性化。后来 Mongaras &amp; Larson (TMLR 2025) 证明：<strong>线性注意力恰好是 softmax 注意力泰勒展开的一阶截断</strong>——这才是两者表达力差距的代数根源。详见第 13 节。
+  </div>
+</section>
+
+<!-- ============ 1 ============ -->
+<section id="problem">
+  <h2 class="sec"><span class="num">1</span>问题：二次复杂度与自回归解码</h2>
+
+  <h3>1.1 记号约定</h3>
+  <p>沿用原论文记号。输入序列 $x\in\mathbb{R}^{N\times F}$，共 $N$ 个位置、每个位置 $F$ 维特征。一个 Transformer 层：</p>
+  $$T_l(x) = f_l\big(A_l(x) + x\big) \tag{1}$$
+  <p>其中 $f_l$ 是逐位置独立的两层 FFN，$A_l$ 是<strong>唯一跨位置</strong>的自注意力。三个投影：</p>
+  $$Q = xW_Q,\quad K = xW_K,\quad V = xW_V$$
+  <p>形状分别是 $W_Q,W_K\in\mathbb{R}^{F\times D}$，$W_V\in\mathbb{R}^{F\times M}$。所以 $Q,K\in\mathbb{R}^{N\times D}$，$V\in\mathbb{R}^{N\times M}$。标准 softmax 注意力：</p>
+  $$A_l(x) = V' = \mathrm{softmax}\!\left(\frac{QK^{\!\top}}{\sqrt{D}}\right)V \tag{2}$$
+
+  <div class="note">
+    <strong>记号提示：</strong>后文会频繁用下标表示"取第 $i$ 行并当成列向量"，即 $Q_i\in\mathbb{R}^{D}$。$D$ 是 query/key 维度，$M$ 是 value 维度，$C$ 是特征映射 $\phi$ 的输出维度。多头时这些都是<em>每头</em>的维度。
+  </div>
+
+  <h3>1.2 两个不同的瓶颈</h3>
+  <p>很多人把 Transformer 的效率问题笼统说成"$N^2$ 复杂度"，但其实是两个性质不同的瓶颈，这篇论文的贡献恰恰在于<strong>同时</strong>解决了它们：</p>
+
+  <table>
+    <tr><th>瓶颈</th><th>发生在</th><th>症状</th><th>2020 年前的方案</th></tr>
+    <tr>
+      <td><strong>训练：$\mathcal{O}(N^2)$ 时间与显存</strong></td>
+      <td>训练 / prefill</td>
+      <td>$N\times N$ 的注意力矩阵必须物化（反向传播要用），显存随 $N^2$ 爆炸</td>
+      <td>Sparse Transformer $\mathcal{O}(N\sqrt{N})$；Reformer LSH $\mathcal{O}(N\log N)$；Linformer 低秩投影</td>
+    </tr>
+    <tr>
+      <td><strong>推理：每步代价随已生成长度线性增长</strong></td>
+      <td>自回归解码</td>
+      <td>生成第 $i$ 个 token 要对前 $i$ 个 key 做注意力；KV cache 显存 $\mathcal{O}(i)$；生成整条序列总代价 $\mathcal{O}(N^2)$</td>
+      <td><span style="color:var(--pink)">基本没有</span>。稀疏/LSH 方案改善了训练，但解码依然要存全部 KV</td>
+    </tr>
+  </table>
+
+  <p class="lead">论文引言原话点得很清楚：前述那些高效 Transformer "<em>can be efficiently trained on large sequences, they do not speed-up autoregressive inference</em>"。线性注意力的杀手锏在第二行——它把解码时的<strong>状态从"随长度增长的 KV 列表"压缩成一个固定大小的矩阵</strong>。</p>
+
+  <figure>
+    <svg viewBox="0 0 900 300" width="900" height="300">
+      <text x="20" y="26" fill="#e8ecf5" font-size="15" font-weight="700">Softmax 解码：状态随长度增长</text>
+      <text x="480" y="26" fill="#e8ecf5" font-size="15" font-weight="700">线性注意力解码：状态恒定</text>
+      <line x1="455" y1="10" x2="455" y2="290" stroke="#2a3150" stroke-width="1.5" stroke-dasharray="5,5"/>
+
+      <!-- left: growing KV cache -->
+      <g>
+        <text x="20" y="56" fill="#9aa4c0" font-size="12">t=1</text>
+        <rect x="60" y="44" width="22" height="16" fill="#6ea8fe" opacity=".8" rx="3"/>
+        <text x="20" y="86" fill="#9aa4c0" font-size="12">t=2</text>
+        <rect x="60" y="74" width="22" height="16" fill="#6ea8fe" opacity=".8" rx="3"/>
+        <rect x="86" y="74" width="22" height="16" fill="#6ea8fe" opacity=".8" rx="3"/>
+        <text x="20" y="116" fill="#9aa4c0" font-size="12">t=3</text>
+        <rect x="60" y="104" width="22" height="16" fill="#6ea8fe" opacity=".8" rx="3"/>
+        <rect x="86" y="104" width="22" height="16" fill="#6ea8fe" opacity=".8" rx="3"/>
+        <rect x="112" y="104" width="22" height="16" fill="#6ea8fe" opacity=".8" rx="3"/>
+        <text x="20" y="146" fill="#9aa4c0" font-size="12">t=4</text>
+        <rect x="60" y="134" width="22" height="16" fill="#6ea8fe" opacity=".8" rx="3"/>
+        <rect x="86" y="134" width="22" height="16" fill="#6ea8fe" opacity=".8" rx="3"/>
+        <rect x="112" y="134" width="22" height="16" fill="#6ea8fe" opacity=".8" rx="3"/>
+        <rect x="138" y="134" width="22" height="16" fill="#6ea8fe" opacity=".8" rx="3"/>
+        <text x="20" y="180" fill="#9aa4c0" font-size="12">…</text>
+        <text x="20" y="212" fill="#9aa4c0" font-size="12">t=N</text>
+        <rect x="60" y="200" width="308" height="16" fill="#6ea8fe" opacity=".5" rx="3"/>
+        <text x="376" y="213" fill="#f78fb2" font-size="12">KV cache = N 项</text>
+        <text x="60" y="248" fill="#f78fb2" font-size="13">显存 O(N)，第 i 步计算 O(i)，总计 O(N²)</text>
+        <text x="60" y="270" fill="#9aa4c0" font-size="12">每个新 token 都要重新扫一遍全部历史 key</text>
+      </g>
+
+      <!-- right: constant state -->
+      <g>
+        <text x="480" y="56" fill="#9aa4c0" font-size="12">t=1</text>
+        <rect x="522" y="42" width="60" height="20" fill="#7ee0c0" opacity=".85" rx="4"/>
+        <text x="592" y="57" fill="#7ee0c0" font-size="11">S₁ (D×M)</text>
+        <text x="480" y="86" fill="#9aa4c0" font-size="12">t=2</text>
+        <rect x="522" y="72" width="60" height="20" fill="#7ee0c0" opacity=".85" rx="4"/>
+        <text x="592" y="87" fill="#7ee0c0" font-size="11">S₂ = S₁ + φ(k₂)v₂ᵀ</text>
+        <text x="480" y="116" fill="#9aa4c0" font-size="12">t=3</text>
+        <rect x="522" y="102" width="60" height="20" fill="#7ee0c0" opacity=".85" rx="4"/>
+        <text x="592" y="117" fill="#7ee0c0" font-size="11">S₃ = S₂ + φ(k₃)v₃ᵀ</text>
+        <text x="480" y="146" fill="#9aa4c0" font-size="12">t=4</text>
+        <rect x="522" y="132" width="60" height="20" fill="#7ee0c0" opacity=".85" rx="4"/>
+        <text x="592" y="147" fill="#7ee0c0" font-size="11">S₄ = S₃ + φ(k₄)v₄ᵀ</text>
+        <text x="480" y="180" fill="#9aa4c0" font-size="12">…</text>
+        <text x="480" y="212" fill="#9aa4c0" font-size="12">t=N</text>
+        <rect x="522" y="198" width="60" height="20" fill="#7ee0c0" opacity=".85" rx="4"/>
+        <text x="592" y="213" fill="#7ee0c0" font-size="11">S_N，形状不变</text>
+        <text x="522" y="248" fill="#7ee0c0" font-size="13">显存 O(1)，每步计算 O(1)，总计 O(N)</text>
+        <text x="522" y="270" fill="#9aa4c0" font-size="12">代价：历史被压进固定大小的矩阵，有损</text>
+      </g>
+    </svg>
+    <figcaption>图 1：自回归解码时两种注意力的状态演化。右边的"有损压缩"正是第 10 节全部麻烦的来源。</figcaption>
+  </figure>
+</section>
+
+<!-- ============ 2 ============ -->
+<section id="kernel">
+  <h2 class="sec"><span class="num">2</span>第一步：注意力其实是核方法</h2>
+
+  <h3>2.1 把 softmax 拆开看</h3>
+  <p>把式 (2) 按行写开。第 $i$ 个输出位置：</p>
+  $$V_i' = \frac{\sum_{j=1}^{N}\exp\!\left(\frac{Q_i^{\!\top}K_j}{\sqrt{D}}\right)V_j}{\sum_{j=1}^{N}\exp\!\left(\frac{Q_i^{\!\top}K_j}{\sqrt{D}}\right)}$$
+  <p>把 $\exp(\cdot)$ 抽象成任意<strong>相似度函数</strong> $\mathrm{sim}(\cdot,\cdot)$，得到<strong>广义注意力</strong>：</p>
+  $$V_i' = \frac{\sum_{j=1}^{N}\mathrm{sim}(Q_i,K_j)\,V_j}{\sum_{j=1}^{N}\mathrm{sim}(Q_i,K_j)} \tag{3}$$
+
+  <div class="key">
+    <p style="margin:0">这一步是<strong>纯粹的换记号</strong>，什么都没损失：取 $\mathrm{sim}(q,k)=\exp(q^\top k/\sqrt{D})$ 就精确还原 softmax 注意力。但它揭示了注意力的本质是 <strong>Nadaraya–Watson 核回归</strong>（kernel smoother）：输出是 value 的加权平均，权重由相似度归一化而来。这个视角来自 Tsai et al. (2019) <em>Transformer Dissection</em>。</p>
+  </div>
+
+  <h3>2.2 唯一的约束：非负</h3>
+  <p>式 (3) 要成为一个合法的"注意力"（权重构成概率分布），需要什么条件？</p>
+  <p><strong>只需要 $\mathrm{sim}(\cdot,\cdot)\ge 0$。</strong> 论文原文："<em>the only constraint we need to impose to $\mathrm{sim}(\cdot)$ ... is to be non-negative</em>"。理由很直接：</p>
+  <ul>
+    <li>非负保证分母 $\sum_j \mathrm{sim}$ 不会因正负抵消而接近 0（否则式 (3) 数值爆炸）</li>
+    <li>非负保证每个权重 $\in[0,1]$ 且求和为 1，输出落在 value 的凸包内</li>
+  </ul>
+  <p>所有取值非负的核函数 $k(x,y):\mathbb{R}^{2\times F}\to\mathbb{R}_+$ 都满足这个条件。</p>
+
+  <div class="warn">
+    <strong>这个"非负"约束是后面很多故事的伏笔。</strong> Performer 早期用三角函数随机特征（sin/cos），它<em>可以取负值</em>，结果就是分母偶尔接近 0、训练炸掉——这正是 Performer 最终改用 <strong>positive random features</strong> 的直接动机。而 DeltaNet（Schlag et al. 2021）走了另一条路：<strong>干脆把分母删掉</strong>，改用 GroupNorm 稳定输出。今天几乎所有生产级线性注意力都不带这个 $\sum\phi(K_j)$ 分母了。
+  </div>
+
+  <h3>2.3 核技巧：从"不可分解"到"可分解"</h3>
+  <p>Mercer 定理告诉我们，一个正定核 $k(x,y)$ 总可以写成某个特征映射的内积：$k(x,y)=\langle\phi(x),\phi(y)\rangle$。把这个代入式 (3)：</p>
+  $$V_i' = \frac{\sum_{j=1}^{N}\phi(Q_i)^{\!\top}\phi(K_j)\,V_j}{\sum_{j=1}^{N}\phi(Q_i)^{\!\top}\phi(K_j)} \tag{4}$$
+
+  <p>看起来只是又换了个写法。但关键区别在于：<strong>式 (4) 里 $Q_i$ 和 $K_j$ 被彻底分离到了内积的两侧</strong>。而 $\exp(q^\top k)$ 做不到——指数函数不能拆成"只含 q 的部分"乘"只含 k 的部分"（在有限维意义下）。</p>
+
+  <figure>
+    <svg viewBox="0 0 880 210" width="880" height="210">
+      <rect x="30" y="30" width="380" height="150" rx="14" fill="#1e2440" stroke="#f78fb2" stroke-width="1.5"/>
+      <text x="50" y="60" fill="#f78fb2" font-size="15" font-weight="700">✗ 不可分解：softmax</text>
+      <text x="50" y="92" fill="#e8ecf5" font-size="15" font-family="monospace">sim(q,k) = exp(qᵀk)</text>
+      <text x="50" y="122" fill="#9aa4c0" font-size="13">q 和 k 被 exp 纠缠在一起</text>
+      <text x="50" y="146" fill="#9aa4c0" font-size="13">必须先算出 N×N 个标量</text>
+      <text x="50" y="168" fill="#9aa4c0" font-size="13">→ 结合律用不上</text>
+
+      <rect x="470" y="30" width="380" height="150" rx="14" fill="#1e2440" stroke="#7ee0c0" stroke-width="1.5"/>
+      <text x="490" y="60" fill="#7ee0c0" font-size="15" font-weight="700">✓ 可分解：核特征映射</text>
+      <text x="490" y="92" fill="#e8ecf5" font-size="15" font-family="monospace">sim(q,k) = φ(q)ᵀφ(k)</text>
+      <text x="490" y="122" fill="#9aa4c0" font-size="13">q 只出现在左侧，k 只出现在右侧</text>
+      <text x="490" y="146" fill="#9aa4c0" font-size="13">可以先把所有 k 的贡献聚合起来</text>
+      <text x="490" y="168" fill="#7ee0c0" font-size="13">→ 结合律解锁</text>
+
+      <text x="425" y="112" fill="#6ea8fe" font-size="22">⇒</text>
+    </svg>
+    <figcaption>图 2：整篇论文的支点。softmax 的表达力来自 exp 的不可分解性，而效率恰恰需要可分解性——这是一个本质的 trade-off，不是实现问题。</figcaption>
+  </figure>
+</section>
+
+<!-- ============ 3 ============ -->
+<section id="assoc">
+  <h2 class="sec"><span class="num">3</span>第二步：结合律 → $\mathcal{O}(N)$</h2>
+
+  <h3>3.1 三行推导</h3>
+  <p>从式 (4) 出发，注意到分子里的求和 $\sum_j$ 与 $\phi(Q_i)$ 无关，可以提出来：</p>
+  $$V_i' = \frac{\phi(Q_i)^{\!\top}\sum_{j=1}^{N}\phi(K_j)V_j^{\!\top}}{\phi(Q_i)^{\!\top}\sum_{j=1}^{N}\phi(K_j)} \tag{5}$$
+  <p>向量化写法就是矩阵乘法结合律：</p>
+  $$\big(\phi(Q)\,\phi(K)^{\!\top}\big)V \;=\; \phi(Q)\big(\phi(K)^{\!\top}V\big) \tag{6}$$
+
+  <div class="note">
+    <strong>为什么这是免费午餐？</strong> 因为 $\sum_{j}\phi(K_j)V_j^\top$ <strong>与 $i$ 无关</strong>——它对所有 query 都是同一个矩阵。原来的做法是对每个 $i$ 都重新扫一遍全部 $j$（$N\times N$ 次），现在只需扫一遍 $K,V$ 算出这个 $C\times M$ 的矩阵，然后每个 query 做一次 $\mathcal{O}(CM)$ 的读取。<strong>把"每个 query 独立聚合"变成了"共享一份聚合结果"</strong>。
+  </div>
+
+  <h3>3.2 复杂度对比</h3>
+  <figure>
+    <svg viewBox="0 0 900 400" width="900" height="400">
+      <!-- Path A -->
+      <text x="20" y="26" fill="#f78fb2" font-size="15" font-weight="700">路径 A：(φ(Q) φ(K)ᵀ) V — 标准做法，O(N²)</text>
+      <!-- phi(Q) -->
+      <rect x="30" y="45" width="40" height="90" fill="#6ea8fe" opacity=".7" rx="3"/>
+      <text x="26" y="152" fill="#9aa4c0" font-size="11">φ(Q) N×C</text>
+      <text x="80" y="95" fill="#e8ecf5" font-size="16">×</text>
+      <!-- phi(K)^T -->
+      <rect x="100" y="70" width="90" height="40" fill="#6ea8fe" opacity=".7" rx="3"/>
+      <text x="96" y="128" fill="#9aa4c0" font-size="11">φ(K)ᵀ C×N</text>
+      <text x="200" y="95" fill="#e8ecf5" font-size="16">=</text>
+      <!-- N x N -->
+      <rect x="225" y="45" width="90" height="90" fill="#f78fb2" opacity=".75" rx="3"/>
+      <text x="222" y="152" fill="#f78fb2" font-size="11" font-weight="700">N×N ← 灾难</text>
+      <text x="325" y="95" fill="#e8ecf5" font-size="16">×</text>
+      <!-- V -->
+      <rect x="350" y="45" width="35" height="90" fill="#7ee0c0" opacity=".7" rx="3"/>
+      <text x="346" y="152" fill="#9aa4c0" font-size="11">V N×M</text>
+      <text x="396" y="95" fill="#e8ecf5" font-size="16">=</text>
+      <rect x="420" y="45" width="35" height="90" fill="#ffd166" opacity=".7" rx="3"/>
+      <text x="414" y="152" fill="#9aa4c0" font-size="11">V′ N×M</text>
+      <text x="490" y="80" fill="#f78fb2" font-size="14">时间 O(N²C + N²M)</text>
+      <text x="490" y="102" fill="#f78fb2" font-size="14">显存 O(N²)（反向要存注意力矩阵）</text>
+      <text x="490" y="128" fill="#9aa4c0" font-size="12.5">N=16384 时 N×N 单精度就是 1 GB / 头 / 层</text>
+
+      <line x1="20" y1="185" x2="880" y2="185" stroke="#2a3150" stroke-width="1.5" stroke-dasharray="6,6"/>
+
+      <!-- Path B -->
+      <text x="20" y="220" fill="#7ee0c0" font-size="15" font-weight="700">路径 B：φ(Q) (φ(K)ᵀ V) — 线性注意力，O(N)</text>
+      <!-- phi(K)^T -->
+      <rect x="30" y="250" width="90" height="40" fill="#6ea8fe" opacity=".7" rx="3"/>
+      <text x="26" y="308" fill="#9aa4c0" font-size="11">φ(K)ᵀ C×N</text>
+      <text x="130" y="275" fill="#e8ecf5" font-size="16">×</text>
+      <!-- V -->
+      <rect x="155" y="238" width="35" height="90" fill="#7ee0c0" opacity=".7" rx="3"/>
+      <text x="151" y="345" fill="#9aa4c0" font-size="11">V N×M</text>
+      <text x="200" y="275" fill="#e8ecf5" font-size="16">=</text>
+      <!-- C x M state -->
+      <rect x="225" y="258" width="34" height="40" fill="#7ee0c0" opacity=".95" rx="3"/>
+      <text x="212" y="315" fill="#7ee0c0" font-size="11" font-weight="700">C×M ← 状态 S</text>
+      <text x="285" y="275" fill="#e8ecf5" font-size="16">→</text>
+      <!-- phi(Q) -->
+      <rect x="320" y="238" width="40" height="90" fill="#6ea8fe" opacity=".7" rx="3"/>
+      <text x="316" y="345" fill="#9aa4c0" font-size="11">φ(Q) N×C</text>
+      <text x="370" y="275" fill="#e8ecf5" font-size="16">×S =</text>
+      <rect x="420" y="238" width="35" height="90" fill="#ffd166" opacity=".7" rx="3"/>
+      <text x="414" y="345" fill="#9aa4c0" font-size="11">V′ N×M</text>
+      <text x="490" y="265" fill="#7ee0c0" font-size="14">时间 O(NCM)</text>
+      <text x="490" y="287" fill="#7ee0c0" font-size="14">显存 O(NC + NM + CM)，与 N 线性</text>
+      <text x="490" y="313" fill="#9aa4c0" font-size="12.5">中间产物大小与 N 无关！这就是全部秘密</text>
+      <text x="490" y="335" fill="#9aa4c0" font-size="12.5">S 就是后面 RNN 的隐状态</text>
+    </svg>
+    <figcaption>图 3：同一个乘积的两种求值顺序。注意 S 这个 $C\times M$ 矩阵——它在第 5 节会变成 RNN 的隐状态，在 2024 年之后的文献里叫"associative memory"或"fast weight matrix"。</figcaption>
+  </figure>
+
+  <table>
+    <tr><th></th><th>softmax 注意力</th><th>线性注意力（一般核）</th><th>线性注意力（$\phi=\mathrm{elu}+1$）</th></tr>
+    <tr><td>时间复杂度</td><td>$\mathcal{O}(N^2\max(D,M))$</td><td>$\mathcal{O}(NCM)$</td><td>$\mathcal{O}(NDM)$（$C=D$）</td></tr>
+    <tr><td>显存（训练）</td><td>$\mathcal{O}(N^2)$</td><td>$\mathcal{O}(N\max(C,M))$</td><td>$\mathcal{O}(N\max(D,M))$</td></tr>
+    <tr><td>解码每步</td><td>$\mathcal{O}(iD)$，随 $i$ 增长</td><td>$\mathcal{O}(CM)$ 常数</td><td>$\mathcal{O}(DM)$ 常数</td></tr>
+    <tr><td>解码状态</td><td>KV cache $\mathcal{O}(i(D+M))$</td><td>$S,z$ 共 $\mathcal{O}(CM)$ 常数</td><td>$\mathcal{O}(DM)$ 常数</td></tr>
+  </table>
+
+  <div class="warn">
+    <strong>交叉点在哪？</strong> 线性注意力并非在任何长度都更快。$NCM$ vs $N^2 D$：当 $C\approx D$ 时，交叉点在 $N \approx M$ 附近；实际因为常数因子（线性版的 $D\times M$ 外积对 GPU 并不友好，见第 10.5 节），2020 年那版实现真正压过 softmax 通常要到 $N$ 几千以上。论文自己的图 1 里 softmax 在 1080 Ti 上最多跑到 4096 长度就 OOM 了，而线性版跑到 65536。
+  </div>
+</section>
+
+<!-- ============ 4 ============ -->
+<section id="phi">
+  <h2 class="sec"><span class="num">4</span>特征映射 $\phi$ 怎么选</h2>
+
+  <p>结合律已经给了我们框架，但 $\phi$ 具体取什么？论文讨论了三种可能：</p>
+
+  <h3>4.1 指数核：无穷维，不可行</h3>
+  <p>$\exp(q^\top k)$ 对应的 RKHS 特征映射是<strong>无穷维</strong>的（可以从 $\exp(q^\top k)=\sum_{n}\frac{(q^\top k)^n}{n!}$ 看出，每一阶都对应一组张量积特征）。所以精确线性化 softmax 是不可能的。这条路后来分成两支：</p>
+  <ul>
+    <li><strong>随机特征近似</strong>：Performer 的 FAVOR+，用 $m=\Theta(d\log d)$ 个随机投影无偏估计 $\exp$ 核</li>
+    <li><strong>低阶截断</strong>：Based 用 2 阶泰勒 $\phi(q)^\top\phi(k)=1+q^\top k+\frac{(q^\top k)^2}{2}$，代价是特征维度 $C=\mathcal{O}(D^2)$</li>
+  </ul>
+
+  <h3>4.2 多项式核：精确有限维</h3>
+  <p>2 次多项式核有精确的有限维特征映射，维度 $C=\mathcal{O}(D^2)$，于是复杂度 $\mathcal{O}(ND^2M)$。论文指出这在 $N \gt D^2$ 时才划算。Tsai et al. (2019) 已经证明多项式核在质量上可以与 exp/RBF 核持平。</p>
+
+  <h3>4.3 论文的实际选择：$\mathrm{elu}(x)+1$</h3>
+  $$\phi(x) = \mathrm{elu}(x) + 1 = \begin{cases} x+1, & x \gt 0\\ e^{x}, & x\le 0\end{cases} \tag{7}$$
+
+  <div class="grid2">
+    <div class="card">
+      <h4>为什么是 elu 而不是 relu？</h4>
+      <p style="margin-bottom:0">$\mathrm{relu}(x)+1$ 在 $x\lt 0$ 处梯度为 0，会导致大片 key/query 维度<strong>永久死亡</strong>——一旦某维进入负区间就再也收不到梯度。elu 在负区间是 $e^x$，梯度是 $e^x \gt 0$，虽然小但不为零。论文原文："<em>We prefer elu over relu to avoid setting the gradients to 0 when x is negative.</em>"</p>
+    </div>
+    <div class="card">
+      <h4>为什么要 +1？</h4>
+      <p style="margin-bottom:0">保证 <strong>$\phi(x) \gt 0$</strong> 严格为正（elu 的值域是 $(-1,\infty)$，加 1 后是 $(0,\infty)$）。这是 2.2 节非负约束的直接落实：$\phi(q)^\top\phi(k)$ 作为正向量的内积必然为正，分母不会归零。</p>
+    </div>
+  </div>
+
+  <p>这个选择的好处是 <strong>$C=D$</strong>：特征映射逐元素作用，不升维，所以复杂度是干净的 $\mathcal{O}(NDM)$，且实现上只是加一行激活函数。</p>
+
+  <div class="bad">
+    <strong>但这是整篇论文最薄弱的一环，也是后续四年被反复攻击的地方。</strong> Zhang et al. 的 <em>Hedgehog &amp; Porcupine</em>（ICLR 2024）系统诊断了原因：好的注意力权重需要两个性质——<br>
+    ① <strong>低熵 / "尖锐"（spiky）</strong>：softmax 会把权重集中到少数几个 key 上；<br>
+    ② <strong>单调性</strong>：权重应随 $q^\top k$ 单调增。<br>
+    而 $1+\mathrm{elu}$、Performer、cosFormer 在他们的诊断表里<strong>三个都既不 spiky 也不单调</strong>，在同一个从零训练的任务上得分约 17.0，而 softmax 是 100.0。他们的解法是<strong>把 $\phi$ 学出来</strong>：用一个单层 MLP，以 softmax 注意力权重作为软标签、交叉熵训练 $\phi$，从零训练可恢复 &gt;99% 的 Transformer 质量。
+  </div>
+
+  <div class="note">
+    <strong>2026 年的实践共识：</strong>生产级线性注意力<strong>基本不用特征映射了</strong>。GLA 论文明说"recent work has found that a linear kernel (i.e., setting $\phi$ to be the identity) without a normalizer works well in practice"。取而代之的是：$q,k$ 上做 <strong>L2 归一化</strong> 或 short conv + SiLU，输出上做 <strong>GroupNorm/RMSNorm</strong>，然后靠<strong>门控/衰减</strong>而不是靠 $\phi$ 来获得表达力。见第 12 节。
+  </div>
+</section>
+
+<!-- ============ 5 ============ -->
+<section id="rnn">
+  <h2 class="sec"><span class="num">5</span>第三步：因果掩码 → 前缀和 → RNN</h2>
+
+  <h3>5.1 因果掩码打破了结合律……表面上</h3>
+  <p>自回归模型要求位置 $i$ 只能看 $j\le i$。式 (3) 变成：</p>
+  $$V_i' = \frac{\sum_{j=1}^{\color{#f78fb2}{i}}\mathrm{sim}(Q_i,K_j)V_j}{\sum_{j=1}^{\color{#f78fb2}{i}}\mathrm{sim}(Q_i,K_j)} \tag{8}$$
+  <p>问题来了：<strong>求和上界现在依赖 $i$ 了</strong>。第 3 节那个"所有 query 共享同一个 $\sum_j\phi(K_j)V_j^\top$"的技巧似乎失效——每个 $i$ 需要的是不同的部分和。</p>
+
+  <div class="key">
+    <p style="margin:0"><strong>但"依赖 $i$ 的部分和"正是前缀和（prefix sum）。</strong> 而前缀和有一个平凡的 $\mathcal{O}(N)$ 增量算法：$P_i = P_{i-1} + a_i$。这就是全部的洞见。</p>
+  </div>
+
+  <h3>5.2 定义两个状态</h3>
+  <p>线性化式 (8)：</p>
+  $$V_i' = \frac{\phi(Q_i)^{\!\top}\sum_{j=1}^{i}\phi(K_j)V_j^{\!\top}}{\phi(Q_i)^{\!\top}\sum_{j=1}^{i}\phi(K_j)} \tag{9}$$
+  <p>引入</p>
+  $$S_i = \sum_{j=1}^{i}\phi(K_j)V_j^{\!\top} \in \mathbb{R}^{C\times M},\qquad Z_i = \sum_{j=1}^{i}\phi(K_j) \in \mathbb{R}^{C} \tag{10,11}$$
+  <p>式 (9) 就变成极其简洁的</p>
+  $$V_i' = \frac{\phi(Q_i)^{\!\top}S_i}{\phi(Q_i)^{\!\top}Z_i} \tag{12}$$
+  <p>而 $S_i,Z_i$ 都能从 $S_{i-1},Z_{i-1}$ 常数时间更新。</p>
+
+  <div class="note">
+    <strong>形状检查（很值得动手做一遍）：</strong><br>
+    $\phi(K_j)\in\mathbb{R}^{C\times 1}$，$V_j^\top\in\mathbb{R}^{1\times M}$，外积 $\phi(K_j)V_j^\top\in\mathbb{R}^{C\times M}$ ✓<br>
+    $\phi(Q_i)^\top\in\mathbb{R}^{1\times C}$，乘 $S_i\in\mathbb{R}^{C\times M}$ 得 $\mathbb{R}^{1\times M}$ ✓ 正是一个 value 向量<br>
+    分母 $\phi(Q_i)^\top Z_i\in\mathbb{R}$ 是标量 ✓
+  </div>
+
+  <h3>5.3 完整的 RNN 方程</h3>
+  <p>把式 (1) 的残差和 FFN 也带上，一个完整的因果线性 Transformer 层就是（论文式 16–20）：</p>
+  $$\begin{aligned}
+  s_0 &= 0,\\
+  z_0 &= 0,\\
+  s_i &= s_{i-1} + \phi(x_iW_K)\,(x_iW_V)^{\!\top},\\
+  z_i &= z_{i-1} + \phi(x_iW_K),\\
+  y_i &= f_l\!\left(\frac{\phi(x_iW_Q)^{\!\top}s_i}{\phi(x_iW_Q)^{\!\top}z_i} + x_i\right).
+  \end{aligned}$$
+
+  <p>这就是标题的全部依据。给定输入 → 更新内部状态 → 产生输出，逐时间步进行——<strong>定义上就是一个 RNN</strong>。</p>
+
+  <div class="warn">
+    <strong>一个容易搞混的点：</strong>论文特意强调，这里的"递归"是<strong>沿时间（序列位置）</strong>的，不是像 Universal Transformer 那样<strong>沿深度</strong>的。每一层各自维护自己的 $(s,z)$，层与层之间仍然是前馈的。$L$ 层模型解码时要维护 $L$ 组状态。
+  </div>
+
+  <figure>
+    <svg viewBox="0 0 900 300" width="900" height="300">
+      <defs>
+        <marker id="ar" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="#6ea8fe"/>
+        </marker>
+        <marker id="ar2" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="#7ee0c0"/>
+        </marker>
+      </defs>
+      <text x="20" y="24" fill="#e8ecf5" font-size="15" font-weight="700">线性注意力层展开成 RNN</text>
+
+      <!-- state chain -->
+      <g>
+        <rect x="60" y="120" width="80" height="46" rx="10" fill="#1e2440" stroke="#7ee0c0" stroke-width="1.6"/>
+        <text x="86" y="141" fill="#7ee0c0" font-size="14" font-weight="700">s₁, z₁</text>
+        <text x="72" y="158" fill="#9aa4c0" font-size="10.5">C×M + C</text>
+
+        <rect x="240" y="120" width="80" height="46" rx="10" fill="#1e2440" stroke="#7ee0c0" stroke-width="1.6"/>
+        <text x="266" y="141" fill="#7ee0c0" font-size="14" font-weight="700">s₂, z₂</text>
+        <text x="252" y="158" fill="#9aa4c0" font-size="10.5">形状不变</text>
+
+        <rect x="420" y="120" width="80" height="46" rx="10" fill="#1e2440" stroke="#7ee0c0" stroke-width="1.6"/>
+        <text x="446" y="141" fill="#7ee0c0" font-size="14" font-weight="700">s₃, z₃</text>
+
+        <text x="540" y="148" fill="#9aa4c0" font-size="18">⋯</text>
+
+        <rect x="620" y="120" width="80" height="46" rx="10" fill="#1e2440" stroke="#7ee0c0" stroke-width="1.6"/>
+        <text x="640" y="141" fill="#7ee0c0" font-size="14" font-weight="700">s_N, z_N</text>
+
+        <line x1="140" y1="143" x2="235" y2="143" stroke="#7ee0c0" stroke-width="2" marker-end="url(#ar2)"/>
+        <line x1="320" y1="143" x2="415" y2="143" stroke="#7ee0c0" stroke-width="2" marker-end="url(#ar2)"/>
+        <line x1="500" y1="143" x2="530" y2="143" stroke="#7ee0c0" stroke-width="2" marker-end="url(#ar2)"/>
+        <line x1="565" y1="143" x2="615" y2="143" stroke="#7ee0c0" stroke-width="2" marker-end="url(#ar2)"/>
+        <text x="152" y="134" fill="#7ee0c0" font-size="10.5">+φ(k₂)v₂ᵀ</text>
+        <text x="332" y="134" fill="#7ee0c0" font-size="10.5">+φ(k₃)v₃ᵀ</text>
+      </g>
+
+      <!-- inputs -->
+      <g>
+        <rect x="70" y="42" width="60" height="30" rx="8" fill="#171b2e" stroke="#6ea8fe"/>
+        <text x="93" y="62" fill="#6ea8fe" font-size="13">x₁</text>
+        <rect x="250" y="42" width="60" height="30" rx="8" fill="#171b2e" stroke="#6ea8fe"/>
+        <text x="273" y="62" fill="#6ea8fe" font-size="13">x₂</text>
+        <rect x="430" y="42" width="60" height="30" rx="8" fill="#171b2e" stroke="#6ea8fe"/>
+        <text x="453" y="62" fill="#6ea8fe" font-size="13">x₃</text>
+        <rect x="630" y="42" width="60" height="30" rx="8" fill="#171b2e" stroke="#6ea8fe"/>
+        <text x="648" y="62" fill="#6ea8fe" font-size="13">x_N</text>
+        <line x1="100" y1="74" x2="100" y2="115" stroke="#6ea8fe" stroke-width="2" marker-end="url(#ar)"/>
+        <line x1="280" y1="74" x2="280" y2="115" stroke="#6ea8fe" stroke-width="2" marker-end="url(#ar)"/>
+        <line x1="460" y1="74" x2="460" y2="115" stroke="#6ea8fe" stroke-width="2" marker-end="url(#ar)"/>
+        <line x1="660" y1="74" x2="660" y2="115" stroke="#6ea8fe" stroke-width="2" marker-end="url(#ar)"/>
+      </g>
+
+      <!-- outputs -->
+      <g>
+        <line x1="100" y1="170" x2="100" y2="210" stroke="#ffd166" stroke-width="2"/>
+        <line x1="280" y1="170" x2="280" y2="210" stroke="#ffd166" stroke-width="2"/>
+        <line x1="460" y1="170" x2="460" y2="210" stroke="#ffd166" stroke-width="2"/>
+        <line x1="660" y1="170" x2="660" y2="210" stroke="#ffd166" stroke-width="2"/>
+        <rect x="70" y="212" width="60" height="30" rx="8" fill="#171b2e" stroke="#ffd166"/>
+        <text x="93" y="232" fill="#ffd166" font-size="13">y₁</text>
+        <rect x="250" y="212" width="60" height="30" rx="8" fill="#171b2e" stroke="#ffd166"/>
+        <text x="273" y="232" fill="#ffd166" font-size="13">y₂</text>
+        <rect x="430" y="212" width="60" height="30" rx="8" fill="#171b2e" stroke="#ffd166"/>
+        <text x="453" y="232" fill="#ffd166" font-size="13">y₃</text>
+        <rect x="630" y="212" width="60" height="30" rx="8" fill="#171b2e" stroke="#ffd166"/>
+        <text x="648" y="232" fill="#ffd166" font-size="13">y_N</text>
+      </g>
+      <text x="740" y="148" fill="#9aa4c0" font-size="12">隐状态是矩阵</text>
+      <text x="740" y="168" fill="#9aa4c0" font-size="12">不是向量 ——</text>
+      <text x="740" y="188" fill="#9aa4c0" font-size="12">这是与 LSTM</text>
+      <text x="740" y="208" fill="#9aa4c0" font-size="12">最本质的区别</text>
+      <text x="20" y="278" fill="#9aa4c0" font-size="12.5">状态转移是纯加法：sᵢ = sᵢ₋₁ + φ(kᵢ)vᵢᵀ。没有非线性、没有门控、没有遗忘 —— 这既是它能并行训练的原因，也是它记忆缺陷的根源。</text>
+    </svg>
+    <figcaption>图 4：因果线性注意力的 RNN 展开。注意状态转移矩阵是恒等阵（$s_i = I\cdot s_{i-1} + \ldots$），这个"$I$"在后续工作里会依次被替换成 $\gamma I$、$\mathrm{diag}(\alpha_t)$、$I-\beta_t k_tk_t^\top$……见第 12 节。</figcaption>
+  </figure>
+</section>
+
+<!-- ============ 6 ============ -->
+<section id="grad">
+  <h2 class="sec"><span class="num">6</span>常数内存的反向传播</h2>
+
+  <p>第 5 节的递推形式在<strong>推理</strong>时完美。但训练时如果直接照着写，会踩一个大坑。</p>
+
+  <div class="bad">
+    <strong>朴素实现的问题：</strong>如果在 PyTorch 里写一个 for 循环逐步更新 $S_i$，autograd 会把<strong>每一个中间状态 $S_1,\dots,S_N$ 都存下来</strong>用于反向。每个 $S_i$ 是 $C\times M$，总显存 $\mathcal{O}(NCM)$——比原来只存 $\mathcal{O}(N\max(C,M))$ 大了 $\max(C,M)$ 倍。论文原话："<em>This increases the memory consumption by $\max(D,M)$ times; thus hindering the applicability of causal linear attention to longer sequences or deeper models.</em>"
+  </div>
+
+  <h3>6.1 手推梯度：全部都是累积和</h3>
+  <p>论文的解法是<strong>手写反向</strong>，观察到三个梯度都可以写成累积和形式，从而不需要存中间状态。设分子 $\bar V_i = \phi(Q_i)^\top\sum_{j\le i}\phi(K_j)V_j^\top$，损失对它的梯度为 $\nabla_{\bar V_i}\mathcal{L}$，则：</p>
+  $$\begin{aligned}
+  \nabla_{\phi(Q_i)}\mathcal{L} &= \nabla_{\bar V_i}\mathcal{L}\left(\sum_{j=1}^{\color{#7ee0c0}{i}}\phi(K_j)V_j^{\!\top}\right)^{\!\top} \tag{13}\\[4pt]
+  \nabla_{\phi(K_i)}\mathcal{L} &= \left(\sum_{j=\color{#f78fb2}{i}}^{\color{#f78fb2}{N}}\phi(Q_j)\big(\nabla_{\bar V_j}\mathcal{L}\big)^{\!\top}\right)V_i \tag{14}\\[4pt]
+  \nabla_{V_i}\mathcal{L} &= \left(\sum_{j=\color{#f78fb2}{i}}^{\color{#f78fb2}{N}}\phi(Q_j)\big(\nabla_{\bar V_j}\mathcal{L}\big)^{\!\top}\right)^{\!\top}\phi(K_i) \tag{15}
+  \end{aligned}$$
+
+  <div class="key">
+    <p style="margin:0"><strong>关键结构：</strong>式 (13) 是<span style="color:#7ee0c0">前缀和</span>（$j\le i$），式 (14)(15) 是<span style="color:#f78fb2">后缀和</span>（$j\ge i$）。所以反向传播是"<strong>正向扫一遍 + 反向扫一遍</strong>"，每次只需维护<strong>一个</strong> $C\times M$ 的累加器，而不是 $N$ 个。显存回到 $\mathcal{O}(N\max(C,M))$，且与朴素 softmax 实现同量级。</p>
+  </div>
+
+  <details class="deriv">
+    <summary>为什么 K 和 V 的梯度是后缀和？（直觉推导）</summary>
+    <div class="body">
+      <p>因为因果掩码。位置 $i$ 的 key/value 会被<strong>所有后面的 query</strong> 用到——$K_i$ 一旦进入状态 $S_i$，它就留在 $S_i, S_{i+1},\dots,S_N$ 里，影响 $\bar V_i,\bar V_{i+1},\dots,\bar V_N$。所以损失对 $K_i$ 的梯度要把 $j\ge i$ 的所有下游贡献加起来。</p>
+      <p>形式上，$\bar V_j = \phi(Q_j)^\top S_j$ 且 $S_j = \sum_{m\le j}\phi(K_m)V_m^\top$，所以 $\phi(K_i)$ 出现在所有 $j\ge i$ 的 $\bar V_j$ 里：</p>
+      $$\frac{\partial \mathcal{L}}{\partial \phi(K_i)} = \sum_{j\ge i}\frac{\partial \mathcal{L}}{\partial \bar V_j}\cdot\frac{\partial \bar V_j}{\partial \phi(K_i)}$$
+      <p>而 $\bar V_j = \phi(Q_j)^\top\phi(K_i)V_i^\top + (\text{与 }K_i\text{ 无关})$，对 $\phi(K_i)$ 求导得 $\phi(Q_j)\otimes V_i$，代入即得式 (14)。反过来，$Q_i$ 只影响 $\bar V_i$ 一个位置，但它要读取 $S_i$（前 $i$ 项之和），所以是前缀和。</p>
+      <p class="lead">对称性很美：<strong>query 向后看历史（前缀），key/value 向前看未来的读取者（后缀）</strong>。</p>
+    </div>
+  </details>
+
+  <h3>6.2 论文的伪代码（Algorithm 1）</h3>
+  <pre><code>function forward(φ(Q), φ(K), V):
+    V̄ ← 0,  S ← 0
+    for i = 1 … N:
+        S    ← S + φ(K_i) V_iᵀ          # 式(10) 前缀和
+        V̄_i  ← φ(Q_i) S
+    return V̄
+
+function backward(φ(Q), φ(K), V, G):    # G = ∂L/∂V̄
+    # ---- 正向扫：Q 的梯度（前缀和）----
+    S ← 0
+    for i = 1 … N:
+        S            ← S + φ(K_i) V_iᵀ
+        ∇_{φ(Q_i)}L  ← G_i Sᵀ           # 式(13)
+
+    # ---- 反向扫：K, V 的梯度（后缀和）----
+    S ← 0
+    for i = N … 1:
+        S            ← S + φ(Q_i) G_iᵀ
+        ∇_{V_i}L     ← Sᵀ φ(K_i)        # 式(15)
+        ∇_{φ(K_i)}L  ← S V_i            # 式(14)
+    return ∇_{φ(Q)}L, ∇_{φ(K)}L, ∇_V L</code></pre>
+
+  <p>论文说这部分是用<strong>约 200 行 CUDA</strong> 实现的。分母（归一化项）和除法本身交给 autograd 处理，只有分子这部分需要手写。</p>
+
+  <div class="note">
+    <strong>这是一个反复出现的模式。</strong> "为了省显存而手写反向、把中间状态重算而不是存下来"——这正是 <strong>FlashAttention</strong> 的核心思想（2022），也是后来 <strong>FlashLinearAttention</strong>（Yang et al., ICML 2024）的出发点。区别在于 2020 年这版是纯串行的 for 循环，没有用上 tensor core，实际 wall-clock 并不理想。见第 10.5 和第 11 节。
+  </div>
+</section>
+
+<!-- ============ 7 ============ -->
+<section id="duality">
+  <h2 class="sec"><span class="num">7</span>训练并行 / 推理常数：两全其美</h2>
+
+  <p>论文 3.3.2 节的标题是 "Training and Inference"，核心论点用他们自己的话说是 "<em>combines the best of both worlds</em>"：</p>
+
+  <table>
+    <tr><th></th><th>训练（teacher forcing）</th><th>推理（自回归）</th></tr>
+    <tr>
+      <td><strong>RNN / LSTM</strong></td>
+      <td><span style="color:#f78fb2">✗ 必须串行 $N$ 步</span>，状态转移含非线性，无法并行</td>
+      <td><span style="color:#7ee0c0">✓ 每步 $\mathcal{O}(1)$</span></td>
+    </tr>
+    <tr>
+      <td><strong>softmax Transformer</strong></td>
+      <td><span style="color:#7ee0c0">✓ 全部位置并行</span>，一次大矩阵乘</td>
+      <td><span style="color:#f78fb2">✗ 第 $i$ 步 $\mathcal{O}(i)$</span>，KV cache 线性增长</td>
+    </tr>
+    <tr>
+      <td><strong>线性 Transformer</strong></td>
+      <td><span style="color:#7ee0c0">✓ 可并行</span>（用式 6 的矩阵形式，或第 11 节的 chunkwise）</td>
+      <td><span style="color:#7ee0c0">✓ 每步 $\mathcal{O}(1)$</span>，状态是固定大小矩阵</td>
+    </tr>
+  </table>
+
+  <div class="key">
+    <p style="margin:0"><strong>为什么线性注意力能兼得？</strong>因为它的状态转移是<strong>线性且无门控</strong>的：$s_i = s_{i-1} + \phi(k_i)v_i^\top$。线性递推的解可以写成闭式的求和 $s_i=\sum_{j\le i}(\cdot)$，因此可以用并行前缀扫描（或直接的矩阵乘）一次算出所有位置；而 LSTM 的 $h_t=\tanh(Wh_{t-1}+\ldots)$ 因为有非线性，无法展开成求和，只能一步步来。<br><br>
+    <strong>这就是"线性 RNN"这个词的真正含义</strong>——不是"复杂度线性"，而是"<strong>状态转移是线性的</strong>"。这两件事碰巧同时成立，但因果关系是后者推出前者。</p>
+  </div>
+
+  <div class="warn">
+    <strong>代价也在这里。</strong> Transformer 之所以强，一部分原因就是它的"状态"是无损的（全部 KV），而 LSTM 之所以能做状态追踪，一部分原因就是它的非线性递推。线性 RNN 两边各舍弃了一点：状态有损，且转移是线性的。第 13 节会看到，这直接导致它落在 $\mathsf{TC}^0$ 复杂度类内，无法做一般的状态追踪。
+  </div>
+</section>
+
+<!-- ============ 8 ============ -->
+<section id="exp">
+  <h2 class="sec"><span class="num">8</span>论文实验结果</h2>
+
+  <p>论文的实验设计很朴素但切中要害：先用合成任务验证"收敛性 + 复杂度"，再用两个真实任务验证"质量 + 加速比"。基线是 softmax Transformer 和 Reformer（LSH-X 表示 X 轮哈希）。</p>
+
+  <h3>8.1 合成任务</h3>
+  <ul>
+    <li><strong>收敛性</strong>：序列复制任务（最长 128，10 种符号），4 层 8 头。结论：linear 平滑收敛且<strong>达到与 softmax 相同的 loss</strong>；lsh 因为哈希噪声收敛到更差的水平。</li>
+    <li><strong>复杂度</strong>：$N\in\{2^9,\dots,2^{16}\}$ 上测峰值显存和时间（GTX 1080 Ti, 11GB）。softmax 最多跑到 4096 就 OOM，lsh-4/8 到 16384，linear 全程最快最省。Reformer 理论是 $\mathcal{O}(N\log N)$，但 $\log N$ 太小，实测也是线性。</li>
+  </ul>
+
+  <h3>8.2 图像自回归生成</h3>
+  <div class="grid2">
+    <div class="card">
+      <h4>MNIST（8 层 8 头，序列长 784）</h4>
+      <table style="margin:8px 0">
+        <tr><th>方法</th><th>Bits/dim ↓</th><th>Images/sec ↑</th></tr>
+        <tr><td>Softmax</td><td>0.621</td><td>0.45 (1×)</td></tr>
+        <tr><td>LSH-1</td><td>0.745</td><td>0.68 (1.5×)</td></tr>
+        <tr><td>LSH-4</td><td>0.676</td><td>0.27 (0.6×)</td></tr>
+        <tr><td><strong>Linear</strong></td><td><strong>0.644</strong></td><td><strong>142.8 (317×)</strong></td></tr>
+      </table>
+      <p style="margin-bottom:0" class="lead">质量几乎持平（0.644 vs 0.621），吞吐 317×。因为显存恒定，可以在单卡上<strong>同时生成 10000 张</strong>。</p>
+    </div>
+    <div class="card">
+      <h4>CIFAR-10（16 层，序列长 3072）</h4>
+      <table style="margin:8px 0">
+        <tr><th>方法</th><th>Bits/dim ↓</th><th>Images/sec ↑</th></tr>
+        <tr><td>Softmax</td><td>3.47</td><td>0.004 (1×)</td></tr>
+        <tr><td>LSH-1</td><td>3.39</td><td>0.015 (3.75×)</td></tr>
+        <tr><td>LSH-4</td><td>3.51</td><td>0.005 (1.25×)</td></tr>
+        <tr><td><strong>Linear</strong></td><td><strong>3.40</strong></td><td><strong>17.85 (4462×)</strong></td></tr>
+      </table>
+      <p style="margin-bottom:0" class="lead">这里 linear 甚至<strong>赢了</strong> softmax（3.40 vs 3.47）。但要注意实验设置：<strong>都训练 7 天固定预算</strong>，softmax 因为只能 batch=1（24GB P40）跑完的 epoch 少 3 倍。这是"每 GPU 小时的效率"胜利，不是同等训练量下的质量胜利。</p>
+    </div>
+  </div>
+
+  <h3>8.3 语音识别（非自回归，CTC）</h3>
+  <table>
+    <tr><th>方法</th><th>Validation PER ↓</th><th>Time/epoch (s) ↓</th></tr>
+    <tr><td>Bi-LSTM</td><td>10.94</td><td>1047</td></tr>
+    <tr><td><strong>Softmax</strong></td><td><strong>5.12</strong></td><td>2711</td></tr>
+    <tr><td>LSH-4</td><td>9.33</td><td>2250</td></tr>
+    <tr><td>Linear</td><td>8.08</td><td><strong>824</strong></td></tr>
+  </table>
+  <p>WSJ 80 小时数据集，平均 800 帧。Linear 比 LSTM 和 Reformer 都好、都快（比 softmax 快 3×+）。</p>
+
+  <div class="bad">
+    <strong>这张表是全文最诚实的一张，值得仔细看。</strong> softmax 的 PER 是 <strong>5.12</strong>，linear 是 <strong>8.08</strong>——<strong>相对差距 58%</strong>，这不是"comparable"，是一个巨大的质量差距。论文自己也承认 "<em>the softmax transformer achieves lower phone error rate in comparison to all baselines, but is significantly slower</em>"。<br><br>
+    对比图像生成任务上 0.644 vs 0.621 的微小差距，这个反差本身就是一条重要信息：<strong>线性注意力在什么任务上会掉分？</strong> 图像逐像素生成高度依赖<em>局部</em>上下文（相邻像素），压缩状态够用；而语音识别需要在长序列里做<em>精确对齐和检索</em>，固定状态就不够了。这个模式在此后六年反复被验证——见第 10 节。
+  </div>
+</section>
+
+<!-- ============ 9 ============ -->
+<section id="whyrnn">
+  <h2 class="sec"><span class="num">9</span>为什么它"是" RNN：概念澄清</h2>
+
+  <h3>9.1 与经典 RNN 的三点关键差异</h3>
+  <table>
+    <tr><th></th><th>LSTM / GRU</th><th>线性注意力 RNN</th></tr>
+    <tr>
+      <td><strong>状态形状</strong></td>
+      <td>向量 $h_t\in\mathbb{R}^{d}$</td>
+      <td><span style="color:#7ee0c0">矩阵</span> $S_t\in\mathbb{R}^{D\times M}$ —— 参数量不变的情况下状态容量涨了 $D$ 倍</td>
+    </tr>
+    <tr>
+      <td><strong>状态转移</strong></td>
+      <td>非线性 + 门控：$h_t=\sigma(\cdot)\odot\tanh(\cdot)$</td>
+      <td><span style="color:#7ee0c0">线性、无门控</span>：$S_t=S_{t-1}+k_tv_t^\top$ —— 因此可并行展开</td>
+    </tr>
+    <tr>
+      <td><strong>写入 / 读取</strong></td>
+      <td>整个状态被整体改写</td>
+      <td><span style="color:#7ee0c0">外积写入、内积读取</span>——是一个<strong>键值联想记忆</strong></td>
+    </tr>
+  </table>
+
+  <h3>9.2 状态就是"快权重"</h3>
+  <p>这是理解整条研究线最重要的一个视角转换。看这两个式子：</p>
+  $$\text{写入：}\; S_t = S_{t-1} + \phi(k_t)v_t^{\!\top} \qquad\qquad \text{读取：}\; \bar V_t = \phi(q_t)^{\!\top}S_t$$
+  <p>读取操作 $\phi(q_t)^\top S_t$ 在形式上<strong>就是一个线性层</strong>：输入 $\phi(q_t)$，权重矩阵 $S_t$。区别只在于这个"权重"不是训练得到的，而是<strong>在前向传播中由数据即时生成的</strong>。</p>
+
+  <div class="key">
+    <p style="margin:0">Schlag, Irie &amp; Schmidhuber（ICML 2021, <em>Linear Transformers Are Secretly Fast Weight Programmers</em>）严格建立了这个等价：线性注意力 <strong>就是</strong> Schmidhuber 1992 年提出的 <strong>Fast Weight Programmer</strong>。一个"慢网络"（$W_K,W_V$）生成一串"编程指令"（外积），写入一个"快权重矩阵"（$S_t$），另一路查询（$W_Q$）读取它。<br><br>
+    今天这个视角叫 <strong>test-time regression / associative memory</strong>：把 $S_t$ 看成一个在推理时被在线训练的线性回归器，不同的状态更新规则对应不同的在线学习目标。这个统一视角是 2024 年之后所有工作的共同语言。</p>
+  </div>
+
+  <p>用这个视角看，普通线性注意力对应的在线目标是 <strong>Hebbian 规则</strong>（直接相加），优化 $-\langle S_tk_t, v_t\rangle$；而 DeltaNet 对应的是<strong>回归目标</strong> $\|S_tk_t-v_t\|^2$ 走一步梯度下降。这个差别就是第 12 节整条演进线的主轴。</p>
+
+  <h3>9.3 那 softmax Transformer 呢？</h3>
+  <p>论文特意留了一句话：这个 RNN 表述"<em>does not impose any constraint on the feature function and it can be used for representing any transformer model, in theory even the ones using softmax attention</em>"。</p>
+  <p>这句话在数学上成立但实践上无意义——softmax 对应的 $\phi$ 无穷维，$S_t$ 是无穷维矩阵，等价于"把所有 KV 都存下来"。这条思路后来被两篇论文明确化：</p>
+  <ul>
+    <li><strong>Transformers are Multi-State RNNs</strong>（Oren et al., EMNLP 2024）：decoder-only Transformer 精确等价于一个<strong>无界多状态 RNN</strong>——"隐状态"就是 KV 对的集合，每步增加一个元素。把状态数固定住 = KV cache 压缩，就变成有界 MSRNN。他们的 <strong>TOVA</strong> 策略（丢掉注意力分数最低的 token）无需训练，在 4 个长程任务上 2/4 用 1/8–1/4 的 cache 就能持平满 cache。</li>
+    <li><strong>Attention as an RNN</strong>（Feng et al., 2024）：注意力的分子分母都是 $\sum$，所以是一个 many-to-one RNN；用 <strong>并行前缀扫描</strong>（Blelloch）配合数值稳定的结合算子 $(m,u,w)=(\max s_i,\sum e^{s_i-m},\sum e^{s_i-m}v_i)$（就是 online softmax 的状态），可以并行算出所有前缀的输出，得到 <strong>Aaren</strong> 模块。</li>
+  </ul>
+</section>
+
+<!-- ============ 10 ============ -->
+<section id="limits">
+  <h2 class="sec"><span class="num">10</span>局限：忘不掉、记不下、找不回</h2>
+
+  <p>这一节是全文最重要的部分。理解这五个缺陷，就理解了 2021–2026 年这条研究线上每一篇论文在干什么。</p>
+
+  <h3>10.1 忘不掉：加法写入，没有遗忘</h3>
+  <p>$S_t = S_{t-1} + \phi(k_t)v_t^\top$ 是<strong>纯累加</strong>。第 1 个 token 的贡献和第 100000 个 token 的贡献<strong>权重完全相同</strong>。后果：</p>
+  <ul>
+    <li><strong>注意力稀释</strong>：随着序列变长，有效注意力分布越来越平，模型无法聚焦</li>
+    <li><strong>上下文切换失败</strong>：文档换了话题，旧内容仍然完整地留在状态里干扰</li>
+    <li>GLA 论文引用 Buckman &amp; Gelada (2024) 的假设：这是线性注意力在长上下文任务上不稳定的部分原因</li>
+  </ul>
+  <p class="lead"><strong>修复方向：</strong>加衰减/门控。RFA (2021) 的标量门 → RetNet (2023) 的固定 $\gamma$ → GLA/Mamba-2 (2024) 的数据相关门控。</p>
+
+  <h3>10.2 记不下：状态容量是硬上限</h3>
+  <p>$S_t\in\mathbb{R}^{D\times M}$ 大小固定，与 $N$ 无关。Schlag et al. (2021) 给出了经典的<strong>容量论证</strong>：外积写入本质是把 $N$ 个键值关联叠加在一个矩阵里，读取靠的是不同 key 之间近似正交。<strong>当关联数超过 key 维度 $D$ 时，key 不可能继续保持近似正交，检索必然退化</strong>。</p>
+
+  <figure>
+    <svg viewBox="0 0 880 240" width="880" height="240">
+      <text x="20" y="24" fill="#e8ecf5" font-size="14.5" font-weight="700">读取干扰：为什么状态装满后会失真</text>
+      <text x="20" y="58" fill="#9aa4c0" font-size="13.5">状态 S = Σⱼ φ(kⱼ)vⱼᵀ，用 query q 读取：</text>
+      <foreignObject x="20" y="70" width="840" height="60">
+        <div xmlns="http://www.w3.org/1999/xhtml" style="color:#e8ecf5;font-family:'SF Mono',monospace;font-size:14px;line-height:1.9">
+          φ(q)ᵀ S &#160;=&#160; <span style="color:#7ee0c0">φ(q)ᵀφ(k_i)·v_iᵀ</span> &#160;+&#160; <span style="color:#f78fb2">Σ_{j≠i} φ(q)ᵀφ(k_j)·v_jᵀ</span>
+        </div>
+      </foreignObject>
+      <text x="60" y="152" fill="#7ee0c0" font-size="13">↑ 想要的信号</text>
+      <text x="330" y="152" fill="#f78fb2" font-size="13">↑ 所有其他键值对的串扰（crosstalk）</text>
+      <text x="20" y="186" fill="#9aa4c0" font-size="13.5">当 N ≤ D 且 key 近似正交时，串扰项 ≈ 0，检索精确。</text>
+      <text x="20" y="210" fill="#ffd166" font-size="13.5">当 N ≫ D 时，D 维空间里塞不下 N 个近似正交的向量（鸽笼原理），串扰项淹没信号 → 检索失败。</text>
+    </svg>
+    <figcaption>图 5：固定状态的信息论天花板。Jelassi et al. (ICML 2024) 把这一点变成了严格定理：$m$ 比特状态的模型无法复制超过约 $m$ 比特的字符串，而两层 Transformer 能复制长度指数于参数量的串。</figcaption>
+  </figure>
+
+  <p class="lead"><strong>修复方向：</strong>① 扩大状态（Based 用 2 阶泰勒把 $C$ 撑大、Mamba-3 的 MIMO）；② 更聪明地写（delta 规则：<em>覆盖</em>而不是<em>叠加</em>）；③ 认输，混合架构里塞几层全注意力。</p>
+
+  <h3>10.3 找不回：recall 是硬伤</h3>
+  <p>这是被最多论文独立验证的经验事实：</p>
+  <ul>
+    <li><strong>Zoology</strong>（Arora et al., ICLR 2024）：预训练 17 个模型，发现高效模型在 Pile 上落后注意力最多 <strong>2.1 ppl</strong>，而<strong>差距几乎全部集中在"联想回忆"类 token 上</strong>。提出 <strong>MQAR</strong> 合成任务作为诊断标准。理论上：注意力解 MQAR 所需模型维度<strong>与序列长度无关</strong>，而循环模型在 $d\le\sqrt{N}$ 时需要 $\Omega(N)$ 比特。</li>
+    <li><strong>Repeat After Me</strong>（Jelassi et al., ICML 2024）：证明两层 Transformer 可复制指数长的串，而任何固定状态模型受 $m$ 比特信息论上界约束。实测预训练 Transformer 在复制/检索上碾压预训练 Mamba。</li>
+    <li><strong>MiniMax-01</strong>（2025）的自家消融是最有说服力的工业证据：纯线性模型在大多数下游任务上追平 softmax，但在 <strong>NIAH（大海捞针）上 40.9 vs 混合的 98.0</strong>，直接崩掉。他们的结论原话是纯线性注意力 "<em>not suitable for LLMs ... due to their inherent inability to perform retrieval</em>"。</li>
+  </ul>
+
+  <div class="note">
+    <strong>一个漂亮的旁证（Just Read Twice, Arora et al. 2024）：</strong>recall 的难度可以归约到通信复杂度里的<strong>集合不相交问题</strong>——流式模型必须缓存先出现的那个集合。所以 <code>[问题, 文档]</code> 的顺序只需记一个事实，而 <code>[文档, 问题]</code> 的顺序需要记全部事实。他们的解法朴素得可爱：<strong>把上下文在 prompt 里重复一遍</strong>，16 个现成循环模型 × 6 个 ICL 任务平均涨 <strong>+11.0 分</strong>。这说明 recall 差有一部分不是容量问题，而是"不知道该存什么"的问题。
+  </div>
+
+  <h3>10.4 归一化项不稳定</h3>
+  <p>分母 $\phi(q_t)^\top z_t$ 会随 $t$ 单调增长（全正），同时可能在某些 $q$ 上接近 0。Schlag et al. 发现 DeltaNet <strong>只有把归一化删掉才能训起来</strong>；反过来把归一化从原始线性 Transformer 里删掉，perplexity 会飙到 1600 以上。</p>
+  <p class="lead"><strong>今天的标准做法：</strong>删掉分母，改用 GroupNorm / RMSNorm 作用在输出上；$q,k$ 做 L2 归一化（Gated DeltaNet）；或者像 mLSTM 那样用 $\max(|n_t^\top q_t|, 1)$ 稳定化。</p>
+
+  <h3>10.5 实测速度：FLOPs 少 ≠ 跑得快</h3>
+  <div class="bad">
+    <p style="margin-top:0">这是 2020 年那版实现最被低估的问题。递推形式 FLOPs 最少，但：</p>
+    <ul style="margin-bottom:0">
+      <li>逐步更新 $S_t$ <strong>全是外积和矩阵-向量乘，不是矩阵-矩阵乘</strong> → 用不上 tensor core</li>
+      <li>用并行扫描算法虽然能并行，但需要<strong>物化每一步的 2D 隐状态</strong>，HBM I/O 开销巨大，反而更慢（GLA 论文点名 Katsch 2023 的 GateLoop 就吃了这个亏）</li>
+      <li>结果是"理论线性、实测在中等长度（2K–4K）打不过 FlashAttention"</li>
+    </ul>
+  </div>
+  <p>这个问题直到 2024 年才被 <strong>FlashLinearAttention</strong> 和 <strong>Lightning Attention-2</strong> 用 <strong>chunkwise + I/O-aware</strong> 的方式解决——FLA 报告在 1K 长度上就已经比 FlashAttention-2 快。<strong>可以说线性注意力在 2020–2023 年沉寂，一半原因是算法，一半原因是 kernel。</strong></p>
+
+  <h3>10.6 小结：五个缺陷 → 五条修复线</h3>
+  <table>
+    <tr><th>缺陷</th><th>机制根源</th><th>代表修复</th></tr>
+    <tr><td>忘不掉</td><td>状态转移矩阵是 $I$</td><td>$\gamma I$ (RetNet) → $\mathrm{diag}(\alpha_t)$ (GLA) → 标量 $a_t$ (Mamba-2)</td></tr>
+    <tr><td>记不下</td><td>$S$ 固定 $D\times M$</td><td>扩大 $C$ (Based)、MIMO (Mamba-3)、混合架构</td></tr>
+    <tr><td>写得笨</td><td>加法叠加而非覆盖</td><td>delta 规则 $I-\beta_tk_tk_t^\top$ (DeltaNet) → 门控 delta (Gated DeltaNet)</td></tr>
+    <tr><td>不稳定</td><td>$\sum\phi(K)$ 分母</td><td>删分母 + GroupNorm / L2 归一化 q,k</td></tr>
+    <tr><td>跑不快</td><td>无 matmul、I/O 重</td><td>chunkwise 形式 + I/O-aware kernel（FLA / Lightning-2）</td></tr>
+  </table>
+</section>
+
+<!-- ============ 11 ============ -->
+<section id="forms">
+  <h2 class="sec"><span class="num">11</span>三种计算形式：这个领域最重要的工程概念</h2>
+
+  <p>原论文只给了两种形式（并行的式 6 / 递推的式 16–20）。2022 年之后，文献统一使用<strong>三种等价形式</strong>的框架。为简洁起见，这里用现代记号（去掉分母、$\phi=$ 恒等）：</p>
+
+  <table>
+    <tr><th>形式</th><th>公式</th><th>总 FLOPs</th><th>串行深度</th><th>能用 tensor core</th><th>用途</th></tr>
+    <tr>
+      <td><strong>递推 Recurrent</strong></td>
+      <td>$S_t = S_{t-1} + k_t^{\!\top}v_t$<br>$o_t = q_tS_t$</td>
+      <td>$\mathcal{O}(Ld^2)$ <span style="color:#7ee0c0">最少</span></td>
+      <td>$\mathcal{O}(L)$ <span style="color:#f78fb2">最深</span></td>
+      <td><span style="color:#f78fb2">✗</span></td>
+      <td>解码（$\mathcal{O}(1)$/token）</td>
+    </tr>
+    <tr>
+      <td><strong>并行 Parallel</strong></td>
+      <td>$O=\big((QK^{\!\top})\odot M\big)V$</td>
+      <td>$\mathcal{O}(L^2d)$ <span style="color:#f78fb2">最多</span></td>
+      <td>$\mathcal{O}(1)$ <span style="color:#7ee0c0">最浅</span></td>
+      <td><span style="color:#7ee0c0">✓</span></td>
+      <td>短序列 / prefill</td>
+    </tr>
+    <tr>
+      <td><strong>分块 Chunkwise</strong></td>
+      <td>$S_{[i+1]}=S_{[i]}+K_{[i]}^{\!\top}V_{[i]}$<br>$O_{[i]}=Q_{[i]}S_{[i]}+\big((Q_{[i]}K_{[i]}^{\!\top})\odot M\big)V_{[i]}$</td>
+      <td>$\mathcal{O}(LCd + Ld^2)$</td>
+      <td>$\mathcal{O}(L/C)$</td>
+      <td><span style="color:#7ee0c0">✓</span></td>
+      <td><strong>训练的实际选择</strong></td>
+    </tr>
+  </table>
+
+  <div class="key">
+    <p style="margin:0"><strong>分块形式的直觉：</strong>把序列切成长 $C$ 的块。<strong>块内</strong>用二次形式（$C$ 很小，$C^2$ 无所谓，而且是干净的矩阵乘）；<strong>块间</strong>用递推传递状态 $S$。取 $C=L$ 退化成并行形式，取 $C=1$ 退化成递推形式。<strong>$C$ 是一个可调旋钮，在"串行深度"和"总 FLOPs"之间插值</strong>。实践中 $C\in\{64,128\}$（必须是 16 的倍数才能吃到 tensor core）。</p>
+  </div>
+
+  <figure>
+    <svg viewBox="0 0 900 300" width="900" height="300">
+      <text x="20" y="24" fill="#e8ecf5" font-size="14.5" font-weight="700">分块（chunkwise）：块内并行 + 块间递推</text>
+
+      <!-- chunks -->
+      <g>
+        <rect x="40" y="60" width="150" height="110" rx="10" fill="#171b2e" stroke="#6ea8fe" stroke-width="1.6"/>
+        <text x="90" y="82" fill="#6ea8fe" font-size="13" font-weight="700">chunk 1</text>
+        <path d="M55 95 L175 95 L175 160 Z" fill="#6ea8fe" opacity=".28"/>
+        <text x="60" y="150" fill="#9aa4c0" font-size="10.5">块内二次(C×C)</text>
+
+        <rect x="240" y="60" width="150" height="110" rx="10" fill="#171b2e" stroke="#6ea8fe" stroke-width="1.6"/>
+        <text x="290" y="82" fill="#6ea8fe" font-size="13" font-weight="700">chunk 2</text>
+        <path d="M255 95 L375 95 L375 160 Z" fill="#6ea8fe" opacity=".28"/>
+        <rect x="255" y="95" width="120" height="20" fill="#7ee0c0" opacity=".3"/>
+        <text x="260" y="150" fill="#9aa4c0" font-size="10.5">+ 读取 S[1]</text>
+
+        <rect x="440" y="60" width="150" height="110" rx="10" fill="#171b2e" stroke="#6ea8fe" stroke-width="1.6"/>
+        <text x="490" y="82" fill="#6ea8fe" font-size="13" font-weight="700">chunk 3</text>
+        <path d="M455 95 L575 95 L575 160 Z" fill="#6ea8fe" opacity=".28"/>
+        <rect x="455" y="95" width="120" height="20" fill="#7ee0c0" opacity=".3"/>
+        <text x="460" y="150" fill="#9aa4c0" font-size="10.5">+ 读取 S[2]</text>
+
+        <text x="620" y="120" fill="#9aa4c0" font-size="18">⋯</text>
+      </g>
+
+      <!-- state chain -->
+      <g>
+        <line x1="190" y1="210" x2="235" y2="210" stroke="#7ee0c0" stroke-width="2.5"/>
+        <line x1="390" y1="210" x2="435" y2="210" stroke="#7ee0c0" stroke-width="2.5"/>
+        <line x1="590" y1="210" x2="635" y2="210" stroke="#7ee0c0" stroke-width="2.5"/>
+        <rect x="100" y="196" width="60" height="28" rx="7" fill="#1e2440" stroke="#7ee0c0"/>
+        <text x="118" y="215" fill="#7ee0c0" font-size="12">S[1]</text>
+        <rect x="300" y="196" width="60" height="28" rx="7" fill="#1e2440" stroke="#7ee0c0"/>
+        <text x="318" y="215" fill="#7ee0c0" font-size="12">S[2]</text>
+        <rect x="500" y="196" width="60" height="28" rx="7" fill="#1e2440" stroke="#7ee0c0"/>
+        <text x="518" y="215" fill="#7ee0c0" font-size="12">S[3]</text>
+        <line x1="130" y1="172" x2="130" y2="192" stroke="#7ee0c0" stroke-width="1.5" stroke-dasharray="3,3"/>
+        <line x1="330" y1="172" x2="330" y2="192" stroke="#7ee0c0" stroke-width="1.5" stroke-dasharray="3,3"/>
+        <line x1="530" y1="172" x2="530" y2="192" stroke="#7ee0c0" stroke-width="1.5" stroke-dasharray="3,3"/>
+        <text x="660" y="215" fill="#7ee0c0" font-size="12.5">只有 L/C 步串行</text>
+      </g>
+
+      <text x="20" y="262" fill="#9aa4c0" font-size="12.5">块内的三角形 = 因果掩码下的二次注意力（用 tensor core 算，C=64 时开销可忽略）</text>
+      <text x="20" y="284" fill="#9aa4c0" font-size="12.5">绿色横条 = 从上一块继承的压缩历史 S[i]，一次矩阵乘读取。总复杂度 O(LCd + Ld²)，随 L 线性。</text>
+    </svg>
+    <figcaption>图 6：chunkwise 形式。这是 2023 年后所有线性注意力模型训练时实际使用的算法。归因：Hua et al. (2022) 首次提出，RetNet 推广到带衰减，FlashLinearAttention / Lightning Attention-2 做成 I/O-aware。</figcaption>
+  </figure>
+</section>
+
+<!-- ============ 12 ============ -->
+<section id="lineage">
+  <h2 class="sec"><span class="num">12</span>后续演进族谱（2021–2026）</h2>
+
+  <p>用一个统一模板看待整条演进线。所有模型都可以写成：</p>
+  $$\boxed{\;S_t \;=\; \underbrace{A_t}_{\text{状态转移}}\; S_{t-1} \;+\; \underbrace{k_t^{\!\top}v_t}_{\text{写入}},\qquad o_t = q_tS_t\;}$$
+  <p><strong>差别只在 $A_t$ 是什么</strong>。这条主线的历史，就是 $A_t$ 从 $I$ 一步步变复杂的历史。</p>
+
+  <table>
+    <tr><th>模型</th><th>年份</th><th>$A_t$（状态转移）</th><th>关键点</th></tr>
+    <tr>
+      <td><strong>Linear Transformer</strong><br><span class="lead">Katharopoulos et al.</span></td>
+      <td>2020</td>
+      <td>$I$</td>
+      <td>本文主角。纯加法，无遗忘</td>
+    </tr>
+    <tr>
+      <td><strong>RFA</strong><br><span class="lead">Peng et al., ICLR'21</span></td>
+      <td>2021</td>
+      <td>$g_t I$，$g_t=\sigma(w_g\!\cdot\!x_t)$</td>
+      <td><strong>第一个门</strong>。随机傅里叶特征 + 可学习标量遗忘门。作者明说这在 softmax 里没有便宜的对应物</td>
+    </tr>
+    <tr>
+      <td><strong>Performer</strong><br><span class="lead">Choromanski et al., ICLR'21</span></td>
+      <td>2021</td>
+      <td>$I$</td>
+      <td>不改 $A_t$，改 $\phi$：用 <strong>正随机特征 + 正交随机特征</strong> 无偏估计 $\exp$ 核，可从预训练 softmax 模型微调转换</td>
+    </tr>
+    <tr>
+      <td><strong>DeltaNet</strong><br><span class="lead">Schlag, Irie, Schmidhuber, ICML'21</span></td>
+      <td>2021</td>
+      <td>$I-\beta_t k_t^{\!\top}k_t$<br><span style="color:#7ee0c0">（非对角！）</span></td>
+      <td><strong>delta 规则</strong>：先读出该 key 下已存的值，写入<em>误差修正</em>而非直接叠加。$A_t$ 是广义 Householder 矩阵。同时建立与 Fast Weight Programmer 的等价</td>
+    </tr>
+    <tr>
+      <td><strong>cosFormer</strong><br><span class="lead">Qin et al., ICLR'22</span></td>
+      <td>2022</td>
+      <td>—（乘性 cos 重加权）</td>
+      <td>论证 softmax 的两个关键性质是<strong>非负</strong>和<strong>非线性重加权</strong>；用 ReLU + cos 距离重加权注入局部性。这一支后来长成 TransNormer → Lightning Attention → MiniMax</td>
+    </tr>
+    <tr>
+      <td><strong>RetNet</strong><br><span class="lead">Sun et al. (MSRA)</span></td>
+      <td>2023</td>
+      <td>$\gamma I$，$\gamma$ 固定<strong>不依赖数据</strong></td>
+      <td>Multi-Scale Retention：每个头一个不同的固定 $\gamma$。把"并行/递推/分块三形式"确立为显式设计目标</td>
+    </tr>
+    <tr>
+      <td><strong>GLA</strong><br><span class="lead">Yang et al., ICML'24</span></td>
+      <td>2023</td>
+      <td>$\mathrm{diag}(\alpha_t)$，$\alpha_t=\sigma(W_\alpha x_t)$</td>
+      <td>数据相关的<strong>逐通道</strong>遗忘门。同样重要的是配套的 <strong>FlashLinearAttention</strong>——第一个在 1K 长度就超过 FlashAttention-2 的线性注意力 kernel，其 <code>flash-linear-attention</code> 库成了整个领域的事实标准</td>
+    </tr>
+    <tr>
+      <td><strong>Mamba-2 / SSD</strong><br><span class="lead">Dao &amp; Gu, ICML'24</span></td>
+      <td>2024</td>
+      <td>$a_t I$，标量、数据相关</td>
+      <td>标题 <em>Transformers are SSMs</em> 是对本文的明确致敬。证明<strong>标量转移的 SSM ≡ 1-半可分掩码的结构化掩码注意力</strong>。Mamba-1 的对角 $A$ 特意简化成标量，就是为了解锁 matmul 密集的分块算法（比 Mamba-1 快 2–8×）</td>
+    </tr>
+    <tr>
+      <td><strong>mLSTM / xLSTM</strong><br><span class="lead">Beck et al., NeurIPS'24</span></td>
+      <td>2024</td>
+      <td>$f_t I$，指数门控 + 稳定化</td>
+      <td>从 LSTM 一侧独立走到同一个地方：把 LSTM 的标量记忆升级成<strong>矩阵记忆 + 外积更新</strong>，放弃记忆混合以换取可并行</td>
+    </tr>
+    <tr>
+      <td><strong>RWKV-5/6/7</strong><br><span class="lead">Peng et al.</span></td>
+      <td>2024–25</td>
+      <td>v5: 矩阵状态<br>v6: 数据相关衰减<br>v7: <strong>DPLR</strong>（对角+低秩）</td>
+      <td>RWKV-7 "Goose" 把 delta 规则推广到<strong>向量值</strong>状态门控和<strong>向量值</strong>学习率，并<strong>证明常数层数可识别全部正则语言</strong>、超出 $\mathsf{TC}^0$</td>
+    </tr>
+    <tr>
+      <td><strong>DeltaNet 并行化</strong><br><span class="lead">Yang et al., NeurIPS'24</span></td>
+      <td>2024</td>
+      <td>同 DeltaNet</td>
+      <td>用 <strong>WY 表示</strong>（Householder 乘积的紧凑表示）推出分块算法，H100 上比串行快 5.5–13.7×。终于把 2021 年的 DeltaNet 训到 1.3B/100B tokens，超过 Mamba 和 GLA</td>
+    </tr>
+    <tr>
+      <td><strong>Gated DeltaNet</strong><br><span class="lead">Yang, Kautz, Hatamizadeh, ICLR'25</span></td>
+      <td>2024</td>
+      <td>$\alpha_t\big(I-\beta_tk_t^{\!\top}k_t\big)$</td>
+      <td><strong>门控与 delta 规则是互补的</strong>：门控负责<em>批量快速清空</em>（换话题），delta 规则负责<em>精确定点覆盖</em>（改一条事实）。$\beta_t=0$ 退化成 Mamba-2，$\alpha_t=1$ 退化成 DeltaNet。这是 2025–26 生产模型的默认线性层</td>
+    </tr>
+    <tr>
+      <td><strong>KDA</strong><br><span class="lead">Kimi Linear, 2025</span></td>
+      <td>2025</td>
+      <td>Gated DeltaNet，但 $\alpha_t$ <strong>逐通道</strong></td>
+      <td>细粒度门控 + 专用 DPLR 分块 kernel。首个在<strong>公平对照下超过全注意力</strong>的混合线性架构</td>
+    </tr>
+    <tr>
+      <td><strong>Mamba-3</strong><br><span class="lead">Lahoti et al., ICLR'26</span></td>
+      <td>2026</td>
+      <td><strong>复数值</strong> SSM + MIMO</td>
+      <td>三项"推理优先"改动：指数-梯形离散化、复数值状态（直接针对第 13 节的特征值定理）、MIMO（对向量而非标量做递推，用闲置 FLOPs 换检索质量）</td>
+    </tr>
+  </table>
+
+  <figure>
+    <svg viewBox="0 0 900 330" width="900" height="330">
+      <text x="20" y="24" fill="#e8ecf5" font-size="14.5" font-weight="700">状态转移矩阵 A_t 的表达力阶梯</text>
+      <defs><marker id="ar3" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#6ea8fe"/></marker></defs>
+
+      <g font-size="13">
+        <rect x="30" y="50" width="170" height="56" rx="10" fill="#1e2440" stroke="#2a3150"/>
+        <text x="44" y="72" fill="#e8ecf5" font-family="monospace">A = I</text>
+        <text x="44" y="94" fill="#9aa4c0" font-size="11.5">Linear Transformer 2020</text>
+
+        <rect x="240" y="50" width="170" height="56" rx="10" fill="#1e2440" stroke="#2a3150"/>
+        <text x="254" y="72" fill="#e8ecf5" font-family="monospace">A = γI  (固定标量)</text>
+        <text x="254" y="94" fill="#9aa4c0" font-size="11.5">RetNet 2023</text>
+
+        <rect x="450" y="50" width="200" height="56" rx="10" fill="#1e2440" stroke="#2a3150"/>
+        <text x="464" y="72" fill="#e8ecf5" font-family="monospace">A = a_t I  (数据相关)</text>
+        <text x="464" y="94" fill="#9aa4c0" font-size="11.5">Mamba-2 / SSD 2024</text>
+
+        <rect x="240" y="140" width="200" height="56" rx="10" fill="#1e2440" stroke="#2a3150"/>
+        <text x="254" y="162" fill="#e8ecf5" font-family="monospace">A = diag(α_t)</text>
+        <text x="254" y="184" fill="#9aa4c0" font-size="11.5">GLA / mLSTM / RWKV-6</text>
+
+        <rect x="480" y="140" width="220" height="56" rx="10" fill="#1e2440" stroke="#7ee0c0" stroke-width="1.6"/>
+        <text x="494" y="162" fill="#7ee0c0" font-family="monospace">A = I − β_t kᵀk</text>
+        <text x="494" y="184" fill="#9aa4c0" font-size="11.5">DeltaNet 2021（非对角！）</text>
+
+        <rect x="330" y="230" width="270" height="56" rx="10" fill="#1e2440" stroke="#ffd166" stroke-width="1.8"/>
+        <text x="344" y="252" fill="#ffd166" font-family="monospace">A = α_t (I − β_t kᵀk)</text>
+        <text x="344" y="274" fill="#9aa4c0" font-size="11.5">Gated DeltaNet 2024 → KDA / Qwen3-Next</text>
+
+        <line x1="200" y1="78" x2="235" y2="78" stroke="#6ea8fe" stroke-width="1.8" marker-end="url(#ar3)"/>
+        <line x1="410" y1="78" x2="445" y2="78" stroke="#6ea8fe" stroke-width="1.8" marker-end="url(#ar3)"/>
+        <line x1="340" y1="106" x2="340" y2="135" stroke="#6ea8fe" stroke-width="1.8" marker-end="url(#ar3)"/>
+        <line x1="115" y1="106" x2="530" y2="136" stroke="#7ee0c0" stroke-width="1.5" stroke-dasharray="4,4"/>
+        <line x1="340" y1="196" x2="420" y2="226" stroke="#ffd166" stroke-width="1.8" marker-end="url(#ar3)"/>
+        <line x1="560" y1="196" x2="490" y2="226" stroke="#ffd166" stroke-width="1.8" marker-end="url(#ar3)"/>
+      </g>
+      <text x="20" y="316" fill="#9aa4c0" font-size="12">越往右下表达力越强、kernel 越难写。第 13 节会说明为什么"非对角"这一步是质变而不是量变。</text>
+    </svg>
+    <figcaption>图 7：$A_t$ 的演化阶梯。上排是"衰减/门控"线（解决忘不掉），右侧的 DeltaNet 是"覆盖写入"线（解决写得笨），Gated DeltaNet 把两条线合并。</figcaption>
+  </figure>
+
+  <h3>12.1 生产落地现状（2025–2026）</h3>
+  <div class="key">
+    <p style="margin:0"><strong>全行业共识已经是"混合"（hybrid）</strong>：绝大多数层用线性/循环层，插入少量全注意力层。纯线性在 LLM 规模上不可行，失败模式就是检索（NIAH / RULER 上崩掉）。</p>
+  </div>
+
+  <table>
+    <tr><th>模型</th><th>时间</th><th>混合结构</th></tr>
+    <tr><td><strong>Jamba</strong>（AI21）</td><td>2024</td><td>1 attention : 7 Mamba，隔层 MoE。首个生产级 Mamba 混合</td></tr>
+    <tr><td><strong>MiniMax-01</strong></td><td>2025-01</td><td>456B 总参 / 45.9B 激活 MoE，每 8 层 <strong>7 Lightning Attention : 1 softmax</strong>，1M 训练 → 4M 推理</td></tr>
+    <tr><td><strong>Qwen3-Next-80B-A3B</strong></td><td>2025-09</td><td>48 层 = 12 × (3 × <strong>Gated DeltaNet</strong> + 1 × Gated Attention)，即 <strong>3:1</strong>；512 专家 top-10+1</td></tr>
+    <tr><td><strong>IBM Granite 4.0</strong></td><td>2025-10</td><td><strong>9 Mamba-2 : 1 Transformer</strong>，长上下文内存降 &gt;70%</td></tr>
+    <tr><td><strong>Kimi Linear 48B-A3B</strong></td><td>2025-10</td><td><strong>20 KDA : 7 gated MLA</strong>（≈3:1）。RULER-128K 84.3 vs MLA 81.3；KV cache −75%，1M 上下文解码吞吐 6.3×</td></tr>
+    <tr><td><strong>NVIDIA Nemotron 3 Nano</strong></td><td>2025-12</td><td>52 层里<strong>只有 2 层注意力</strong>，其余 Mamba-2 + MoE；完全不用位置编码</td></tr>
+    <tr><td><strong>Qwen3.5-397B-A17B</strong></td><td>2026-02</td><td>60 层 = 15 × (3 × Gated DeltaNet + 1 × Gated Attention)，沿用 3:1 骨架</td></tr>
+  </table>
+
+  <p class="lead">经验规律：<strong>线性注意力类混合大多用 3:1，SSM 类混合大多用 7:1～9:1 甚至更稀疏</strong>。两个比例都是消融试出来的，没有理论依据。Mamba-3 作者的原话很直白：线性层"未来将主要与全局自注意力层配合使用，至少对语言建模而言如此"。</p>
+</section>
+
+<!-- ============ 13 ============ -->
+<section id="theory">
+  <h2 class="sec"><span class="num">13</span>表达能力的理论边界</h2>
+
+  <h3>13.1 线性注意力 = softmax 的一阶泰勒截断</h3>
+  <p>Mongaras &amp; Larson（TMLR 2025）给出了最干净的代数答案。利用 $\exp$ 的泰勒展开和张量积恒等式 $(A\cdot B)^n=(A^{\otimes n})\cdot(B^{\otimes n})$，softmax 注意力的<strong>精确</strong>递推形式是：</p>
+  $$O_t = G_t\sum_{n=0}^{\infty}\frac{1}{n!}\big(Q_t^{\otimes n}\big)\cdot H_t^{(n)},\qquad H_t^{(n)} = \sum_{s\le t}\big(K_s^{\otimes n}\big)^{\!\top}V_s$$
+  <p>截断到 $n=1$：$O_t = Q_t\sum_s K_s^\top V_s = Q_tH_t$——<strong>恰好就是 Katharopoulos 的线性注意力</strong>。</p>
+  <div class="key">
+    <p style="margin:0">所以"线性注意力比 softmax 差"不是玄学，而是<strong>丢掉了高阶张量积项</strong>。他们实测把逐阶泰勒项加回 $1+\mathrm{elu}$、ReLU、cosine 三种线性注意力，性能从"线性注意力水平"<strong>平滑插值</strong>到"softmax 水平"。这也解释了为什么 Based 用 2 阶泰勒能显著缩小差距、Hedgehog 的诊断（不 spiky 不单调）为什么成立——高阶项正是"尖锐化"的来源。</p>
+  </div>
+
+  <h3>13.2 复杂度类：递归形式并不带来更强的表达力</h3>
+  <p><strong>The Illusion of State in State-Space Models</strong>（Merrill, Petty, Sabharwal, ICML 2024）证明了一个反直觉的结果：尽管有"递归"外观，对数精度下的 S4、Mamba(S6) 和广义线性 SSM 都落在 <strong>L-uniform $\mathsf{TC}^0$</strong>——和 Transformer<strong>同一个复杂度天花板</strong>。</p>
+  <ul>
+    <li>技术关键：卷积形式 $h_i=\sum_j\big(\prod_{k=j+1}^{i}\bar A_k\big)\bar B_jx_j$ 需要"迭代乘积"和"矩阵幂"，两者在对数精度下都属于 $\mathsf{TC}^0$</li>
+    <li>推论：无法求解 $S_5$ 的字问题（置换复合，NC¹-hard），因此<strong>原则上无法</strong>跟踪棋局、执行 Python、追踪长叙事中的实体状态</li>
+    <li>但论文第 5 节同时指出：<strong>只要引入依赖输入的转移矩阵</strong>就能跳出 $\mathsf{TC}^0$——这正是后面两篇论文走的门</li>
+  </ul>
+
+  <h3>13.3 负特征值：一个免费的修复</h3>
+  <p><strong>Unlocking State-Tracking in Linear RNNs Through Negative Eigenvalues</strong>（Grazzi et al., ICLR 2025）是这条线上最实用的理论结果：</p>
+  <ul>
+    <li><strong>定理 1</strong>：任何有限精度的线性 RNN，若其状态转移矩阵<strong>只有正实特征值</strong>，则无法在任意长度上求解 PARITY。这覆盖了几乎所有已部署模型——Mamba、RWKV-4/5/6、GLA、mLSTM、原始 DeltaNet，它们的特征值都在 $[0,1]$</li>
+    <li><strong>定理 2</strong>（以 ICLR camera-ready 为准）：需要<strong>非三角</strong>矩阵才能模 3 计数</li>
+    <li><strong>定理 3</strong>：若转移矩阵是特征值在 $[-1,1]$ 的 $I-\beta k k^\top$ 的乘积，则可学习<strong>任意正则语言</strong>——正是 DeltaNet 把 $\beta$ 扩到 $(0,2)$ 的情形</li>
+  </ul>
+  <div class="key">
+    <p style="margin:0"><strong>修复是免费的：</strong>把特征值范围从 $[0,1]$ 放宽到 $[-1,1]$（即 $\beta_t\in(0,2)$），不增加任何训练/推理成本，Mamba 和 DeltaNet 都能解 PARITY，$S_5$ 和模算术上稳定提升，代码和数学 perplexity 变好（TriviaQA 这种纯记忆任务略降，符合预期）。已在 1.3B 预训练上验证稳定。</p>
+  </div>
+
+  <div class="warn">
+    <strong>版本注意：</strong>该论文 arXiv v1 的表述是"需要复特征值"，v2 修正了定理 1 和 2，ICLR camera-ready（v3–v5）改为"非三角"。引用时请用 camera-ready 版本。类似地，Based 的头条数字在 arXiv v1 是 6.22 分、ICML 版是 10.36 分。
+  </div>
+
+  <h3>13.4 三个结论合起来看</h3>
+  <div class="grid3">
+    <div class="card">
+      <h4>为什么线性注意力质量差</h4>
+      <p style="margin-bottom:0">它是 softmax 的一阶截断，丢了高阶项 → 注意力权重不够尖锐（13.1 / Hedgehog）</p>
+    </div>
+    <div class="card">
+      <h4>为什么它 recall 差</h4>
+      <p style="margin-bottom:0">固定状态的信息论上界，与表达力无关，是<strong>容量</strong>问题（10.2–10.3）</p>
+    </div>
+    <div class="card">
+      <h4>为什么它状态追踪差</h4>
+      <p style="margin-bottom:0">对角/正特征值转移矩阵落在 $\mathsf{TC}^0$ 内；换成非对角、允许负特征值就能跳出（13.2–13.3）</p>
+    </div>
+  </div>
+  <p class="lead">这三个是<strong>互相独立</strong>的缺陷，需要三种不同的修复。混合架构之所以有效，是因为插入的全注意力层<strong>一次性同时补上了三者</strong>。</p>
+</section>
+
+<!-- ============ 14 ============ -->
+<section id="code">
+  <h2 class="sec"><span class="num">14</span>亲手实现与等价性验证</h2>
+
+  <p>下面是三种形式的最小 PyTorch 实现，可直接运行，并验证三者数值等价。这是理解这篇论文最快的方式——建议自己敲一遍。</p>
+
+  <pre><code>import torch, torch.nn.functional as F
+
+def phi(x):
+    """论文式(7)的特征映射：elu(x)+1，保证严格为正"""
+    return F.elu(x) + 1.0
+
+# ---------------- 形式 A：并行（二次），最直观 ----------------
+def linear_attn_parallel(q, k, v, eps=1e-6):
+    """q,k: (B,H,N,D)   v: (B,H,N,M)"""
+    q, k = phi(q), phi(k)
+    N = q.shape[-2]
+    mask = torch.tril(torch.ones(N, N, device=q.device, dtype=torch.bool))
+    A   = q @ k.transpose(-1, -2)               # (B,H,N,N) 未归一化注意力
+    A   = A.masked_fill(~mask, 0.0)             # 因果掩码
+    num = A @ v                                 # (B,H,N,M)
+    den = A.sum(-1, keepdim=True)               # (B,H,N,1)
+    return num / (den + eps)
+
+# ---------------- 形式 B：递推（RNN），论文式(16)-(20) ----------------
+def linear_attn_recurrent(q, k, v, eps=1e-6):
+    q, k = phi(q), phi(k)
+    B, H, N, D = q.shape
+    M = v.shape[-1]
+    S = q.new_zeros(B, H, D, M)                 # 矩阵状态  式(10)
+    z = q.new_zeros(B, H, D)                    # 归一化状态 式(11)
+    out = []
+    for i in range(N):
+        ki, vi, qi = k[:, :, i], v[:, :, i], q[:, :, i]
+        S = S + ki.unsqueeze(-1) * vi.unsqueeze(-2)      # S += φ(k)vᵀ  外积
+        z = z + ki
+        num = (qi.unsqueeze(-2) @ S).squeeze(-2)         # (B,H,M)
+        den = (qi * z).sum(-1, keepdim=True)             # (B,H,1)
+        out.append(num / (den + eps))                    # 式(12)
+    return torch.stack(out, dim=2)
+
+# ---------------- 形式 C：分块（训练实际用的） ----------------
+def linear_attn_chunkwise(q, k, v, C=64, eps=1e-6):
+    q, k = phi(q), phi(k)
+    B, H, N, D = q.shape
+    M = v.shape[-1]
+    assert N % C == 0
+    q = q.view(B, H, N // C, C, D)
+    k = k.view(B, H, N // C, C, D)
+    v = v.view(B, H, N // C, C, M)
+    S = q.new_zeros(B, H, D, M)
+    z = q.new_zeros(B, H, D)
+    mask = torch.tril(torch.ones(C, C, device=q.device, dtype=torch.bool))
+    outs = []
+    for i in range(N // C):
+        qi, ki, vi = q[:, :, i], k[:, :, i], v[:, :, i]
+        # --- 块间：从压缩历史读取 ---
+        num = qi @ S                                     # (B,H,C,M)
+        den = qi @ z.unsqueeze(-1)                       # (B,H,C,1)
+        # --- 块内：小规模二次注意力（tensor core 友好）---
+        A   = (qi @ ki.transpose(-1, -2)).masked_fill(~mask, 0.0)
+        num = num + A @ vi
+        den = den + A.sum(-1, keepdim=True)
+        outs.append(num / (den + eps))
+        # --- 状态推进 ---
+        S = S + ki.transpose(-1, -2) @ vi
+        z = z + ki.sum(-2)
+    return torch.cat(outs, dim=2)
+
+
+if __name__ == "__main__":
+    torch.manual_seed(0)
+    B, H, N, D, M = 2, 4, 256, 32, 32
+    q = torch.randn(B, H, N, D, dtype=torch.float64)
+    k = torch.randn(B, H, N, D, dtype=torch.float64)
+    v = torch.randn(B, H, N, M, dtype=torch.float64)
+
+    a = linear_attn_parallel(q, k, v)
+    b = linear_attn_recurrent(q, k, v)
+    c = linear_attn_chunkwise(q, k, v, C=64)
+
+    print("parallel vs recurrent :", (a - b).abs().max().item())
+    print("parallel vs chunkwise :", (a - c).abs().max().item())
+    # 双精度下两者都应在 1e-12 量级 —— 三种形式在数学上完全等价</code></pre>
+
+  <div class="note">
+    <strong>建议做的三个实验：</strong>
+    <ol style="margin-bottom:0">
+      <li>把 $N$ 从 512 加到 16384，画出三种形式的时间/显存曲线，找到 parallel 的 OOM 点和 chunkwise 的最优 $C$。你会发现 <strong>chunkwise 在几乎所有长度上都赢</strong>——这就是为什么 2023 年后大家都用它。</li>
+      <li>把 <code>phi</code> 换成恒等映射，看 perplexity 怎么变；再换成 <code>lambda x: F.relu(x)+1</code>，观察是否出现"死维度"。</li>
+      <li>在递推版里加一行 <code>S = alpha * S + ...</code>（$\alpha\in(0,1)$），你就得到了 RetNet；把 <code>alpha</code> 换成 <code>sigmoid(W @ x)</code>，你就得到了 Mamba-2 / GLA。<strong>整条演进线在代码上只差一行。</strong></li>
+    </ol>
+  </div>
+
+  <p>生产代码请直接用 <a href="https://github.com/fla-org/flash-linear-attention">flash-linear-attention</a>（Triton 实现，覆盖 GLA / DeltaNet / Gated DeltaNet / KDA / RWKV 系列），以及原论文的 <a href="https://github.com/idiap/fast-transformers">idiap/fast-transformers</a>。</p>
+</section>
+
+<!-- ============ 15 ============ -->
+<section id="faq">
+  <h2 class="sec"><span class="num">15</span>常见误解 FAQ</h2>
+
+  <div class="card">
+    <h4>Q1：这篇论文证明了"Transformer 就是 RNN"吗？</h4>
+    <p style="margin-bottom:0"><strong>不是。</strong>它证明的是"<em>线性化的、带因果掩码的</em> Transformer 是 RNN"。softmax Transformer 只有在"无界状态 RNN"这种平凡意义上才是 RNN（Oren et al. 2024 把这个意义严格化了），而那等价于说"KV cache 是个会长大的状态"，没有效率收益。</p>
+  </div>
+
+  <div class="card">
+    <h4>Q2：线性注意力是对 softmax 注意力的近似吗？</h4>
+    <p style="margin-bottom:0"><strong>本文的版本不是。</strong> $\phi=\mathrm{elu}+1$ 定义了一个<em>全新的</em>注意力函数，不试图逼近 softmax。<strong>Performer 才是近似</strong>（无偏估计 $\exp$ 核）。有趣的是 Mongaras &amp; Larson (2025) 事后表明，线性注意力<em>恰好</em>是 softmax 的一阶泰勒项——所以说它是"一种非常粗糙的近似"也说得通，但这不是原论文的立意。</p>
+  </div>
+
+  <div class="card">
+    <h4>Q3：既然复杂度 $\mathcal{O}(N)$，为什么 2020–2023 年几乎没人用？</h4>
+    <p style="margin-bottom:0">两个原因叠加。<strong>质量</strong>：无遗忘 + 状态容量有限 → recall 崩，语言建模掉分明显（参见 8.3 的 PER 5.12 vs 8.08）。<strong>速度</strong>：递推形式没有 matmul，用不上 tensor core；并行扫描要物化 2D 状态，I/O 爆炸。<strong>直到 2024 年门控（GLA/Mamba-2）解决前者、chunkwise I/O-aware kernel 解决后者，这条线才真正起飞。</strong></p>
+  </div>
+
+  <div class="card">
+    <h4>Q4：Mamba 和线性注意力是两回事吗？</h4>
+    <p style="margin-bottom:0"><strong>不是两回事。</strong> Dao &amp; Gu 的 SSD 定理（ICML 2024）证明：<strong>标量转移的 SSM 精确等价于 1-半可分掩码的结构化掩码注意力</strong>。Mamba-2 就是"带数据相关标量衰减的线性注意力"，和 RetNet（固定衰减）、GLA（对角衰减）是同一族的不同点。他们论文标题 <em>Transformers are SSMs</em> 就是对本文的致敬。</p>
+  </div>
+
+  <div class="card">
+    <h4>Q5：那 4000× 加速是真的吗？</h4>
+    <p style="margin-bottom:0">数字是真的，但要看清语境：<strong>CIFAR-10 自回归<em>逐像素生成</em>的吞吐比</strong>（17.85 vs 0.004 images/sec），序列长 3072，且 softmax 基线因显存只能 batch=1 而线性版能开大 batch。这是"长序列自回归解码"这个特定场景的极端值，不是通用加速比。语音识别那栏的加速只有 3×。</p>
+  </div>
+
+  <div class="card">
+    <h4>Q6：现在还值得读这篇 2020 年的论文吗？</h4>
+    <p style="margin-bottom:0"><strong>非常值得</strong>，因为它是整个领域的<strong>词汇表</strong>。$S_t$ 的外积更新、三种计算形式、常数内存反向传播、"矩阵值隐状态"这些概念都在这里第一次以现代形式出现。读完这篇再读 GLA / Mamba-2 / Gated DeltaNet，会发现它们全都是在同一个骨架上换 $A_t$ 和换 kernel。</p>
+  </div>
+</section>
+
+<!-- ============ 16 ============ -->
+<section id="refs">
+  <h2 class="sec"><span class="num">16</span>学习路径与参考文献</h2>
+
+  <h3>16.1 推荐阅读顺序</h3>
+  <ol>
+    <li><strong>本文（Katharopoulos et al., ICML 2020）</strong>——只读 §3，把式 (3)→(6)→(12)→(20) 手推一遍</li>
+    <li><strong>Schlag, Irie, Schmidhuber, ICML 2021</strong>——建立 Fast Weight 视角和 delta 规则，理解"状态是可编程权重"</li>
+    <li><strong>GLA（Yang et al., ICML 2024）</strong>——§2 是<strong>最好的三种形式教程</strong>，§3 是最好的 GPU kernel 讲解</li>
+    <li><strong>Mamba-2 / SSD（Dao &amp; Gu, ICML 2024）</strong>——统一 SSM 与注意力，理解整个格局</li>
+    <li><strong>Gated DeltaNet（Yang et al., ICLR 2025）</strong>——当前生产级线性层的标准答案 + test-time regression 统一视角</li>
+    <li><strong>Zoology / Repeat After Me / MiniMax-01 消融</strong>——理解"为什么必须混合"的经验与理论证据</li>
+  </ol>
+
+  <h3>16.2 主要文献</h3>
+  <h4>核心</h4>
+  <ul>
+    <li>Katharopoulos, A., Vyas, A., Pappas, N., Fleuret, F. (2020). <em>Transformers are RNNs: Fast Autoregressive Transformers with Linear Attention.</em> ICML, PMLR 119:5156–5165. arXiv:2006.16236. 项目页 <a href="https://linear-transformers.com/">linear-transformers.com</a>，代码 <a href="https://github.com/idiap/fast-transformers">idiap/fast-transformers</a></li>
+    <li>Tsai, Y.-H. et al. (2019). <em>Transformer Dissection: A Unified Understanding of Transformer's Attention via the Lens of Kernel.</em> EMNLP. —— 核视角的来源</li>
+    <li>Schmidhuber, J. (1992). <em>Learning to Control Fast-Weight Memories.</em> Neural Computation. —— 三十年前的同一个东西</li>
+  </ul>
+  <h4>早期衍生（2021–2022）</h4>
+  <ul>
+    <li>Choromanski, K. et al. (2021). <em>Rethinking Attention with Performers.</em> ICLR (oral). arXiv:2009.14794</li>
+    <li>Peng, H. et al. (2021). <em>Random Feature Attention.</em> ICLR (spotlight). arXiv:2103.02143 —— 第一个门控</li>
+    <li>Schlag, I., Irie, K., Schmidhuber, J. (2021). <em>Linear Transformers Are Secretly Fast Weight Programmers.</em> ICML, PMLR 139:9355–9366. arXiv:2102.11174 —— delta 规则 / DeltaNet</li>
+    <li>Qin, Z. et al. (2022). <em>cosFormer: Rethinking Softmax in Attention.</em> ICLR. arXiv:2202.08791</li>
+  </ul>
+  <h4>门控 / 衰减世代（2023–2025）</h4>
+  <ul>
+    <li>Sun, Y. et al. (2023). <em>Retentive Network: A Successor to Transformer for LLMs.</em> arXiv:2307.08621</li>
+    <li>Yang, S., Wang, B., Shen, Y., Panda, R., Kim, Y. (2024). <em>Gated Linear Attention Transformers with Hardware-Efficient Training.</em> ICML, PMLR 235:56501–56523. arXiv:2312.06635</li>
+    <li>Gu, A., Dao, T. (2023). <em>Mamba: Linear-Time Sequence Modeling with Selective State Spaces.</em> arXiv:2312.00752</li>
+    <li>Dao, T., Gu, A. (2024). <em>Transformers are SSMs: ... Structured State Space Duality.</em> ICML, PMLR 235:10041–10071. arXiv:2405.21060</li>
+    <li>Beck, M. et al. (2024). <em>xLSTM: Extended Long Short-Term Memory.</em> NeurIPS (spotlight). arXiv:2405.04517</li>
+    <li>Peng, B. et al. (2024). <em>Eagle and Finch: RWKV with Matrix-Valued States and Dynamic Recurrence.</em> arXiv:2404.05892</li>
+    <li>Peng, B. et al. (2025). <em>RWKV-7 "Goose" with Expressive Dynamic State Evolution.</em> arXiv:2503.14456</li>
+    <li>Yang, S., Wang, B., Zhang, Y., Shen, Y., Kim, Y. (2024). <em>Parallelizing Linear Transformers with the Delta Rule over Sequence Length.</em> NeurIPS. arXiv:2406.06484</li>
+    <li>Yang, S., Kautz, J., Hatamizadeh, A. (2024). <em>Gated Delta Networks: Improving Mamba2 with Delta Rule.</em> ICLR 2025. arXiv:2412.06464</li>
+  </ul>
+  <h4>特征映射与 recall</h4>
+  <ul>
+    <li>Zhang, M., Bhatia, K., Kumbong, H., Ré, C. (2024). <em>The Hedgehog &amp; the Porcupine: Expressive Linear Attentions with Softmax Mimicry.</em> ICLR. arXiv:2402.04347</li>
+    <li>Arora, S. et al. (2024). <em>Simple linear attention language models balance the recall-throughput tradeoff (Based).</em> ICML, PMLR 235:1763–1840. arXiv:2402.18668</li>
+    <li>Arora, S. et al. (2024). <em>Zoology: Measuring and Improving Recall in Efficient Language Models.</em> ICLR. arXiv:2312.04927</li>
+    <li>Jelassi, S., Brandfonbrener, D., Kakade, S., Malach, E. (2024). <em>Repeat After Me: Transformers are Better than State Space Models at Copying.</em> ICML, PMLR 235:21502–21521. arXiv:2402.01032</li>
+    <li>Arora, S. et al. (2024). <em>Just read twice: closing the recall gap for recurrent language models.</em> arXiv:2407.05483</li>
+  </ul>
+  <h4>理论</h4>
+  <ul>
+    <li>Merrill, W., Petty, J., Sabharwal, A. (2024). <em>The Illusion of State in State-Space Models.</em> ICML, PMLR 235:35492–35506. arXiv:2404.08819</li>
+    <li>Sarrof, Y., Veitsman, Y., Hahn, M. (2024). <em>The Expressive Capacity of State Space Models: A Formal Language Perspective.</em> NeurIPS. arXiv:2405.17394</li>
+    <li>Grazzi, R. et al. (2025). <em>Unlocking State-Tracking in Linear RNNs Through Negative Eigenvalues.</em> ICLR. arXiv:2411.12537（请引 camera-ready）</li>
+    <li>Mongaras, G., Larson, E.C. (2025). <em>On the Expressiveness of Softmax Attention: A Recurrent Neural Network Perspective.</em> TMLR. arXiv:2507.23632</li>
+  </ul>
+  <h4>其他"Transformers are X RNNs"</h4>
+  <ul>
+    <li>Oren, M., Hassid, M., Yarden, N., Adi, Y., Schwartz, R. (2024). <em>Transformers are Multi-State RNNs.</em> EMNLP, 18724–18741. arXiv:2401.06104 —— TOVA</li>
+    <li>Feng, L. et al. (2024). <em>Attention as an RNN.</em> arXiv:2405.13956 —— Aaren，并行前缀扫描（会议归属存疑，很可能是 workshop）</li>
+  </ul>
+  <h4>系统与生产模型</h4>
+  <ul>
+    <li>MiniMax et al. (2025). <em>MiniMax-01: Scaling Foundation Models with Lightning Attention.</em> arXiv:2501.08313 —— 含最有价值的纯线性 vs 混合 scaling law 消融</li>
+    <li>Moonshot AI (2025). <em>Kimi Linear.</em> arXiv:2510.26692</li>
+    <li>Lieber, O. et al. (2024). <em>Jamba.</em> ICLR 2025. arXiv:2403.19887</li>
+    <li>Irie, K., Gershman, S. (2026). <em>Fast Weight Programming and Linear Transformers: From Machine Learning to Neurobiology.</em> TMLR. arXiv:2508.08435 —— 权威回顾综述</li>
+    <li>代码库：<a href="https://github.com/fla-org/flash-linear-attention">flash-linear-attention</a>、<a href="https://github.com/HazyResearch/zoology">zoology</a>（MQAR 诊断）</li>
+  </ul>
+
+  <div class="warn">
+    <strong>核实说明：</strong>本报告中 2020 年原论文的公式、算法、实验数字均直接来自论文正文（arXiv:2006.16236 / PMLR v119）并已逐条核对。第 12 节生产模型部分的架构比例来自各家官方博客 / 论文 / 模型卡；其中 <strong>Qwen3.5 的架构数字来自多个独立推理服务商页面而非 Qwen 官方原始来源，Ling 2.5、Nemotron 3 Super/Ultra 的参数量为二手来源</strong>，引用请自行复核。RWKV-4 与 Lightning Attention-2 的 arXiv 编号未在本次调研中直接核实。
+  </div>
+
+  <div class="foot">
+    <strong>Transformers are RNNs 调研报告</strong><br>
+    首次生成日期：2026-08-08 · 最后更新日期：2026-08-08 · 使用模型：Claude Opus 5 · 模式：xhigh<br>
+    本报告为学习调研用途，图示均为帮助理解的示意图（非精确数值绘制）。公式已尽力核对；如需严格证明细节，请回溯上述原始文献。<br>
+    生成于本地文件 <code>transformers-are-RNNs.html</code> · 使用 MathJax 3 渲染公式 · 建议用现代浏览器打开。
+  </div>
+</section>
+
+
+
+</main>
+</div>
+</body>
+</html>

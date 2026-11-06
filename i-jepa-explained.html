@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>I-JEPA 论文讲解</title>
+<style>
+:root{
+  --bg:#fbfaf8; --surface:#ffffff; --border:#e5e1da; --border-soft:#efece6;
+  --text:#23201c; --muted:#6b6459; --accent:#b4541f; --accent-soft:#fdf2ec;
+  --code-bg:#f5f2ed; --shadow:0 1px 2px rgba(35,32,28,.05), 0 8px 24px rgba(35,32,28,.04);
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+}
+:root:not([data-theme="light"]) { }
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#161513; --surface:#1e1d1a; --border:#332f2a; --border-soft:#282521;
+    --text:#e8e4dd; --muted:#9b9386; --accent:#e08a56; --accent-soft:#2a2019;
+    --code-bg:#242220; --shadow:0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.25);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#161513; --surface:#1e1d1a; --border:#332f2a; --border-soft:#282521;
+  --text:#e8e4dd; --muted:#9b9386; --accent:#e08a56; --accent-soft:#2a2019;
+  --code-bg:#242220; --shadow:0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.25);
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0; background:var(--bg); color:var(--text);
+  font-family:var(--sans); font-size:16.5px; line-height:1.78;
+  letter-spacing:.01em;
+}
+.wrap{max-width:780px; margin:0 auto; padding:64px 16px 120px}
+header{margin-bottom:48px; padding-bottom:28px; border-bottom:1px solid var(--border)}
+h1{font-size:2.05rem; line-height:1.3; margin:0 0 14px; letter-spacing:-.015em; font-weight:650}
+.sub{color:var(--muted); font-size:.93rem; margin:0}
+.sub a{color:var(--muted)}
+.paper{
+  margin-top:20px; padding:14px 18px; background:var(--accent-soft);
+  border-left:3px solid var(--accent); border-radius:0 6px 6px 0;
+  font-size:.92rem; line-height:1.6; color:var(--text);
+}
+h2{
+  font-size:1.34rem; font-weight:640; letter-spacing:-.01em;
+  margin:56px 0 18px; padding-top:6px;
+}
+h2::before{
+  content:""; display:block; width:34px; height:3px; background:var(--accent);
+  border-radius:2px; margin-bottom:14px; opacity:.85;
+}
+h3{font-size:1.04rem; font-weight:620; margin:34px 0 12px; color:var(--text)}
+p{margin:0 0 16px}
+ul,ol{margin:0 0 18px; padding-left:1.4em}
+li{margin:0 0 8px}
+li::marker{color:var(--accent)}
+strong{font-weight:640}
+a{color:var(--accent); text-decoration:none; border-bottom:1px solid color-mix(in srgb, var(--accent) 35%, transparent)}
+a:hover{border-bottom-color:var(--accent)}
+code{
+  font-family:var(--mono); font-size:.87em; background:var(--code-bg);
+  padding:.14em .4em; border-radius:4px;
+}
+blockquote{
+  margin:22px 0; padding:14px 18px; background:var(--surface);
+  border:1px solid var(--border); border-left:3px solid var(--muted);
+  border-radius:0 6px 6px 0; color:var(--muted); font-size:.95rem;
+}
+blockquote p:last-child{margin:0}
+.tablewrap{overflow-x:auto; margin:0 0 22px; -webkit-overflow-scrolling:touch}
+table{
+  border-collapse:collapse; width:100%; font-size:.91rem;
+  background:var(--surface); border:1px solid var(--border); border-radius:8px;
+  overflow:hidden; box-shadow:var(--shadow);
+}
+th,td{padding:10px 14px; text-align:left; border-bottom:1px solid var(--border-soft); vertical-align:top}
+th{
+  background:var(--code-bg); font-weight:620; font-size:.85rem;
+  letter-spacing:.02em; color:var(--muted); white-space:nowrap;
+}
+tbody tr:last-child td{border-bottom:none}
+td:first-child{white-space:nowrap}
+.formula{
+  margin:22px 0; padding:22px 18px; background:var(--surface);
+  border:1px solid var(--border); border-radius:8px; text-align:center;
+  font-family:var(--mono); font-size:1.02rem; overflow-x:auto; box-shadow:var(--shadow);
+}
+.formula .big{font-size:1.25em; vertical-align:-.15em}
+.formula sub, .formula sup{font-size:.68em}
+figure{margin:26px 0; padding:0}
+figure svg{display:block; width:100%; height:auto; max-width:100%}
+figcaption{margin-top:10px; font-size:.86rem; color:var(--muted); text-align:center}
+.diagram{
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:8px; padding:22px 16px; box-shadow:var(--shadow);
+}
+.svg-node{fill:var(--surface); stroke:var(--border); stroke-width:1.5}
+.svg-node-accent{fill:var(--accent-soft); stroke:var(--accent); stroke-width:1.5}
+.svg-label{fill:var(--text); font-family:var(--sans); font-size:12px; text-anchor:middle}
+.svg-label-sm{fill:var(--muted); font-family:var(--sans); font-size:10.5px; text-anchor:middle}
+.svg-edge{stroke:var(--muted); stroke-width:1.4; fill:none; opacity:.7}
+.callout{
+  margin:26px 0; padding:18px 20px; background:var(--surface);
+  border:1px solid var(--border); border-radius:8px; box-shadow:var(--shadow);
+}
+.callout h3{margin-top:0}
+.callout p:last-child, .callout ol:last-child, .callout ul:last-child{margin-bottom:0}
+footer{
+  margin-top:72px; padding-top:24px; border-top:1px solid var(--border);
+  font-size:.88rem; color:var(--muted);
+}
+footer ul{padding-left:1.2em}
+@media (max-width:600px){
+  .wrap{padding:40px 16px 80px}
+  h1{font-size:1.6rem}
+  h2{font-size:1.18rem; margin-top:44px}
+  body{font-size:16px}
+  td:first-child{white-space:normal}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>I-JEPA 论文讲解</h1>
+  <p class="sub">图像联合嵌入预测架构 · 2026-09-22</p>
+  <div class="paper">
+    <strong>Self-Supervised Learning from Images with a Joint-Embedding Predictive Architecture</strong><br>
+    Assran, Duval, Misra, Bojanowski, Vincent, Rabbat, LeCun, Ballas — Meta AI, CVPR 2023<br>
+    <a href="https://arxiv.org/abs/2301.08243">arXiv:2301.08243</a> · <a href="https://github.com/facebookresearch/ijepa">facebookresearch/ijepa</a>
+  </div>
+</header>
+
+<h2>一句话概括</h2>
+<p>I-JEPA 用一张图里的一个「上下文块」去预测同一张图里几个「目标块」的<strong>表征</strong>（而不是像素），由此在完全不用手工数据增强、不用负样本的前提下学到语义特征。ViT-Huge/14 在 16 张 A100 上训练不到 72 小时，ImageNet linear probe 达到 79.3%。</p>
+<p>三个值得记住的点：</p>
+<ul>
+  <li><strong>预测发生在表征空间</strong>。消融显示改成像素空间预测，1% ImageNet 从 66.9% 掉到 40.7%——这是全文最关键的一条证据。</li>
+  <li><strong>掩码策略是成败关键</strong>，不是配角。多块掩码 54.2% vs 随机掩码 17.6%（1% ImageNet）。</li>
+  <li><strong>效率</strong>。收敛所需迭代数约为 MAE 的 1/5，整体计算量比 MAE 训练同规模 ViT-H/14 省 10 倍以上。</li>
+</ul>
+
+<h2>背景：自监督的两条旧路线各自撞墙</h2>
+<p>I-JEPA 之前，图像自监督主要有两派，各自有一个结构性缺陷。</p>
+<div class="tablewrap">
+<table>
+<thead><tr><th>路线</th><th>代表工作</th><th>怎么做</th><th>痛点</th></tr></thead>
+<tbody>
+<tr><td>生成式 / 重建式</td><td>MAE、BEiT</td><td>遮住一部分像素，在<strong>像素空间</strong>把它补回来</td><td>被迫花容量拟合纹理、噪声这些不可预测也无意义的细节；表征语义度低，linear probe 弱，往往要微调才能用</td></tr>
+<tr><td>联合嵌入 / 对比式</td><td>DINO、iBOT、SimCLR</td><td>把同一张图的两个增强视图编码后拉近</td><td>依赖手工设计的增强（crop、色抖、翻转），等于把人的先验写死进了不变性，对图像以外的模态很难迁移</td></tr>
+</tbody>
+</table>
+</div>
+<p>两条路线的共同困境可以这么看：重建式把<strong>全部</strong>信息都当成预测目标，包括根本预测不了的那部分；对比式则靠人工告诉模型「什么变了不算变」来丢掉信息。</p>
+<p>I-JEPA 的答案是第三条路：<strong>预测目标本身就是一个可学的、会自动丢掉细节的抽象表征</strong>。不用人定义不变性，也不强迫模型处理噪声。</p>
+
+<figure>
+<div class="diagram">
+<svg viewBox="0 0 700 220" role="img" aria-label="三条自监督路线对比">
+  <rect class="svg-node" x="10" y="85" width="96" height="46" rx="8"/>
+  <text class="svg-label" x="58" y="113">同一张图</text>
+
+  <path class="svg-edge" d="M106 96 C 150 96, 160 40, 200 40" marker-end="url(#a)"/>
+  <path class="svg-edge" d="M106 108 C 150 108, 160 108, 200 108" marker-end="url(#a)"/>
+  <path class="svg-edge" d="M106 120 C 150 120, 160 178, 200 178" marker-end="url(#a)"/>
+
+  <rect class="svg-node" x="204" y="16" width="176" height="48" rx="8"/>
+  <text class="svg-label" x="292" y="36">生成式</text>
+  <text class="svg-label-sm" x="292" y="52">预测像素</text>
+
+  <rect class="svg-node" x="204" y="84" width="176" height="48" rx="8"/>
+  <text class="svg-label" x="292" y="104">对比式</text>
+  <text class="svg-label-sm" x="292" y="120">拉近两个增强视图</text>
+
+  <rect class="svg-node-accent" x="204" y="154" width="176" height="48" rx="8"/>
+  <text class="svg-label" x="292" y="174">JEPA</text>
+  <text class="svg-label-sm" x="292" y="190">预测另一部分的表征</text>
+
+  <path class="svg-edge" d="M380 40 L 436 40" marker-end="url(#a)"/>
+  <path class="svg-edge" d="M380 108 L 436 108" marker-end="url(#a)"/>
+  <path class="svg-edge" d="M380 178 L 436 178" marker-end="url(#a)"/>
+
+  <rect class="svg-node" x="440" y="16" width="176" height="48" rx="8"/>
+  <text class="svg-label" x="528" y="45">过度关注细节</text>
+
+  <rect class="svg-node" x="440" y="84" width="176" height="48" rx="8"/>
+  <text class="svg-label" x="528" y="113">依赖手工增强</text>
+
+  <rect class="svg-node-accent" x="440" y="154" width="176" height="48" rx="8"/>
+  <text class="svg-label" x="528" y="183">语义且无需增强</text>
+
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor" style="color:var(--muted); opacity:.7"/>
+    </marker>
+  </defs>
+</svg>
+</div>
+<figcaption>三条路线与各自的代价</figcaption>
+</figure>
+
+<h2>核心思想：在表征空间做预测</h2>
+<p>JEPA 的定义很短：给定输入 x 和目标 y，不要求 x 重建出 y，而是要求 x 的编码能预测 y 的编码。</p>
+<div class="formula">
+  min<sub>θ,φ</sub> &nbsp; ‖ g<sub>φ</sub>( f<sub>θ</sub>(x), z ) &nbsp;−&nbsp; sg[ f̄<sub>θ̄</sub>(y) ] ‖<sub>2</sub><sup>2</sup>
+</div>
+<p>其中 <code>f</code> 是 context encoder，<code>f̄</code> 是 target encoder（停梯度 + EMA 更新），<code>g</code> 是 predictor，<code>z</code> 是告诉 predictor「要预测哪个位置」的条件变量（实际上就是目标块的位置编码）。</p>
+<p>为什么这个改动如此关键：</p>
+<ol>
+  <li><strong>表征空间可以丢信息，像素空间不行</strong>。预测一只狗每根毛的颜色是不可能的；但预测「这块是狗的躯干」这个抽象描述是可能的。让目标自己去学习该保留什么，等于把「什么值得预测」从人工设计变成了学习出来的。</li>
+  <li><strong>不需要多个视图</strong>。x 和 y 来自同一张图的不同区域，不用额外的增强管道，所以也就不依赖图像特有的先验。</li>
+  <li><strong>能量视角</strong>。把预测误差看作能量：兼容的 (x, y) 能量低，不兼容的高。与对比式模型不同的是，JEPA 允许一个 x 对应多个合理的 y，不硬把它们压成同一个点。</li>
+</ol>
+<blockquote><p>注意区分：JEPA 不是生成模型。它不能从表征重建图像，也不应该拿来当生成器用。它的产出只是一个好的编码器。</p></blockquote>
+
+<h2>架构拆解：三个模块</h2>
+<p>整个模型只有三个部件，都是 ViT。</p>
+<div class="tablewrap">
+<table>
+<thead><tr><th>模块</th><th>输入</th><th>输出</th><th>参数怎么更新</th></tr></thead>
+<tbody>
+<tr><td>Context encoder f<sub>θ</sub></td><td>上下文块的 patch（已剔除与目标重叠的部分）</td><td>每个 patch 的表征</td><td>梯度下降</td></tr>
+<tr><td>Target encoder f̄</td><td><strong>完整图像</strong>的全部 patch</td><td>每个 patch 的表征，再按目标块位置取出作为监督信号</td><td>EMA，不回传梯度</td></tr>
+<tr><td>Predictor g<sub>φ</sub></td><td>context 表征 + 带位置编码的 mask token</td><td>目标块各 patch 的预测表征</td><td>梯度下降</td></tr>
+</tbody>
+</table>
+</div>
+<p>几个容易读漏的细节：</p>
+<ul>
+  <li><strong>Target encoder 看的是完整图，不是裁剪后的块</strong>。先编码整张图，再按位置抽取目标 patch 的表征。这意味着目标表征自带上下文，质量更高——论文明确指出先遮挡再编码会降低性能。</li>
+  <li><strong>Predictor 是窄的</strong>，它只是个轻量桥接器，训练完就丢掉，下游只用 context encoder。</li>
+  <li><strong>M 个目标块共享一个 predictor</strong>，predictor 被调用 M 次，每次换一组位置编码。mask token 本身是一个共享的可学向量，位置信息全靠加上去的 positional embedding 区分。</li>
+</ul>
+
+<figure>
+<div class="diagram">
+<svg viewBox="0 0 700 260" role="img" aria-label="I-JEPA 数据流">
+  <rect class="svg-node" x="14" y="104" width="94" height="46" rx="8"/>
+  <text class="svg-label" x="61" y="132">输入图像</text>
+
+  <path class="svg-edge" d="M108 116 C 135 116, 140 52, 168 52" marker-end="url(#b)"/>
+  <path class="svg-edge" d="M108 127 C 135 127, 140 127, 168 127" marker-end="url(#b)"/>
+  <path class="svg-edge" d="M108 138 C 135 138, 140 208, 168 208" marker-end="url(#b)"/>
+
+  <rect class="svg-node" x="172" y="28" width="132" height="48" rx="8"/>
+  <text class="svg-label" x="238" y="48">采 context 块</text>
+  <text class="svg-label-sm" x="238" y="64">剔除重叠</text>
+
+  <rect class="svg-node-accent" x="172" y="104" width="132" height="46" rx="8"/>
+  <text class="svg-label" x="238" y="122">target encoder</text>
+  <text class="svg-label-sm" x="238" y="138">EMA · stop-grad</text>
+
+  <rect class="svg-node" x="172" y="184" width="132" height="48" rx="8"/>
+  <text class="svg-label" x="238" y="204">采 4 个</text>
+  <text class="svg-label-sm" x="238" y="220">target 块位置</text>
+
+  <path class="svg-edge" d="M304 52 L 352 52" marker-end="url(#b)"/>
+  <path class="svg-edge" d="M304 208 C 330 208, 336 76, 352 76" marker-end="url(#b)"/>
+
+  <rect class="svg-node" x="356" y="28" width="132" height="48" rx="8"/>
+  <text class="svg-label" x="422" y="48">context encoder</text>
+  <text class="svg-label-sm" x="422" y="64">→ predictor</text>
+
+  <path class="svg-edge" d="M488 52 C 528 52, 536 112, 560 112" marker-end="url(#b)"/>
+  <path class="svg-edge" d="M304 127 C 420 127, 500 140, 560 140" marker-end="url(#b)"/>
+
+  <rect class="svg-node-accent" x="564" y="102" width="122" height="48" rx="8"/>
+  <text class="svg-label" x="625" y="122">L2 损失</text>
+  <text class="svg-label-sm" x="625" y="138">表征空间</text>
+
+  <defs>
+    <marker id="b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor" style="color:var(--muted); opacity:.7"/>
+    </marker>
+  </defs>
+</svg>
+</div>
+<figcaption>预测在表征空间闭环，像素从不参与损失</figcaption>
+</figure>
+
+<h2>多块掩码：真正决定成败的设计</h2>
+<p>论文反复强调：掩码策略是引导模型学到语义特征的核心设计。两条原则——目标块要够大（才能涵盖物体级的语义），上下文块要够分散且信息量足。</p>
+<div class="tablewrap">
+<table>
+<thead><tr><th>参数</th><th>取值</th></tr></thead>
+<tbody>
+<tr><td>目标块数量 M</td><td>4</td></tr>
+<tr><td>目标块面积比例</td><td>0.15 – 0.2</td></tr>
+<tr><td>目标块长宽比</td><td>0.75 – 1.5</td></tr>
+<tr><td>上下文块面积比例</td><td>0.85 – 1.0，长宽比固定为 1</td></tr>
+<tr><td>重叠处理</td><td>从 context 中剔除与任何 target 重叠的 patch</td></tr>
+</tbody>
+</table>
+</div>
+<p>流程是：先在图上采 4 个目标块（允许互相重叠），再采一个占据大部分画面的上下文块，然后把上下文块里和目标重叠的区域挖空。挖空这一步是必须的，否则任务变成了拷贝。注意挖空后上下文是不连续的碎块，这正是「空间上分散」的来源。</p>
+<p>消融结果（ViT-B/16，1% ImageNet top-1）把差距拉得很开：</p>
+<div class="tablewrap">
+<table>
+<thead><tr><th>掩码方式</th><th>top-1</th></tr></thead>
+<tbody>
+<tr><td>多块（本文）</td><td>54.2%</td></tr>
+<tr><td>单块</td><td>20.2%</td></tr>
+<tr><td>随机 patch</td><td>17.6%</td></tr>
+<tr><td>栅格化（按行块）</td><td>15.5%</td></tr>
+</tbody>
+</table>
+</div>
+<p>这个对比值得反复品：同样的网络、同样的损失，只换掩码方式，性能差三倍。目标块太小时，预测任务退化成补纹理，学不到物体级的东西。</p>
+
+<h2>训练目标与防坍缩</h2>
+<p>损失就是平均 L2：</p>
+<div class="formula">
+  ℒ &nbsp;=&nbsp; <span class="big">1</span>⁄<span class="big">M</span> &nbsp; <span class="big">Σ</span><sub>i=1..M</sub> &nbsp; <span class="big">Σ</span><sub>j∈B<sub>i</sub></sub> &nbsp; ‖ ŝ<sub>y<sub>j</sub></sub> − s<sub>y<sub>j</sub></sub> ‖<sub>2</sub><sup>2</sup>
+</div>
+<p><code>B<sub>i</sub></code> 是第 i 个目标块包含的 patch 索引集。没有负样本、没有温度系数、没有聚类头、没有 Sinkhorn。</p>
+<div class="callout">
+<h3>坍缩风险从哪里来</h3>
+<p>如果 f 和 f̄ 共享参数并同时优化，模型会直接学成常数输出，损失归零但表征无用。I-JEPA 靠两件事防住：</p>
+<ol>
+  <li><strong>非对称结构</strong>。target encoder 只由 context encoder 的 EMA 得到，梯度不回传，所以目标不会主动向常数靠拢。论文明确说这一点对用 ViT 训练联合嵌入架构是 <em>essential</em> 的。</li>
+  <li><strong>predictor 带位置条件</strong>。它必须针对不同位置给出不同预测，常数解在任务上就是差解。</li>
+</ol>
+</div>
+<p>这套机制和 BYOL / DINO 同源，但 I-JEPA 多了一个条件预测头，所以不需要靠多视图增强来制造正样本对。</p>
+<p>实际训练里还有一些常规配置：AdamW、EMA 动量按计划从 0.996 逐步升到 1.0、target 表征做 LayerNorm、bfloat16。这些不是论文的贡献点，但复现时缺一不可。</p>
+
+<h2>实验结果</h2>
+
+<h3>ImageNet-1K linear probe</h3>
+<div class="tablewrap">
+<table>
+<thead><tr><th>方法</th><th>主干</th><th>epochs</th><th>top-1</th></tr></thead>
+<tbody>
+<tr><td>I-JEPA</td><td>ViT-B/16</td><td>600</td><td>72.9%</td></tr>
+<tr><td>I-JEPA</td><td>ViT-L/16</td><td>600</td><td>77.5%</td></tr>
+<tr><td>I-JEPA</td><td>ViT-H/14</td><td>300</td><td>79.3%</td></tr>
+<tr><td>I-JEPA</td><td>ViT-H/16<sub>448</sub></td><td>300</td><td>81.1%</td></tr>
+<tr><td>MAE</td><td>ViT-H/14</td><td>1600</td><td>77.2%</td></tr>
+<tr><td>data2vec</td><td>ViT-L/16</td><td>1600</td><td>77.3%</td></tr>
+<tr><td>DINO</td><td>ViT-B/8</td><td>300</td><td>80.1%</td></tr>
+<tr><td>iBOT</td><td>ViT-L/16</td><td>250</td><td>81.0%</td></tr>
+</tbody>
+</table>
+</div>
+<p>读法：在<strong>不用增强</strong>的方法里（MAE、data2vec）I-JEPA 大幅领先；对上用多视图增强的 iBOT / DINO，它追平了差距。这是论文的主要叙事——不靠人工先验也能达到相当水平。</p>
+
+<h3>1% ImageNet（low-shot）</h3>
+<div class="tablewrap">
+<table>
+<thead><tr><th>方法</th><th>主干</th><th>top-1</th></tr></thead>
+<tbody>
+<tr><td>I-JEPA</td><td>ViT-H/14</td><td>73.3%</td></tr>
+<tr><td>I-JEPA</td><td>ViT-H/16<sub>448</sub></td><td>77.3%</td></tr>
+<tr><td>data2vec</td><td>ViT-L/16</td><td>73.3%</td></tr>
+<tr><td>MAE</td><td>ViT-H/14</td><td>71.5%</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>下游迁移（ViT-H/14，linear probe）</h3>
+<div class="tablewrap">
+<table>
+<thead><tr><th>任务</th><th>I-JEPA</th></tr></thead>
+<tbody>
+<tr><td>CIFAR100</td><td>87.5%</td></tr>
+<tr><td>Places205</td><td>58.4%</td></tr>
+<tr><td>iNat18</td><td>47.6%</td></tr>
+<tr><td>Clevr/Count（数物体）</td><td>86.7%</td></tr>
+<tr><td>Clevr/Dist（深度）</td><td>72.4%</td></tr>
+</tbody>
+</table>
+</div>
+<p>Clevr 两项是亮点：I-JEPA 在计数和深度这类<strong>低层、空间性</strong>的任务上反而超过 DINO 和 iBOT。原因不难理解：对比式方法用增强教模型忽略位置和尺度，而这些信息在空间任务上恰恰有用；I-JEPA 没丢。</p>
+
+<h3>训练效率</h3>
+<ul>
+  <li>ViT-H/14：16 张 A100，&lt; 72 小时（约 1200 GPU 小时）。</li>
+  <li>比 iBOT 的 ViT-S/16 快约 2.5×；比 MAE 训练 ViT-H/14 省 10× 以上计算。</li>
+  <li>单步开销与 MAE 相仿，但收敛所需迭代约为 1/5。</li>
+</ul>
+
+<h2>消融：哪些设计真的在起作用</h2>
+<div class="tablewrap">
+<table>
+<thead><tr><th>消融项</th><th>结果</th><th>结论</th></tr></thead>
+<tbody>
+<tr><td>预测空间：表征 vs 像素</td><td>66.9% → 40.7%（1% ImageNet）</td><td>整篇论文最关键的证据；在表征空间预测不是小技巧，是主线</td></tr>
+<tr><td>掩码策略</td><td>多块 54.2% vs 随机 17.6%</td><td>目标块要大到含语义，上下文要空间分散</td></tr>
+<tr><td>target 编码时机</td><td>先编码完整图优于先遮挡</td><td>目标表征带上下文，监督信号质量更高</td></tr>
+<tr><td>predictor 宽深</td><td>窄而不浅的配置最好</td><td>它只需要做空间推理，不需要再建一套表征</td></tr>
+</tbody>
+</table>
+</div>
+<p>一个值得注意的副产品：论文把 predictor 的输出接上一个冻结的解码器可视化后发现，预测出的表征确实对应了正确的物体部件和姿态，但不包含具体纹理。这是「模型学会了丢掉不可预测细节」的直观证据。</p>
+
+<h2>意义、局限与后续</h2>
+
+<h3>在 LeCun 蓝图里的位置</h3>
+<p>LeCun 在《A Path Towards Autonomous Machine Intelligence》里主张：智能体需要一个<strong>世界模型</strong>，它在抽象表征空间里预测世界的演化，而不是预测原始感官信号。I-JEPA 是这套主张的第一个大规模实证：把「预测发生在表征空间」从理念变成了可复现的 SOTA 级结果。</p>
+<p>需要说清楚的是，I-JEPA 本身<strong>并不是世界模型</strong>。它预测的是同一时刻的空间缺失部分，没有时间维度、没有动作。它只是把 JEPA 这个计算框架跑通了。</p>
+
+<h3>局限</h3>
+<ul>
+  <li>掩码超参敏感。尺度、数量、长宽比都要调，换数据集未必直接能用。</li>
+  <li>预测目标是移动的（EMA 在变），训练动力学比重建式难分析，坍缩只是经验上避开的，没有理论保证。</li>
+  <li>linear probe 上强，但细粒度识别（iNat18 47.6%）与强增强方法相比仍有差距。</li>
+  <li>不能生成，也不提供可解释的概率。</li>
+</ul>
+
+<h3>后续演进</h3>
+<div class="tablewrap">
+<table>
+<thead><tr><th>工作</th><th>时间</th><th>关键延伸</th></tr></thead>
+<tbody>
+<tr><td>I-JEPA</td><td>2023</td><td>图像，空间预测，验证框架可行</td></tr>
+<tr><td>V-JEPA</td><td>2024</td><td>视频，引入时间维度，掩码变成时空管状</td></tr>
+<tr><td>V-JEPA 2</td><td>2025</td><td>大规模视频预训练 + 动作条件，用于机器人零样本规划</td></tr>
+</tbody>
+</table>
+</div>
+<p>从 I-JEPA 到 V-JEPA 2 的主线很清晰：先证明表征空间预测可行，再加上时间，再加上动作——加完这三样，它就真的是个世界模型了。</p>
+
+<h2>速查表</h2>
+<p><strong>一句话流程</strong>：采 4 个大目标块 → 采一个大上下文块并挖掉重叠 → context encoder 编码上下文 → predictor 配上位置 mask token 预测每个目标块的表征 → 与 EMA target encoder 对完整图的编码算 L2。</p>
+<div class="tablewrap">
+<table>
+<thead><tr><th>项</th><th>值</th></tr></thead>
+<tbody>
+<tr><td>损失</td><td>表征空间 L2，无负样本</td></tr>
+<tr><td>目标块</td><td>4 个，面积 0.15–0.2，长宽比 0.75–1.5</td></tr>
+<tr><td>上下文块</td><td>面积 0.85–1.0，长宽比 1，剔除重叠</td></tr>
+<tr><td>target encoder</td><td>context encoder 的 EMA，stop-grad</td></tr>
+<tr><td>predictor</td><td>窄 ViT，共享可学 mask token + 位置编码</td></tr>
+<tr><td>数据增强</td><td>无（仅 resize/crop）</td></tr>
+<tr><td>最佳结果</td><td>ViT-H/16<sub>448</sub>，ImageNet linear 81.1%</td></tr>
+<tr><td>训练成本</td><td>ViT-H/14，16×A100，&lt;72h</td></tr>
+</tbody>
+</table>
+</div>
+<div class="callout">
+<h3>三个可以拿去考别人的问题</h3>
+<ol>
+  <li>为什么 target encoder 不能和 context encoder 共享参数并同时回传梯度？</li>
+  <li>如果把目标块改得很小、很多，模型会学成什么？</li>
+  <li>I-JEPA 和 MAE 单步计算量相仿，为什么收敛快 5 倍？</li>
+</ol>
+</div>
+
+<footer>
+<strong>参考来源</strong>
+<ul>
+  <li><a href="https://arxiv.org/abs/2301.08243">Self-Supervised Learning from Images with a Joint-Embedding Predictive Architecture</a>（arXiv:2301.08243，CVPR 2023）</li>
+  <li><a href="https://arxiv.org/html/2301.08243v3">论文全文 HTML 版</a></li>
+  <li><a href="https://github.com/facebookresearch/ijepa">facebookresearch/ijepa 官方代码</a></li>
+  <li><a href="https://ai.meta.com/blog/yann-lecun-ai-model-i-jepa/">Meta AI 博文：I-JEPA</a></li>
+</ul>
+</footer>
+
+</div>
+</body>
+</html>

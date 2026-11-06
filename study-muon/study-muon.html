@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="面向已了解 Shampoo 的读者：系统学习 Muon 优化器的数学、Newton-Schulz 实现、规模化实践与证据边界。">
+<title>Muon 优化器：从 Shampoo 到谱最速下降</title>
+<script>
+  window.MathJax = {
+    tex: {
+      inlineMath: [['$', '$'], ['\\(', '\\)']],
+      displayMath: [['$$', '$$'], ['\\[', '\\]']],
+      macros: { msign: '\\operatorname{msign}', RMS: '\\operatorname{RMS}' }
+    },
+    svg: { fontCache: 'global' }
+  };
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+<style>
+  :root {
+    --bg: #07110f;
+    --surface: #0c1916;
+    --surface-2: #10231e;
+    --surface-3: #142c25;
+    --line: #244038;
+    --ink: #e7f0eb;
+    --muted: #9cb2a9;
+    --cyan: #60e1d2;
+    --lime: #c8f169;
+    --amber: #f4c56a;
+    --red: #ff8e7d;
+    --blue: #79b8ff;
+    --code: #050b0a;
+    --shadow: 0 22px 70px rgba(0,0,0,.28);
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    color: var(--ink);
+    background:
+      linear-gradient(rgba(96,225,210,.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(96,225,210,.025) 1px, transparent 1px),
+      radial-gradient(circle at 78% -10%, rgba(200,241,105,.1), transparent 28rem),
+      var(--bg);
+    background-size: 32px 32px, 32px 32px, auto, auto;
+    font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    font-size: 16px;
+    line-height: 1.78;
+  }
+  a { color: var(--cyan); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .layout { max-width: 1510px; margin: 0 auto; display: grid; grid-template-columns: 286px minmax(0, 1fr); }
+  aside {
+    position: sticky; top: 0; height: 100vh; overflow-y: auto;
+    padding: 30px 20px 48px; border-right: 1px solid var(--line);
+    background: rgba(7,17,15,.84); backdrop-filter: blur(12px);
+  }
+  .brand { color: var(--lime); font-weight: 850; font-size: 21px; letter-spacing: -.02em; }
+  .brand small { display: block; color: var(--muted); font-size: 11px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; }
+  .toc-label { margin: 28px 9px 8px; color: #6e887e; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; }
+  aside a { display: block; color: var(--muted); padding: 5px 9px; border-radius: 7px; font-size: 13px; line-height: 1.35; }
+  aside a:hover { color: var(--ink); background: var(--surface-2); text-decoration: none; }
+  aside a.sub { padding-left: 22px; font-size: 12px; }
+  .progress { height: 2px; background: var(--line); margin-top: 18px; overflow: hidden; }
+  .progress span { display: block; height: 100%; width: 0; background: linear-gradient(90deg,var(--cyan),var(--lime)); }
+  main { min-width: 0; padding: 48px 64px 120px; }
+  .hero {
+    position: relative; overflow: hidden; min-height: 390px;
+    padding: 48px; border: 1px solid var(--line); border-radius: 24px;
+    background: linear-gradient(145deg, rgba(16,35,30,.98), rgba(8,19,16,.96)); box-shadow: var(--shadow);
+  }
+  .hero::after {
+    content: "μ"; position: absolute; right: 32px; top: -110px; color: rgba(200,241,105,.06);
+    font-family: Georgia, serif; font-size: 430px; line-height: 1; transform: rotate(8deg); pointer-events: none;
+  }
+  .eyebrow { color: var(--cyan); font-size: 12px; font-weight: 750; letter-spacing: .16em; text-transform: uppercase; }
+  h1 { position: relative; z-index: 1; max-width: 900px; margin: 18px 0 14px; font-size: clamp(38px,5.2vw,72px); line-height: 1.03; letter-spacing: -.055em; }
+  h1 span { color: var(--lime); }
+  .hero .lead { position: relative; z-index: 1; max-width: 760px; color: #b9cbc4; font-size: 18px; }
+  .tags { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 28px; }
+  .tag { border: 1px solid var(--line); background: rgba(4,10,9,.5); border-radius: 999px; padding: 4px 11px; color: var(--muted); font-size: 12px; }
+  .stamp { margin-top: 24px; color: #718a80; font-size: 12px; }
+  section { margin-top: 74px; scroll-margin-top: 22px; }
+  h2 { margin: 0 0 18px; font-size: 29px; line-height: 1.25; letter-spacing: -.025em; }
+  h2 .n { color: var(--lime); font-family: "SF Mono", Menlo, monospace; font-size: 14px; margin-right: 10px; }
+  h3 { margin: 34px 0 10px; font-size: 20px; letter-spacing: -.01em; }
+  h4 { margin: 24px 0 8px; color: var(--cyan); font-size: 16px; }
+  p { margin: 12px 0; }
+  strong { color: #fff; }
+  ul, ol { padding-left: 24px; }
+  li { margin: 7px 0; }
+  .muted { color: var(--muted); }
+  .section-lead { max-width: 850px; color: var(--muted); font-size: 17px; }
+  .grid-2, .grid-3, .metric-grid { display: grid; gap: 16px; margin: 20px 0; }
+  .grid-2 { grid-template-columns: repeat(2, minmax(0,1fr)); }
+  .grid-3 { grid-template-columns: repeat(3, minmax(0,1fr)); }
+  .metric-grid { grid-template-columns: repeat(4,minmax(0,1fr)); }
+  .card { border: 1px solid var(--line); background: rgba(12,25,22,.9); border-radius: 15px; padding: 20px 22px; }
+  .card h3, .card h4 { margin-top: 0; }
+  .metric { min-height: 126px; }
+  .metric .k { color: var(--muted); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; }
+  .metric .v { margin: 8px 0 4px; color: var(--lime); font-size: 27px; font-weight: 800; line-height: 1.15; }
+  .metric .d { color: var(--muted); font-size: 12px; line-height: 1.45; }
+  .callout { margin: 20px 0; border-left: 3px solid var(--cyan); background: rgba(96,225,210,.055); padding: 15px 19px; border-radius: 0 12px 12px 0; }
+  .callout.key { border-color: var(--lime); background: rgba(200,241,105,.055); }
+  .callout.warn { border-color: var(--amber); background: rgba(244,197,106,.055); }
+  .callout.red { border-color: var(--red); background: rgba(255,142,125,.05); }
+  .callout .label { display: block; margin-bottom: 4px; color: var(--cyan); font-size: 11px; font-weight: 800; letter-spacing: .13em; text-transform: uppercase; }
+  .callout.key .label { color: var(--lime); }
+  .callout.warn .label { color: var(--amber); }
+  .callout.red .label { color: var(--red); }
+  .math { margin: 18px 0; padding: 8px 20px; overflow-x: auto; border: 1px solid var(--line); background: var(--surface); border-radius: 12px; }
+  code { padding: 2px 6px; color: #d7c4ff; background: var(--code); border-radius: 5px; font-family: "SF Mono", Menlo, Consolas, monospace; font-size: .87em; }
+  pre { margin: 18px 0; padding: 18px 20px; overflow: auto; border: 1px solid var(--line); border-radius: 13px; background: var(--code); line-height: 1.58; }
+  pre code { padding: 0; color: #c9d8d2; background: none; font-size: 13px; }
+  table { width: 100%; margin: 20px 0; border-collapse: collapse; font-size: 14px; }
+  th, td { padding: 11px 13px; border: 1px solid var(--line); text-align: left; vertical-align: top; }
+  th { color: var(--lime); background: var(--surface-2); }
+  tr:nth-child(even) td { background: rgba(255,255,255,.013); }
+  .table-wrap { overflow-x: auto; }
+  .flow { display: grid; grid-template-columns: 1fr 34px 1fr 34px 1fr 34px 1fr; align-items: stretch; margin: 24px 0; }
+  .flow .node { padding: 16px 13px; text-align: center; border: 1px solid var(--line); background: var(--surface); border-radius: 12px; }
+  .flow .node b { display: block; color: var(--cyan); }
+  .flow .node small { color: var(--muted); }
+  .flow .arrow { align-self: center; text-align: center; color: var(--lime); font-size: 20px; }
+  .viz { border: 1px solid var(--line); background: #091512; border-radius: 16px; padding: 20px; }
+  .viz-head { display: flex; justify-content: space-between; gap: 15px; align-items: center; margin-bottom: 12px; }
+  .viz-head h3 { margin: 0; }
+  .controls { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 12px; }
+  input[type="range"] { accent-color: var(--lime); width: 140px; }
+  canvas { display: block; width: 100%; height: 260px; border-radius: 10px; background: #06100d; }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 10px; color: var(--muted); font-size: 12px; }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; }
+  .dot-cyan { background: var(--cyan); }
+  .dot-amber { background: var(--amber); }
+  .dot-muted { background: #70877e; }
+  .timeline { margin: 24px 0 0 8px; border-left: 1px solid var(--line); }
+  .event { position: relative; margin-left: 26px; padding: 0 0 28px; }
+  .event::before { content: ""; position: absolute; left: -31px; top: 7px; width: 9px; height: 9px; border: 2px solid var(--bg); border-radius: 50%; background: var(--lime); box-shadow: 0 0 0 1px var(--line); }
+  .event time { color: var(--cyan); font: 700 12px "SF Mono",Menlo,monospace; }
+  .event p { margin: 3px 0; }
+  details { margin: 13px 0; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); overflow: hidden; }
+  summary { cursor: pointer; padding: 13px 17px; color: #d9e8e2; font-weight: 700; }
+  details[open] summary { border-bottom: 1px solid var(--line); color: var(--lime); }
+  details > div { padding: 4px 18px 16px; }
+  .checklist { list-style: none; padding: 0; }
+  .checklist li { position: relative; padding-left: 28px; }
+  .checklist li::before { content: "□"; position: absolute; left: 2px; color: var(--lime); font-size: 17px; }
+  .level { display: inline-block; padding: 2px 7px; border: 1px solid var(--line); border-radius: 5px; color: var(--cyan); font-size: 11px; }
+  .refs { font-size: 14px; }
+  .refs li { margin: 11px 0; color: var(--muted); }
+  .refs a { overflow-wrap: anywhere; }
+  .footer { margin-top: 74px; padding-top: 20px; border-top: 1px solid var(--line); color: #728a80; font-size: 12px; }
+  mjx-container { overflow-x: auto; overflow-y: hidden; max-width: 100%; }
+  @media (max-width: 1080px) {
+    .layout { display: block; }
+    aside { display: none; }
+    main { padding: 30px 30px 90px; }
+    .metric-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  }
+  @media (max-width: 700px) {
+    main { padding: 18px 14px 70px; }
+    .hero { padding: 29px 22px; min-height: 0; }
+    .hero::after { display: none; }
+    h1 { font-size: 42px; }
+    .grid-2, .grid-3, .metric-grid { grid-template-columns: 1fr; }
+    .flow { grid-template-columns: 1fr; gap: 7px; }
+    .flow .arrow { transform: rotate(90deg); }
+    .viz-head { display: block; }
+    .controls { margin-top: 10px; }
+    table { font-size: 12px; }
+    th, td { padding: 9px; }
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+  <aside aria-label="目录">
+    <div class="brand">MUON <small>matrix-aware optimization</small></div>
+    <div class="progress" aria-hidden="true"><span id="progressBar"></span></div>
+    <div class="toc-label">建立全景</div>
+    <a href="#guide">0. 阅读指南</a>
+    <a href="#algorithm">1. 一分钟看懂算法</a>
+    <a href="#linear-algebra">2. 线性代数核心</a>
+    <a class="sub" href="#polar">2.1 极分解与 matrix sign</a>
+    <a href="#geometry">3. 谱范数最速下降</a>
+    <a class="sub" href="#dual">3.1 对偶范数推导</a>
+    <div class="toc-label">吃透算法</div>
+    <a href="#ns">4. Newton–Schulz</a>
+    <a class="sub" href="#ns-demo">4.1 交互演示</a>
+    <a href="#shampoo">5. 从 Shampoo 到 Muon</a>
+    <a href="#scaling">6. 更新尺度与 RMS</a>
+    <a href="#implementation">7. 实现与参数分组</a>
+    <a href="#systems">8. 计算与分布式</a>
+    <div class="toc-label">评估与实践</div>
+    <a href="#evidence">9. 实验证据怎么读</a>
+    <a href="#limits">10. 边界、风险与误区</a>
+    <a href="#lab">11. 建议实验</a>
+    <a href="#roadmap">12. 学习路线与自测</a>
+    <a href="#refs">参考资料</a>
+  </aside>
+
+  <main>
+    <header class="hero">
+      <div class="eyebrow">A Shampoo-aware field guide</div>
+      <h1>Muon：从矩阵白化到<span>谱最速下降</span></h1>
+      <p class="lead">面向已经理解 Shampoo 的读者。用一条连续主线串起 matrix sign、极分解、Newton–Schulz、RMS 尺度、MuonW/MuonClip，以及大模型预训练中的真实证据。</p>
+      <div class="tags">
+        <span class="tag">MomentUm Orthogonalized by Newton–Schulz</span>
+        <span class="tag">矩阵参数专用</span>
+        <span class="tag">谱范数几何</span>
+        <span class="tag">预训练证据最强</span>
+      </div>
+      <div class="stamp">资料核验至 2026-08-07 · 公式约定：权重 $W\in\mathbb{R}^{m\times n}$，$m$ 为 fan-out，$n$ 为 fan-in</div>
+    </header>
+
+    <section id="guide">
+      <h2><span class="n">00</span>先建立正确的心理模型</h2>
+      <p class="section-lead">如果只能记住一句话：<strong>Muon 对动量矩阵做“矩阵版 sign”，保留奇异向量、把非零奇异值拉到约 1，再按层形状校准尺度。</strong></p>
+      <div class="metric-grid">
+        <div class="card metric"><div class="k">作用对象</div><div class="v">2D hidden weights</div><div class="d">Linear/attention/MLP 的稠密矩阵；不是所有参数</div></div>
+        <div class="card metric"><div class="k">核心状态</div><div class="v">1× momentum</div><div class="d">不像 AdamW 还保存逐元素二阶矩；不像 Shampoo 保存两侧矩阵统计</div></div>
+        <div class="card metric"><div class="k">核心算子</div><div class="v">$U\Sigma V^T\to UV^T$</div><div class="d">对奇异值做 sign/zeroth power，方向仍由奇异向量决定</div></div>
+        <div class="card metric"><div class="k">默认数值方法</div><div class="v">5× NS</div><div class="d">5 次 quintic Newton–Schulz；矩阵乘法友好，可用 bfloat16</div></div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <h3>你已有 Shampoo 基础，优先读</h3>
+          <ol>
+            <li>§5：关掉 Shampoo 累积后为何恰好得到 $UV^T$。</li>
+            <li>§3：为何这不是“便宜二阶法”这么简单，而是谱范数几何。</li>
+            <li>§6：为何不做 shape scaling 会让宽矩阵更新过小。</li>
+            <li>§9：不同论文的“2×”与“1.1×”为何并不直接矛盾。</li>
+          </ol>
+        </div>
+        <div class="card">
+          <h3>先排除三个错误印象</h3>
+          <ul>
+            <li><strong>不是约束权重正交：</strong>被处理的是更新矩阵，不是 $W$ 本身。</li>
+            <li><strong>不是标准 Newton–Schulz 精确极分解：</strong>实用系数故意容忍奇异值在 1 附近振荡。</li>
+            <li><strong>不是可无脑替换 AdamW：</strong>embedding、LM head、bias、norm gain 通常仍交给 AdamW。</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="algorithm">
+      <h2><span class="n">01</span>一分钟看懂 Muon</h2>
+      <div class="flow" role="group" aria-label="Muon 算法流程">
+        <div class="node"><b>梯度</b><small>$G_t=\nabla_W\mathcal L_t$</small></div><div class="arrow">→</div>
+        <div class="node"><b>动量</b><small>$M_t=\beta M_{t-1}+(1-\beta)G_t$</small></div><div class="arrow">→</div>
+        <div class="node"><b>正交化</b><small>$O_t\approx\msign(\widetilde M_t)$</small></div><div class="arrow">→</div>
+        <div class="node"><b>缩放更新</b><small>$W_{t+1}=(1-\eta\lambda)W_t-\eta s(W)O_t$</small></div>
+      </div>
+      <p>公开实现通常使用 Nesterov 风格的前瞻动量。按 Keller Jordan 当前代码的记法：</p>
+      <div class="math">
+        $$M_t\leftarrow \beta M_{t-1}+(1-\beta)G_t,\qquad
+        \widetilde M_t\leftarrow \beta M_t+(1-\beta)G_t,$$
+        $$O_t\leftarrow \operatorname{NS}_5(\widetilde M_t),\qquad
+        W_{t+1}\leftarrow(1-\eta\lambda)W_t-\eta\,s(m,n)O_t.$$
+      </div>
+      <p>有些论文用未归一化动量 $M_t=\mu M_{t-1}+G_t$。由于 matrix sign 对正数缩放不变，理想精确算子满足 $\msign(cM)=\msign(M)$，两种约定的整体缩放会被正交化抹掉；有限步 NS 下仍可能有小差异。</p>
+      <div class="callout key"><span class="label">名字的含义</span><strong>M</strong>oment<strong>U</strong>m <strong>O</strong>rthogonalized by <strong>N</strong>ewton–Schulz。最关键的设计选择不是 NS 本身，而是“先积累动量，再对整个动量做矩阵正交化”。</div>
+    </section>
+
+    <section id="linear-algebra">
+      <h2><span class="n">02</span>线性代数核心：matrix sign</h2>
+      <h3 id="polar">2.1 从 SVD 到极分解</h3>
+      <p>对秩为 $r$ 的矩阵 $M\in\mathbb R^{m\times n}$，写 reduced SVD：</p>
+      <div class="math">$$M=U\Sigma V^T,\qquad U\in\mathbb R^{m\times r},\ \Sigma=\operatorname{diag}(\sigma_1,\ldots,\sigma_r),\ V\in\mathbb R^{n\times r}.$$</div>
+      <p>Muon 的理想算子是矩阵符号/零次幂（也就是极分解中的半正交因子）：</p>
+      <div class="math">$$\boxed{\msign(M)=UV^T=(MM^T)^{\dagger/2}M=M(M^TM)^{\dagger/2}}$$</div>
+      <p>其中 $\dagger$ 表示 Moore–Penrose 伪逆。它把每个<strong>非零</strong>奇异值 $\sigma_i$ 替换为 1，但保留左右奇异向量。若 $m\le n$ 且满行秩，则 $(UV^T)(UV^T)^T=I_m$；若 $m\ge n$ 且满列秩，则 $(UV^T)^T(UV^T)=I_n$，所以准确说是<strong>半正交</strong>。</p>
+      <div class="grid-3">
+        <div class="card"><h4>逐元素 sign</h4><p>$g_i\mapsto\operatorname{sign}(g_i)$</p><p class="muted">抹平坐标幅值，保留每个坐标的正负。</p></div>
+        <div class="card"><h4>矩阵 sign</h4><p>$U\Sigma V^T\mapsto UV^T$</p><p class="muted">抹平奇异值，保留子空间方向。</p></div>
+        <div class="card"><h4>几何结果</h4><p>$\kappa(O)=1$（在非零子空间）</p><p class="muted">原来被大奇异值压制的“稀有方向”被放大。</p></div>
+      </div>
+      <h3>2.2 最近半正交矩阵</h3>
+      <p>$UV^T$ 还解决正交 Procrustes 问题：</p>
+      <div class="math">$$UV^T\in\arg\min_{Q\in\mathcal O_{m,n}}\|Q-M\|_F,
+      \quad \mathcal O_{m,n}=\{Q:QQ^T=I_m\ \text{或}\ Q^TQ=I_n\}.$$</div>
+      <p>这解释“正交化”一词，但不是最深的优化解释。真正回答“为什么这可能是好更新”的，是下一节的<strong>谱范数最速下降</strong>。</p>
+      <div class="callout warn"><span class="label">秩亏时的细节</span>若 $M$ 秩亏，最近半正交补全一般不唯一，而 $UV^T$ 的紧致极因子只作用于非零奇异子空间。有限精度 NS 会如何处理极小奇异值，取决于初始归一化、迭代次数和多项式斜率；不能把“所有奇异值严格变成 1”当成工程事实。</div>
+    </section>
+
+    <section id="geometry">
+      <h2><span class="n">03</span>为什么是谱范数最速下降</h2>
+      <p class="section-lead">普通梯度下降默认参数空间是 Euclidean/Frobenius 几何；Muon 主张：Linear 层是从激活到激活的算子，衡量一次更新“有多大”更自然的方式是它最多能把输入放大多少。</p>
+      <h3>3.1 从功能变化定义矩阵大小</h3>
+      <p>Linear 层 $y=Wx$，更新 $\Delta W$ 引起 $\Delta y=\Delta Wx$。若输入输出都按 RMS 计量：</p>
+      <div class="math">
+        $$\|x\|_{\RMS}=\frac{\|x\|_2}{\sqrt n},\qquad
+        \|y\|_{\RMS}=\frac{\|y\|_2}{\sqrt m},$$
+        $$\|\Delta W\|_{\RMS\to\RMS}
+        :=\max_{x\ne0}\frac{\|\Delta Wx\|_{\RMS}}{\|x\|_{\RMS}}
+        =\sqrt{\frac nm}\,\|\Delta W\|_2.$$
+      </div>
+      <p>这里 $\|\cdot\|_2=\sigma_{\max}$ 是谱范数。因此：</p>
+      <div class="math">$$\|\Delta y\|_{\RMS}\le \|\Delta W\|_{\RMS\to\RMS}\|x\|_{\RMS}.$$</div>
+      <p>这个不等式把<strong>权重空间变化</strong>与<strong>层的功能变化</strong>连起来，也是 shape-aware 学习率缩放的来源。</p>
+
+      <h3 id="dual">3.2 对偶范数一步推导出 $UV^T$</h3>
+      <p>先忽略 RMS 前因子，考虑在谱范数信赖域内让线性化损失下降最多：</p>
+      <div class="math">$$\min_{\|\Delta W\|_2\le \rho}\langle G,\Delta W\rangle_F.$$</div>
+      <p>谱范数 $S_\infty$ 的对偶是核范数 $S_1$。von Neumann 迹不等式给出：</p>
+      <div class="math">$$|\langle G,\Delta W\rangle_F|\le \|G\|_*\|\Delta W\|_2,
+      \qquad \|G\|_*=\sum_i\sigma_i(G).$$</div>
+      <p>令 $G=U\Sigma V^T$，取 $\Delta W=-\rho UV^T$ 达到等号，因此：</p>
+      <div class="math">$$\boxed{\Delta W^*=-\rho\,UV^T}.$$</div>
+      <p>若约束改成 RMS-to-RMS 算子范数不超过 $\eta$，则 $\rho=\eta\sqrt{m/n}$：</p>
+      <div class="math">$$\Delta W^*=-\eta\sqrt{\frac mn}\,UV^T.$$</div>
+      <div class="callout key"><span class="label">最重要的理论结论</span>Muon 的方向不是在估计 Hessian 逆，而是某种预先选定的<strong>非欧几里得几何中的一阶最速下降方向</strong>。写成 $(GG^T)^{-1/2}G$ 看起来像预条件，但预条件器由当前梯度/动量自身构造，不等于曲率逆。</div>
+
+      <h3>3.3 “最速下降”说法需要一个限定</h3>
+      <p>若解的是带平方惩罚的模型</p>
+      <div class="math">$$\min_{\Delta W}\ \langle G,\Delta W\rangle_F+\frac{\lambda}{2}\|\Delta W\|_2^2,$$</div>
+      <p>完整解的幅值还含对偶范数 $\|G\|_*/\lambda$，即 $-(\|G\|_*/\lambda)UV^T$。实用 Muon 通常把<strong>方向</strong>设为 matrix sign，再用全局/分组学习率和 shape factor 决定幅值。因此更精确的表述是：Muon 实现谱范数最速下降的 duality-map 方向，并另行参数化步长。</p>
+    </section>
+
+    <section id="ns">
+      <h2><span class="n">04</span>Newton–Schulz 如何避免 SVD</h2>
+      <p>直接 SVD 每一步都昂贵且不适合低精度 GPU 吞吐。Muon 使用仅含矩阵乘法的奇多项式。先归一化 $X_0=M/(\|M\|_F+\varepsilon)$，必要时转置，使“短边”成为左维度；再迭代：</p>
+      <div class="math">$$X_{k+1}=aX_k+b(X_kX_k^T)X_k+c(X_kX_k^T)^2X_k.$$</div>
+      <p>若 $X_k=U\Sigma_kV^T$，则：</p>
+      <div class="math">$$X_{k+1}=U\phi(\Sigma_k)V^T,\qquad \phi(x)=ax+bx^3+cx^5.$$</div>
+      <p>即每步不改变奇异向量，只对每个奇异值应用标量多项式。传统可收敛系数可取 $(2,-1.5,0.5)$；Muon 默认取：</p>
+      <div class="math">$$\boxed{(a,b,c)=(3.4445,-4.7750,2.0315),\qquad K=5.}$$</div>
+      <div class="callout warn"><span class="label">实用系数不是精确极分解</span>这组系数追求原点附近更大斜率，让很小的奇异值在 5 步内迅速长大，代价是不再全局收敛到 1。官方源码明确说明输出更像 $US'V^T$，$S'_{ii}$ 大致落在 $[0.5,1.5]$，而不是精确 $UV^T$。这是有意识的速度/精度折中，不是 bug。</div>
+
+      <div class="viz" id="ns-demo">
+        <div class="viz-head">
+          <h3>奇异值经过 $K$ 次多项式后的轨迹</h3>
+          <div class="controls"><label for="steps">迭代步数 <strong id="stepValue">5</strong></label><input id="steps" type="range" min="0" max="10" value="5"></div>
+        </div>
+        <canvas id="nsCanvas" width="1000" height="300" role="img" aria-label="Newton-Schulz 多项式对奇异值的作用图"></canvas>
+        <div class="legend"><span><i class="dot dot-cyan"></i>Muon 实用系数</span><span><i class="dot dot-amber"></i>传统可收敛系数</span><span><i class="dot dot-muted"></i>目标 $y=1$</span></div>
+      </div>
+
+      <h3>4.1 计算布局</h3>
+      <p>设转置后 $X\in\mathbb R^{r\times q}$ 且 $r\le q$。先算 $A=XX^T\in\mathbb R^{r\times r}$，再算：</p>
+      <pre><code>A = X @ X.T
+B = b * A + c * (A @ A)
+X = a * X + B @ X</code></pre>
+      <p>每步主要是两个 $r\times r$ 与 $r\times q$ 级别矩阵乘法。原作者给出的单矩阵每步成本为 $4q r^2+2r^3$ FLOPs（按乘加计 2 FLOPs），5 步后仍常被大 batch 的前后向计算淹没。关键优势是 bfloat16 GEMM 对 GPU 友好。</p>
+      <div class="callout red"><span class="label">数值检查</span>必须先归一化；转置判断必须与恢复转置成对；不要在 CPU 上期待同样的性能；不要默认增加到 10 步会改善训练，Moonlight 报告中更精确的正交化没有带来更好性能。</div>
+    </section>
+
+    <section id="shampoo">
+      <h2><span class="n">05</span>从 Shampoo 精确走到 Muon</h2>
+      <p class="section-lead">这部分是两者最干净的代数桥梁，也是最容易被一句“Muon 是无累积 Shampoo”掩盖细节的地方。</p>
+      <h3>5.1 关掉 Shampoo 的时间累积</h3>
+      <p>矩阵版 Shampoo 更新：</p>
+      <div class="math">$$L_t=\sum_{s\le t}G_sG_s^T,\qquad R_t=\sum_{s\le t}G_s^TG_s,$$
+      $$\Delta W_t=-\eta L_t^{-1/4}G_tR_t^{-1/4}.$$</div>
+      <p>若只保留当前梯度，令 $L=GG^T$、$R=G^TG$。代入 $G=U\Sigma V^T$：</p>
+      <div class="math">
+        $$\begin{aligned}
+        (GG^T)^{-1/4}G(G^TG)^{-1/4}
+        &amp;=U\Sigma^{-1/2}U^T\ U\Sigma V^T\ V\Sigma^{-1/2}V^T\\
+        &amp;=UV^T.
+        \end{aligned}$$
+      </div>
+      <p>所以<strong>无累积、无动量的 Shampoo = 精确 matrix sign 梯度更新</strong>。Muon 再做两项改变：</p>
+      <ol>
+        <li>对<strong>动量 $M_t$</strong> 而不是原始 $G_t$ 做 matrix sign，降低 mini-batch 噪声并形成时间平滑。</li>
+        <li>用有限步 Newton–Schulz 直接近似 $UV^T$，不显式形成两侧逆四次根。</li>
+      </ol>
+
+      <h3>5.2 两者到底差在哪里</h3>
+      <div class="table-wrap"><table>
+        <thead><tr><th>维度</th><th>Shampoo</th><th>Muon</th></tr></thead>
+        <tbody>
+          <tr><td>时间信息</td><td>累积/EMA 行列二阶矩 $L_t,R_t$</td><td>一阶动量 $M_t$，随后瞬时正交化</td></tr>
+          <tr><td>自适应对象</td><td>历史梯度协方差，含方差自适应</td><td>当前平滑方向的奇异谱；没有独立二阶矩</td></tr>
+          <tr><td>矩阵函数</td><td>逆四次根，左右预条件</td><td>有限步 matrix sign / polar factor</td></tr>
+          <tr><td>优化几何</td><td>无累积极限可解释为谱范数最速下降</td><td>直接采用该 duality-map 方向</td></tr>
+          <tr><td>状态内存</td><td>每矩阵约 $m^2+n^2$（实现可分块）</td><td>每参数一个同形 momentum buffer</td></tr>
+          <tr><td>优势来源</td><td>谱归一化 + 历史方差/曲率式适应</td><td>便宜的谱均衡 + momentum；机制更简单</td></tr>
+        </tbody>
+      </table></div>
+      <div class="callout key"><span class="label">最有用的辨析</span>Muon 可以写成 $(MM^T)^{-1/2}M$，所以是“预条件更新”；但它没有 Shampoo 的长期二阶统计。把 Muon 称作一阶还是二阶，取决于分类口径。按“是否需要 Hessian/梯度协方差历史”它更像一阶谱方法；按“是否用非对角矩阵变换梯度”它属于 matrix-aware / matrix-preconditioned 方法。学习时不要让标签替代机制。</div>
+    </section>
+
+    <section id="scaling">
+      <h2><span class="n">06</span>更新尺度：最容易漏掉的关键</h2>
+      <h3>6.1 半正交矩阵的 RMS 并不恒定</h3>
+      <p>若 $O=UV^T\in\mathbb R^{m\times n}$ 满秩，$r=\min(m,n)$，则：</p>
+      <div class="math">$$\|O\|_F^2=r,\qquad
+      \RMS(O)=\sqrt{\frac{\|O\|_F^2}{mn}}
+      =\sqrt{\frac{\min(m,n)}{mn}}
+      =\frac{1}{\sqrt{\max(m,n)}}.$$</div>
+      <p>所以同一个学习率下，最大维度越大，逐元素 RMS 更新越小。大规模训练中，不同 shape 的 attention、MLP、router、GQA/MLA 矩阵会收到不一致的有效更新。</p>
+      <div class="grid-2">
+        <div class="card">
+          <h3>原始 Muon scaling</h3>
+          <div class="math">$$s_{\text{orig}}(m,n)=\sqrt{\max(1,m/n)}.$$</div>
+          <p>当前 KellerJordan/Muon 使用这一因子。若 $m\ge n$，它把 RMS 从 $1/\sqrt m$ 调到 $1/\sqrt n$；若 $m&lt;n$ 则不变。它带有 fan-in 基准的 muP 风格。</p>
+        </div>
+        <div class="card">
+          <h3>Moonlight RMS matching</h3>
+          <div class="math">$$s_{\text{match}}(m,n)=0.2\sqrt{\max(m,n)}.$$</div>
+          <p>这样理论更新 RMS 约为 0.2，以匹配作者观测到的 AdamW 更新 RMS 范围，并可复用其学习率量级。常数 0.2 是经验校准，不是数学常数。</p>
+        </div>
+      </div>
+      <p>还有从 RMS-to-RMS operator norm 直接推导的 $\sqrt{m/n}$ 因子。三种规则对应不同的“什么应该跨层保持不变”的选择，不应混用学习率后直接比较。</p>
+      <div class="callout warn"><span class="label">版本敏感</span>看到代码中的 Muon 学习率时，必须同时问：用了哪种 `adjust_lr_fn`？是否乘 0.2？矩阵方向如何定义？PyTorch 原生 API 提供 `original` 与 `match_rms_adamw` 两类调整。脱离 scaling 规则谈学习率没有可比性。</div>
+
+      <h3>6.2 weight decay 为什么在长训练更重要</h3>
+      <p>Moonlight 报告观察到无 weight decay 的 Muon 在早期很快，但长训练中权重与层输出 RMS 持续增长；加入 decoupled weight decay 后改善 over-training 区域：</p>
+      <div class="math">$$W_{t+1}=(1-\eta_t\lambda)W_t-\eta_t s(m,n)O_t.$$</div>
+      <p>这与 AdamW 一样把衰减从梯度变换中解耦。当前公开 Muon 和 PyTorch 实现均支持 weight decay。</p>
+    </section>
+
+    <section id="implementation">
+      <h2><span class="n">07</span>最小实现与正确参数分组</h2>
+      <h3>7.1 教学版核心代码</h3>
+      <pre><code>import torch
+
+@torch.no_grad()
+def zeropower_ns5(g: torch.Tensor, steps: int = 5):
+    assert g.ndim == 2
+    a, b, c = 3.4445, -4.7750, 2.0315
+    x = g.to(torch.bfloat16)
+    transposed = x.shape[0] &gt; x.shape[1]
+    if transposed:
+        x = x.T
+    x = x / (x.norm() + 1e-7)
+    for _ in range(steps):
+        gram = x @ x.T
+        x = a * x + (b * gram + c * (gram @ gram)) @ x
+    return x.T if transposed else x
+
+@torch.no_grad()
+def muon_direction(grad, momentum, beta=0.95):
+    momentum.lerp_(grad, 1 - beta)
+    nesterov = grad.lerp(momentum, beta)
+    update = zeropower_ns5(nesterov)
+    update *= max(1.0, update.shape[0] / update.shape[1]) ** 0.5
+    return update</code></pre>
+      <p>这是解释算法的最小骨架，不含 fused/batched/distributed 优化。生产中优先使用经验证实现，例如 PyTorch 2.9+ 的 `torch.optim.Muon` 或项目官方实现，并确认它采用的 shape scaling。</p>
+
+      <h3>7.2 参数分组不是可选细节</h3>
+      <div class="table-wrap"><table>
+        <thead><tr><th>参数类型</th><th>通常选择</th><th>原因</th></tr></thead>
+        <tbody>
+          <tr><td>Transformer hidden Linear 权重</td><td>Muon</td><td>输入输出是稠密 RMS 激活，符合 operator-norm 动机</td></tr>
+          <tr><td>Q / K / V / O 投影</td><td>Muon；Q/K/V 最好分开</td><td>拼接后一次正交化会耦合不同语义块；原始实验分开更好</td></tr>
+          <tr><td>MLP up/gate/down 权重</td><td>Muon</td><td>典型大矩阵，也是主要参数量所在</td></tr>
+          <tr><td>Embedding / LM head</td><td>AdamW</td><td>one-hot 输入或输出分类器语义不同；原作者经验也支持排除</td></tr>
+          <tr><td>bias、RMSNorm/LayerNorm gain</td><td>AdamW</td><td>标量/向量，不适用矩阵正交化</td></tr>
+          <tr><td>Conv kernel</td><td>可用 Muon</td><td>除第一层外，常将后 3 维 flatten 成二维</td></tr>
+          <tr><td>LoRA 小矩阵 / 微调参数</td><td>先以 AdamW 为基线</td><td>预训练到微调的 optimizer mismatch 与极端长宽比需单独验证</td></tr>
+        </tbody>
+      </table></div>
+
+      <h3>7.3 PyTorch 原生用法</h3>
+      <pre><code>muon_params, adamw_params = [], []
+for name, p in model.named_parameters():
+    is_hidden_matrix = p.ndim == 2 and "embed" not in name and "lm_head" not in name
+    (muon_params if is_hidden_matrix else adamw_params).append(p)
+
+muon = torch.optim.Muon(
+    muon_params,
+    lr=1e-3,
+    momentum=0.95,
+    weight_decay=0.1,
+    ns_steps=5,
+    adjust_lr_fn="match_rms_adamw",
+)
+adamw = torch.optim.AdamW(
+    adamw_params, lr=1e-3, betas=(0.9, 0.95), weight_decay=0.1
+)
+
+# 每步对两个 optimizer 同时 zero_grad / step；scheduler 也要同步管理。</code></pre>
+      <div class="callout red"><span class="label">不要照抄超参数</span>示例只展示 API 和分组。`lr=1e-3` 是否合理取决于 scaling、模型参数化、batch、schedule 与目标训练长度。原始实现默认 Muon LR 曾为 0.02，而 RMS-matched 大模型配方可复用约 $10^{-3}$ 的 AdamW 量级；数字差异主要来自单位不同。</div>
+    </section>
+
+    <section id="systems">
+      <h2><span class="n">08</span>计算、内存与分布式</h2>
+      <div class="grid-3">
+        <div class="card"><h3>状态内存</h3><p>Muon：每个参数一份 momentum。</p><p>AdamW：通常一阶矩 + 二阶矩两份状态。</p><p>在相同精度策略下，Muon optimizer state 可更省。</p></div>
+        <div class="card"><h3>单步额外计算</h3><p>每个矩阵 5 次 NS，每次若短边 $r$、长边 $q$，约 $4qr^2+2r^3$ FLOPs。</p><p>但 GEMM 尺寸与硬件利用率决定真实 wall-clock。</p></div>
+        <div class="card"><h3>通信</h3><p>正交化需要完整矩阵，不能像逐元素 AdamW 那样随意在矩阵内部切碎后独立算。</p><p>DP/TP shard 需要 gather 或设计块近似。</p></div>
+      </div>
+      <p>原作者按 Linear 层前后向约 $6mnB$ FLOPs 推出额外比例上界约 $Kr/B$，大 token batch 下可低于 1%。但这只是 FLOP 估计；小 batch、小模型、CPU、频繁 optimizer step 或通信受限时，真实开销会更明显。</p>
+      <p>Moonlight 的 Distributed Muon 采用 ZeRO-1 风格：optimizer state 在 DP 组分片，先对本地分片更新 momentum，再 gather 成完整矩阵做 NS，只保留本地 update 分片，最后 all-gather 参数。报告估算通信量为 AdamW ZeRO-1 的 $(1,1.25]$ 倍，optimizer 延迟约占端到端 1%–3%，并通过 overlap 隐藏。到 2026 年，PyTorch 原生 Muon 与 DeepSpeed 支持已经降低了接入门槛，但具体并行策略仍需按框架核验。</p>
+      <div class="callout warn"><span class="label">切块会改变数学</span>对每个 shard 分别做 $\msign$ 一般不等于对完整矩阵做 $\msign$。如果为了通信采用 block-wise Muon，必须把它视作新近似并重新验证收敛、更新谱和质量。</div>
+    </section>
+
+    <section id="evidence">
+      <h2><span class="n">09</span>实验证据：强在哪里，边界在哪里</h2>
+      <p class="section-lead">Muon 的经验支持已从 speedrun 扩展到万亿参数训练，但“更好多少”高度依赖模型规模、batch、训练长度、baseline 调参和计量口径。</p>
+      <div class="timeline">
+        <div class="event"><time>2024-10 / 12</time><p><strong>原始 Muon 与 speedrun。</strong> NanoGPT 达到目标 loss 的训练速度记录提升约 1.35×；CIFAR-10 94% 从 3.3 降到 2.6 A100 秒。证据强在公开竞争任务，弱在任务规模与训练配方高度特化。</p></div>
+        <div class="event"><time>2025-02</time><p><strong>Moonlight。</strong> 399M–1.5B dense scaling-law 实验声称匹配 AdamW loss 约需 52% FLOPs；MuonW 加入 weight decay 和一致 update RMS；16B total / 3B activated MoE 训练 5.7T tokens。</p></div>
+        <div class="event"><time>2025-05</time><p><strong>Essential AI。</strong> 100M–约 4B 模型、多 batch 设置下，报告 Muon 达到同 loss 少用约 10%–15% tokens，并在大 batch 超过 AdamW critical batch size 后保持数据效率；还验证与 μP 超参迁移兼容。</p></div>
+        <div class="event"><time>2025-07 / 2026-02 rev.</time><p><strong>Kimi K2 / MuonClip。</strong> 1.04T total、32B activated MoE 以 15.5T tokens 预训练；QK-Clip 控制 attention logits，报告全程零 loss spike。这证明可扩展性，但使用的是增强版 MuonClip，不是朴素 Muon。</p></div>
+        <div class="event"><time>2025-09 / ICLR 2026</time><p><strong>系统独立复核。</strong> 10 个优化器、0.1B–1.2B、公平调参后，矩阵方法仍领先，但相对 AdamW 的速度优势从 0.1B 约 1.4× 降到 1.2B 约 1.1×；强调末端评估和独立 tuning。</p></div>
+        <div class="event"><time>2026</time><p><strong>理论与生态成熟。</strong> 非凸收敛、critical batch、inexact polar 等分析快速出现；PyTorch/DeepSpeed 提供正式支持。理论能解释特定假设下的优势，但尚没有一个定理完整解释 Transformer 中的全部收益。</p></div>
+      </div>
+      <h3>9.1 如何同时理解“2×”和“1.1×”</h3>
+      <ul>
+        <li><strong>计量不同：</strong>匹配 loss 的训练 FLOPs、token 数、step 数和 wall-clock 不是同一个量。</li>
+        <li><strong>缩放外推不同：</strong>Moonlight 拟合 compute-optimal scaling law；独立基准直接测到 1.2B，并观察优势随规模减小。</li>
+        <li><strong>batch 区域不同：</strong>Essential AI 发现优势在超大 batch 更明显；另一项研究也指出小 batch 可能改变优化器排序。</li>
+        <li><strong>调参协议不同：</strong>复用 AdamW 超参便于部署，但不等于对每个优化器都做到独立最优。</li>
+        <li><strong>训练阶段不同：</strong>预训练证据明显强于 SFT；中途 checkpoint 排名可能在 LR decay 后翻转。</li>
+      </ul>
+      <div class="callout key"><span class="label">稳健结论</span>截至核验日期，最保守而有支持的说法是：<strong>Muon 是预训练中最可信的 AdamW 挑战者之一，尤其值得在矩阵参数占比高、batch 大、token 昂贵的训练中做公平 A/B；但收益不是普适常数，也不能从小模型 loss 曲线直接外推。</strong></div>
+    </section>
+
+    <section id="limits">
+      <h2><span class="n">10</span>边界、风险与常见误区</h2>
+      <div class="grid-2">
+        <div class="card">
+          <h3>适合优先尝试</h3>
+          <ul>
+            <li>从头预训练 Transformer / ConvNet。</li>
+            <li>主要计算来自大 hidden matrices。</li>
+            <li>全局 batch 很大，token/data efficiency 重要。</li>
+            <li>有能力独立调 LR、WD、schedule 并测最终 checkpoint。</li>
+            <li>框架能高效做 batched NS 或完整矩阵 gather。</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>谨慎或先不换</h3>
+          <ul>
+            <li>短程 SFT、LoRA、RL 或已有 AdamW pretrained checkpoint。</li>
+            <li>模型以 embedding/稀疏参数/极小矩阵为主。</li>
+            <li>CPU、小 batch 或 optimizer step 已是瓶颈。</li>
+            <li>现有分片方式拿不到完整矩阵。</li>
+            <li>没有预算做公平 baseline 与稳定性监控。</li>
+          </ul>
+        </div>
+      </div>
+      <details><summary>误区 1：Muon 在让权重矩阵保持正交</summary><div><p>错。Muon 近似正交化的是动量更新 $M_t$，随后把它加到 $W$ 上。$W_t$ 一般不正交。weight decay 与连续更新会塑造权重谱，但那是动态结果，不是显式 Stiefel manifold 约束。</p></div></details>
+      <details><summary>误区 2：所有方向都更新为相同强度，所以会放大纯噪声</summary><div><p>有风险但表述过度。理想 matrix sign 会均衡非零奇异值；Muon 先用 momentum 平滑，有限步 NS 对极小奇异值也未必拉到 1。它仍可能放大低信噪比方向，这正是 momentum、batch size 和后续 variance-adaptive 变体的重要性所在。</p></div></details>
+      <details><summary>误区 3：Muon 就是更便宜的 Shampoo，所以表现必然相同</summary><div><p>错。Shampoo 的历史二阶统计带来 variance adaptation；Muon 只对平滑的一阶矩做瞬时谱变换。两者在“无累积极限”才代数相等，真实训练动态不同。</p></div></details>
+      <details><summary>误区 4：NS steps 越多越好</summary><div><p>错。实用系数不是以无限步收敛到 1 为目标；Moonlight 报告 10 步更精确但无质量收益。增加步数还会增加计算，并可能让多项式动力学进入不希望的区域。</p></div></details>
+      <details><summary>误区 5：Muon 已证明普遍优于 AdamW</summary><div><p>错。已有证据集中在预训练，而且独立基准显示收益随规模和设置变化。对 fine-tuning，Moonlight 在 Qwen2.5-7B 上的 Muon-SFT 没有胜过 Adam-SFT；pretrain/finetune optimizer mismatch 仍是研究问题。</p></div></details>
+
+      <h3>10.1 大规模稳定性：为什么出现 MuonClip</h3>
+      <p>Kimi K2 的中等规模实验观察到朴素 Muon 下最大 attention logit 很快超过 1000。MuonClip 在每个 attention head 监控 $S^h_{\max}$，若超过阈值 $\tau$，令 $\gamma_h=\min(1,\tau/S^h_{\max})$，对 query/key 的非共享分量做配对缩放，使 QK 内积回落。K2 使用 $\tau=100$。</p>
+      <p>这提示一个重要边界：<strong>Muon 提高 token efficiency 与 Muon 单独保证超大规模稳定，不是同一件事。</strong>万亿参数成功案例依赖 weight decay、RMS matching、QK-Clip 和完整系统工程。</p>
+    </section>
+
+    <section id="lab">
+      <h2><span class="n">11</span>建议你亲手做的三个实验</h2>
+      <div class="grid-3">
+        <div class="card">
+          <span class="level">30 分钟</span><h3>实验 A：看奇异值</h3>
+          <p>随机造一个条件数 $10^4$ 的矩阵，比较 SVD 的 $UV^T$ 与 NS 1–10 步输出。</p>
+          <ul class="checklist"><li>画每步奇异值</li><li>测 $\|X-UV^T\|_F$</li><li>bf16 vs fp32</li></ul>
+        </div>
+        <div class="card">
+          <span class="level">2 小时</span><h3>实验 B：公平优化器 A/B</h3>
+          <p>小 GPT 上固定 tokens、data order、schedule family，各自 sweep LR/WD。</p>
+          <ul class="checklist"><li>AdamW baseline 独立调参</li><li>报告 final loss</li><li>同时报告 tokens 与 wall-clock</li></ul>
+        </div>
+        <div class="card">
+          <span class="level">半天</span><h3>实验 C：拆解机制</h3>
+          <p>做 SGDM、matrix-sign(G)、Muon、无累积 Shampoo、Shampoo 五组。</p>
+          <ul class="checklist"><li>分离 momentum 收益</li><li>分离 spectral transform</li><li>分离历史方差适应</li></ul>
+        </div>
+      </div>
+      <h3>必须记录的诊断量</h3>
+      <div class="table-wrap"><table>
+        <thead><tr><th>指标</th><th>看什么</th><th>异常信号</th></tr></thead>
+        <tbody>
+          <tr><td>每层 update RMS</td><td>shape scaling 是否生效</td><td>宽 MLP 比 attention 小数倍，或小 KV 矩阵过大</td></tr>
+          <tr><td>update singular values / entropy</td><td>是否真正均衡谱</td><td>有限步 NS 后仍极端低秩，或小方向异常放大</td></tr>
+          <tr><td>weight RMS / spectral norm</td><td>长期漂移与 decay 平衡</td><td>持续单调增长、接近 bf16 数值风险</td></tr>
+          <tr><td>max attention logits</td><td>QK 稳定性</td><td>快速升到数百/上千</td></tr>
+          <tr><td>optimizer step time</td><td>NS/通信真实开销</td><td>FLOP 占比低但 wall-clock 明显升高</td></tr>
+          <tr><td>loss vs tokens / FLOPs / time</td><td>同时区分数据与系统效率</td><td>只在 step 轴领先，时间轴不领先</td></tr>
+        </tbody>
+      </table></div>
+      <div class="callout key"><span class="label">最小公平协议</span>至少对 AdamW 和 Muon 各自调学习率与 weight decay；固定数据顺序和总 tokens；比较 schedule 结束后的 checkpoint；报告均值/方差；把 optimizer 额外 FLOPs、wall-clock 和显存分开列出。</div>
+    </section>
+
+    <section id="roadmap">
+      <h2><span class="n">12</span>学习路线与自测</h2>
+      <div class="grid-2">
+        <div class="card">
+          <h3>建议顺序</h3>
+          <ol>
+            <li><strong>第一遍：</strong>§1 → §2 → §5，掌握算法与 Shampoo 桥梁。</li>
+            <li><strong>第二遍：</strong>§3 → §4 → §6，亲手推 dual norm、NS 和 RMS。</li>
+            <li><strong>第三遍：</strong>读原始博客源码、Moonlight §2、独立基准。</li>
+            <li><strong>动手：</strong>完成实验 A，再在你熟悉的训练代码中做实验 B。</li>
+            <li><strong>进阶：</strong>读 modular norm/duality、收敛分析和 MuonClip。</li>
+          </ol>
+        </div>
+        <div class="card">
+          <h3>完成标准</h3>
+          <ul class="checklist">
+            <li>能从 SVD 推出无累积 Shampoo 等于 $UV^T$。</li>
+            <li>能用谱范数/核范数对偶推出最速方向。</li>
+            <li>能解释实用 NS 系数为何“不精确反而更快”。</li>
+            <li>能推出 $\RMS(UV^T)=1/\sqrt{\max(m,n)}$。</li>
+            <li>能正确拆分 Muon 与 AdamW 参数组。</li>
+            <li>能解释不同 speedup 报告为何不能直接横比。</li>
+          </ul>
+        </div>
+      </div>
+      <h3>五道自测题</h3>
+      <details><summary>1. $G$ 乘以 100 后，精确 Muon 方向会变吗？有限步 NS 呢？</summary><div><p>精确 $\msign(cG)=\msign(G)$（$c&gt;0$）不变。NS 前若用 Frobenius norm 完全归一化，理论上也不变；有限精度、epsilon、溢出/下溢可能造成小差异。</p></div></details>
+      <details><summary>2. 为什么 $UV^T$ 是谱范数单位球上的最陡方向？</summary><div><p>谱范数的对偶是核范数，$\langle G,Q\rangle\le\|G\|_*\|Q\|_2$；$Q=UV^T$ 满足 $\|Q\|_2=1$ 并使内积达到 $\sum_i\sigma_i(G)$。</p></div></details>
+      <details><summary>3. Muon 与 Shampoo 最本质的时间维差异是什么？</summary><div><p>Shampoo 在 $L_t,R_t$ 中积累梯度二阶统计；Muon 只积累一阶 momentum，然后对当前 momentum 做瞬时谱归一化。</p></div></details>
+      <details><summary>4. 一个 $4096\times16384$ 的满秩 semi-orthogonal update，未缩放 RMS 是多少？</summary><div><p>$1/\sqrt{16384}=1/128\approx0.0078125$。若希望 RMS 约 0.2，需要乘 $0.2\sqrt{16384}=25.6$。</p></div></details>
+      <details><summary>5. 为什么 embedding 虽是二维矩阵，仍通常不用 Muon？</summary><div><p>Embedding 接收 one-hot/稀疏索引，不是稠密 RMS 激活到稠密 RMS 激活的 Linear 算子；对应自然 operator norm 与 hidden Linear 不同，原作者实验也发现 AdamW 更好。</p></div></details>
+    </section>
+
+    <section id="refs">
+      <h2><span class="n">REF</span>一手资料与延伸阅读</h2>
+      <ol class="refs">
+        <li><strong>Jordan et al. (2024), Muon: An optimizer for hidden layers in neural networks.</strong> 原始定义、NS 系数、speedrun、Shampoo 关系。<a href="https://kellerjordan.github.io/posts/muon/" target="_blank" rel="noreferrer">原始博客</a> · <a href="https://github.com/KellerJordan/Muon" target="_blank" rel="noreferrer">官方代码</a></li>
+        <li><strong>Bernstein &amp; Newhouse (2024), Old Optimizer, New Norm: An Anthology.</strong> Adam/Shampoo 的 norm-steepest-descent 统一视角。<a href="https://arxiv.org/abs/2409.20325" target="_blank" rel="noreferrer">arXiv:2409.20325</a></li>
+        <li><strong>Bernstein (2025), Deriving Muon.</strong> RMS-to-RMS operator norm、shape scaling 与 Newton–Schulz 的四步推导。<a href="https://jeremybernste.in/writing/deriving-muon" target="_blank" rel="noreferrer">文章</a></li>
+        <li><strong>Liu et al. / Kimi Team (2025), Muon is Scalable for LLM Training.</strong> weight decay、consistent update RMS、Distributed Muon、Moonlight。<a href="https://arxiv.org/abs/2502.16982" target="_blank" rel="noreferrer">arXiv:2502.16982</a> · <a href="https://github.com/MoonshotAI/Moonlight" target="_blank" rel="noreferrer">代码/模型</a></li>
+        <li><strong>Shah et al. / Essential AI (2025), Practical Efficiency of Muon for Pretraining.</strong> 大 batch、compute-time Pareto、μP transfer，模型至约 4B。<a href="https://arxiv.org/abs/2505.02222" target="_blank" rel="noreferrer">arXiv:2505.02222</a></li>
+        <li><strong>Wen et al. (2025), Fantastic Pretraining Optimizers and Where to Find Them.</strong> 公平调参、末端评估、规模增大后收益缩小。<a href="https://arxiv.org/abs/2509.02046" target="_blank" rel="noreferrer">arXiv:2509.02046</a></li>
+        <li><strong>Kimi Team (2025/2026), Kimi K2: Open Agentic Intelligence.</strong> MuonClip、QK-Clip、1T 参数与 15.5T tokens 的规模化案例。<a href="https://arxiv.org/abs/2507.20534" target="_blank" rel="noreferrer">arXiv:2507.20534</a></li>
+        <li><strong>PyTorch Muon API.</strong> 原生实现、`adjust_lr_fn` 与参数说明。<a href="https://docs.pytorch.org/docs/stable/generated/torch.optim.Muon.html" target="_blank" rel="noreferrer">官方文档</a></li>
+        <li><strong>Gupta, Koren &amp; Singer (2018), Shampoo.</strong> Muon 的主要代数前身。<a href="https://arxiv.org/abs/1802.09568" target="_blank" rel="noreferrer">arXiv:1802.09568</a></li>
+        <li><strong>Shen et al. (2025, v3 2026), On the Convergence Analysis of Muon.</strong> 非凸收敛与低秩 Hessian 条件下相对 GD 的分析。<a href="https://arxiv.org/abs/2505.23737" target="_blank" rel="noreferrer">arXiv:2505.23737</a></li>
+        <li><strong>Tuddenham et al. (2022), Orthogonalising Gradients to Speed Up Neural Network Optimisation.</strong> 更早的 SVD 正交梯度方法；与 Muon 的动量顺序不同。<a href="https://arxiv.org/abs/2202.07052" target="_blank" rel="noreferrer">arXiv:2202.07052</a></li>
+        <li><strong>Carlson et al. (2015), Stochastic Spectral Descent.</strong> 谱最速下降与早期神经网络应用。<a href="https://proceedings.mlr.press/v38/carlson15.html" target="_blank" rel="noreferrer">AISTATS paper</a></li>
+      </ol>
+      <div class="callout"><span class="label">阅读建议</span>先读 1 → 3 → 4，再读 6 做证据校准。若想研究新变体，再进入 modular duality、Schatten norm、variance adaptation 与 inexact polar decomposition 文献。</div>
+    </section>
+
+    <footer class="footer">本页是学习型调研材料，不把预印本中的单一实验结论视为普遍定律。所有效果数字均保留其模型规模、计量口径或实验来源。页面仅依赖 MathJax CDN 渲染公式，其余内容与图表均内嵌。</footer>
+  </main>
+</div>
+
+<script>
+  (function () {
+    const bar = document.getElementById('progressBar');
+    function updateProgress() {
+      const max = document.documentElement.scrollHeight - window.innerHeight;
+      bar.style.width = (max > 0 ? window.scrollY / max * 100 : 0) + '%';
+    }
+    window.addEventListener('scroll', updateProgress, { passive: true });
+    updateProgress();
+
+    const canvas = document.getElementById('nsCanvas');
+    const slider = document.getElementById('steps');
+    const label = document.getElementById('stepValue');
+    if (!canvas || !slider) return;
+    const ctx = canvas.getContext('2d');
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+    function iterate(x, coeffs, steps) {
+      for (let i = 0; i < steps; i++) {
+        const x2 = x * x;
+        x = coeffs[0] * x + coeffs[1] * x * x2 + coeffs[2] * x * x2 * x2;
+        if (!Number.isFinite(x) || Math.abs(x) > 4) return NaN;
+      }
+      return x;
+    }
+
+    function draw() {
+      const rect = canvas.getBoundingClientRect();
+      const w = Math.max(320, rect.width);
+      const h = 260;
+      canvas.width = Math.round(w * dpr);
+      canvas.height = Math.round(h * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, w, h);
+      const pad = { l: 44, r: 18, t: 16, b: 34 };
+      const pw = w - pad.l - pad.r, ph = h - pad.t - pad.b;
+      const xMax = 1, yMax = 1.65;
+      const sx = x => pad.l + x / xMax * pw;
+      const sy = y => pad.t + (yMax - y) / yMax * ph;
+
+      ctx.strokeStyle = '#1d3831'; ctx.lineWidth = 1;
+      ctx.fillStyle = '#789087'; ctx.font = '11px ui-monospace, monospace';
+      [0, .25, .5, .75, 1].forEach(x => {
+        ctx.beginPath(); ctx.moveTo(sx(x), pad.t); ctx.lineTo(sx(x), pad.t + ph); ctx.stroke();
+        ctx.fillText(x.toFixed(2).replace('0.','.'), sx(x) - 8, h - 12);
+      });
+      [0, .5, 1, 1.5].forEach(y => {
+        ctx.beginPath(); ctx.moveTo(pad.l, sy(y)); ctx.lineTo(pad.l + pw, sy(y)); ctx.stroke();
+        ctx.fillText(y.toFixed(1), 10, sy(y) + 4);
+      });
+      ctx.setLineDash([5,5]); ctx.strokeStyle = '#70877e'; ctx.beginPath();
+      ctx.moveTo(pad.l, sy(1)); ctx.lineTo(pad.l + pw, sy(1)); ctx.stroke(); ctx.setLineDash([]);
+
+      const k = Number(slider.value);
+      label.textContent = k;
+      const curves = [
+        { c: [3.4445, -4.7750, 2.0315], color: '#60e1d2' },
+        { c: [2, -1.5, .5], color: '#f4c56a' }
+      ];
+      curves.forEach(curve => {
+        ctx.strokeStyle = curve.color; ctx.lineWidth = 2.2; ctx.beginPath();
+        let started = false;
+        for (let i = 0; i <= 500; i++) {
+          const x = i / 500;
+          const y = iterate(x, curve.c, k);
+          if (!Number.isFinite(y) || y < 0 || y > yMax) { started = false; continue; }
+          if (!started) { ctx.moveTo(sx(x), sy(y)); started = true; } else ctx.lineTo(sx(x), sy(y));
+        }
+        ctx.stroke();
+      });
+      ctx.fillStyle = '#8da69c'; ctx.fillText('初始奇异值', w / 2 - 34, h - 3);
+      ctx.save(); ctx.translate(10, h / 2 + 26); ctx.rotate(-Math.PI / 2); ctx.fillText('迭代后奇异值', 0, 0); ctx.restore();
+    }
+    slider.addEventListener('input', draw);
+    window.addEventListener('resize', draw);
+    draw();
+  })();
+</script>
+</body>
+</html>

@@ -1,0 +1,2405 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>世界模型系统讲义：从 Schmidhuber 1990 到 2026 年的三条路线</title>
+<script>
+  MathJax = {
+    tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$','$$'],['\\[','\\]']], tags: 'ams' },
+    svg: { fontCache: 'global' }
+  };
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js" id="MathJax-script" async></script>
+<style>
+
+  :root{
+    --bg:#0f1220; --panel:#171b2e; --panel2:#1e2440; --ink:#e8ecf5; --muted:#9aa4c0;
+    --accent:#6ea8fe; --accent2:#7ee0c0; --warn:#ffd166; --pink:#f78fb2; --line:#2a3150;
+    --code:#0b0e1a;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0; background:linear-gradient(180deg,#0c0f1c,#0f1220 40%); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    line-height:1.75; font-size:16px;
+  }
+  a{color:var(--accent); text-decoration:none}
+  a:hover{text-decoration:underline}
+  .layout{display:flex; max-width:1500px; margin:0 auto}
+  nav.toc{
+    position:sticky; top:0; align-self:flex-start; height:100vh; overflow-y:auto;
+    width:300px; flex:0 0 300px; padding:26px 18px; border-right:1px solid var(--line);
+    background:rgba(12,15,28,.6); backdrop-filter:blur(6px);
+  }
+  nav.toc h2{font-size:14px; letter-spacing:.12em; color:var(--muted); text-transform:uppercase; margin:18px 0 8px}
+  nav.toc a{display:block; color:var(--muted); padding:4px 10px; border-radius:8px; font-size:14px}
+  nav.toc a:hover{background:var(--panel2); color:var(--ink); text-decoration:none}
+  nav.toc a.sub{padding-left:24px; font-size:13px; opacity:.85}
+  .brand{font-weight:800; font-size:18px; background:linear-gradient(90deg,var(--accent),var(--accent2)); -webkit-background-clip:text; background-clip:text; color:transparent}
+  main{flex:1; min-width:0; padding:40px 54px 120px}
+  header.hero{
+    padding:46px 40px; border-radius:22px; margin-bottom:40px;
+    background:radial-gradient(1200px 400px at 10% -10%,rgba(110,168,254,.25),transparent),
+               radial-gradient(900px 400px at 90% 10%,rgba(126,224,192,.18),transparent),
+               var(--panel);
+    border:1px solid var(--line);
+  }
+  header.hero h1{margin:0 0 12px; font-size:34px; line-height:1.2}
+  header.hero p{margin:6px 0; color:var(--muted); max-width:80ch}
+  .meta{margin-top:20px; font-size:13px; color:var(--muted); border-top:1px dashed var(--line); padding-top:14px; display:flex; flex-wrap:wrap; gap:10px 22px}
+  .meta b{color:var(--accent2); font-weight:600}
+  .tags{margin-top:18px; display:flex; gap:8px; flex-wrap:wrap}
+  .tag{font-size:12px; padding:5px 12px; border-radius:999px; background:var(--panel2); border:1px solid var(--line); color:var(--accent2)}
+  section{margin:0 0 54px; scroll-margin-top:20px}
+  h2.sec{font-size:26px; margin:0 0 6px; padding-bottom:10px; border-bottom:2px solid var(--line); display:flex; align-items:center; gap:12px}
+  h2.sec .num{font-size:15px; color:#0b0e1a; background:linear-gradient(90deg,var(--accent),var(--accent2)); border-radius:8px; padding:3px 10px; font-weight:800}
+  h3{font-size:20px; margin:30px 0 8px; color:#dfe6f7}
+  h4{font-size:17px; margin:22px 0 6px; color:var(--accent2)}
+  p{margin:12px 0}
+  ul,ol{margin:12px 0; padding-left:26px}
+  li{margin:6px 0}
+  .lead{color:var(--muted)}
+  code{background:var(--code); padding:2px 6px; border-radius:6px; font-family:"SF Mono",Consolas,Menlo,monospace; font-size:.9em; color:#c7d2fe}
+  pre{background:var(--code); border:1px solid var(--line); border-radius:12px; padding:16px 18px; overflow:auto; font-family:"SF Mono",Consolas,Menlo,monospace; font-size:13.5px; line-height:1.6}
+  pre code{background:none; padding:0; color:#d7dcf0}
+  .card{background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:22px 26px; margin:20px 0}
+  .note{border-left:4px solid var(--accent); background:var(--panel2); padding:14px 18px; border-radius:0 12px 12px 0; margin:18px 0}
+  .warn{border-left:4px solid var(--warn); background:rgba(255,209,102,.08); padding:14px 18px; border-radius:0 12px 12px 0; margin:18px 0}
+  .key{border-left:4px solid var(--accent2); background:rgba(126,224,192,.08); padding:14px 18px; border-radius:0 12px 12px 0; margin:18px 0}
+  .bad{border-left:4px solid var(--pink); background:rgba(247,143,178,.08); padding:14px 18px; border-radius:0 12px 12px 0; margin:18px 0}
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:20px}
+  .grid3{display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px}
+  @media(max-width:1100px){.grid2,.grid3{grid-template-columns:1fr} nav.toc{display:none} main{padding:24px}}
+  figure{margin:26px 0; text-align:center}
+  figure svg{max-width:100%; height:auto; background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:10px}
+  figcaption{color:var(--muted); font-size:13.5px; margin-top:10px}
+  table{border-collapse:collapse; width:100%; margin:18px 0; font-size:14.5px}
+  th,td{border:1px solid var(--line); padding:10px 12px; text-align:left; vertical-align:top}
+  th{background:var(--panel2); color:var(--accent2)}
+  tr:nth-child(even) td{background:rgba(255,255,255,.02)}
+  .pill{display:inline-block; font-size:12px; padding:2px 8px; border-radius:6px; background:var(--panel2); color:var(--accent); margin-right:6px}
+  .mjx-container{overflow-x:auto; overflow-y:hidden; max-width:100%}
+  .foot{color:var(--muted); font-size:13px; border-top:1px solid var(--line); padding-top:20px; margin-top:40px}
+  svg text{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif}
+  details.deriv{margin:18px 0; border:1px solid var(--line); border-radius:14px; background:var(--panel); overflow:hidden}
+  details.deriv>summary{cursor:pointer; list-style:none; padding:14px 20px; font-weight:700; color:var(--accent2); background:var(--panel2); user-select:none}
+  details.deriv>summary::-webkit-details-marker{display:none}
+  details.deriv>summary::before{content:"▶"; display:inline-block; margin-right:10px; font-size:11px; color:var(--accent); transition:transform .2s}
+  details.deriv[open]>summary::before{transform:rotate(90deg)}
+  details.deriv .body{padding:8px 22px 18px}
+  .best{background:rgba(126,224,192,.10) !important; font-weight:650}
+  .cmt{border:1px dashed var(--warn); border-radius:12px; padding:14px 18px; margin:18px 0; background:rgba(255,209,102,.05)}
+  .cmt b.tagline{color:var(--warn)}
+
+
+  /* ---- 本页补充（保持房屋风格，仅加长文需要的部分）---- */
+  .tw{overflow-x:auto; margin:18px 0; border:1px solid var(--line); border-radius:12px}
+  .tw table{margin:0; border:0}
+  table{width:100%; border-collapse:collapse; font-size:14.5px}
+  th,td{border-bottom:1px solid var(--line); padding:9px 13px; text-align:left; vertical-align:top}
+  th{background:var(--panel2); color:var(--accent2); font-weight:600; white-space:nowrap}
+  tr:last-child td{border-bottom:0}
+  tbody tr:hover{background:rgba(110,168,254,.05)}
+  strong{color:#fff; font-weight:650}
+  h3{scroll-margin-top:16px}
+  h5{font-size:15.5px; margin:18px 0 4px; color:#cbd5f0; font-weight:650}
+  blockquote{margin:0}
+  .note p:first-child,.warn p:first-child,.key p:first-child,.cmt p:first-child{margin-top:0}
+  .note p:last-child,.warn p:last-child,.key p:last-child,.cmt p:last-child{margin-bottom:0}
+  nav.toc a b{color:var(--accent); font-variant-numeric:tabular-nums; margin-right:6px}
+  mjx-container[display="true"]{overflow-x:auto; overflow-y:hidden; padding:4px 0}
+  .toplink{position:fixed; right:22px; bottom:22px; background:var(--panel2); border:1px solid var(--line);
+           border-radius:999px; padding:10px 16px; font-size:13px; color:var(--muted); z-index:9}
+  .toplink:hover{color:var(--ink); text-decoration:none}
+  @media (max-width:1000px){ nav.toc{display:none} main{padding:24px 18px 80px} }
+
+</style>
+</head>
+<body>
+<div class="layout" id="top">
+
+<nav class="toc">
+  <div class="brand">世界模型系统讲义</div>
+  <h2>章节</h2>
+    <a href="#x0e5aae"><b>·</b> 世界模型系统讲义</a>
+    <a class="sub" href="#x0e5aae">目录</a>
+    <a href="#ch00"><b>0</b> 导览：世界模型到底是什么问题</a>
+    <a class="sub" href="#s0.1">0.1 一句话定义与它的三个身份</a>
+    <a class="sub" href="#s0.2">0.2 三条技术路线（读文献前先记住这张地图）</a>
+    <a class="sub" href="#s0.3">0.3 本讲义的推进节奏</a>
+    <a href="#ch01"><b>1</b> 为什么需要模型：数学骨架</a>
+    <a class="sub" href="#s1.1">1.1 问题设定：POMDP</a>
+    <a class="sub" href="#s1.2">1.2 有了模型能干三件事（别混淆）</a>
+    <a class="sub" href="#s1.3">1.3 复合误差：为什么长 horizon 一定会炸</a>
+    <a href="#ch02"><b>2</b> 前史：1990–1991，这件事从一开始就想清楚了</a>
+    <a class="sub" href="#s2.1">2.1 &quot;Making the World Differentiable&quot; —— 标题就是全部思想</a>
+    <a class="sub" href="#s2.2">2.2 好奇心：内在奖励为什么不能正比于预测误差</a>
+    <a class="sub" href="#s2.3">2.3 2015：C 学会&quot;查询&quot;M</a>
+    <a class="sub" href="#s2.4">2.4 平行线：Sutton 的 Dyna（以及一个要纠正的误传）</a>
+    <a class="sub" href="#s2.5">2.5 小结：1990 年就位的四件事</a>
+    <a href="#ch03"><b>3</b> Ha &amp; Schmidhuber 2018 完整拆解</a>
+    <a class="sub" href="#s3.1">3.1 三件套与训练流程</a>
+    <a class="sub" href="#s3.2">3.2 V：ConvVAE 与 ELBO</a>
+    <a class="sub" href="#s3.3">3.3 M：MDN-RNN 与它存在的理由</a>
+    <a class="sub" href="#s3.4">3.4 温度 …：可调的&quot;梦有多难&quot;</a>
+    <a class="sub" href="#s3.5">3.5 C：为什么只有 867 个参数</a>
+    <a class="sub" href="#s3.6">3.6 结果与&quot;在梦里训练&quot;</a>
+    <a class="sub" href="#s3.7">3.7 这篇论文真正的贡献</a>
+    <a href="#ch04"><b>4</b> 动手：从零实现一个能迁移的世界模型</a>
+    <a class="sub" href="#s4.1">4.1 环境设计：为什么是这个环境</a>
+    <a class="sub" href="#s4.2">4.2 关键实现细节（八个容易写错的地方）</a>
+    <a class="sub" href="#s4.3">4.3 我的实测结果</a>
+    <a class="sub" href="#s4.4">4.4 我踩的两个坑（这一节比结果重要）</a>
+    <a class="sub" href="#s4.5">4.5 给你的六道练习（按难度递增）</a>
+    <a href="#ch05"><b>5</b> PlaNet：把 ELBO 铺开到整条序列上</a>
+    <a class="sub" href="#s5.1">5.1 RSSM：为什么必须有两条状态通道</a>
+    <a class="sub" href="#s5.2">5.2 序列 ELBO 的推导</a>
+    <a class="sub" href="#s5.3">5.3 Latent overshooting：一步监督撑不起十二步规划</a>
+    <a class="sub" href="#s5.4">5.4 CEM 规划（PlaNet 完全没有 policy 网络）</a>
+    <a class="sub" href="#s5.5">5.5 三代对比</a>
+    <a href="#ch06"><b>6</b> Dreamer v1 → v4：把梯度打穿世界模型</a>
+    <a class="sub" href="#s6.1">6.1 v1 的核心：解析梯度穿过世界模型</a>
+    <a class="sub" href="#s6.2">6.2 λ-return：在 15 步之外看得更远</a>
+    <a class="sub" href="#s6.3">6.3 v2：离散 latent 与 KL balancing</a>
+    <a class="sub" href="#s6.4">6.4 v3：让超参消失（这一代的贡献是工程学）</a>
+    <a class="sub" href="#s6.5">6.5 Dreamer 4：换掉 RSSM，实时可交互，纯离线学会挖钻石</a>
+    <a class="sub" href="#s6.6">6.6 四代演进一张表</a>
+    <a href="#ch07"><b>7</b> 不重构的世界模型：MuZero 与 TD-MPC</a>
+    <a class="sub" href="#s7.1">7.1 MuZero：hidden state 不必对应真实状态</a>
+    <a class="sub" href="#s7.2">7.2 Value equivalence 原则：这件事为什么是对的</a>
+    <a class="sub" href="#s7.3">7.3 TD-MPC / TD-MPC2：decoder-free 的极简形态</a>
+    <a class="sub" href="#s7.4">7.4 三条路线对比总表</a>
+    <a href="#ch08"><b>8</b> JEPA：LeCun 的赌注</a>
+    <a class="sub" href="#s8.1">8.1 2022 的架构提案</a>
+    <a class="sub" href="#s8.2">8.2 三个防塌缩的门派（这是理解 JEPA 的关键）</a>
+    <a class="sub" href="#s8.3">8.3 I-JEPA → V-JEPA → V-JEPA 2 → V-JEPA 2.1</a>
+    <a class="sub" href="#s8.4">8.4 LeJEPA：从工程 trick 到定理</a>
+    <a class="sub" href="#s8.5">8.5 人事与路线：AMI Labs</a>
+    <a href="#ch09"><b>9</b> 生成式交互世界模型：把世界模型做成产品</a>
+    <a class="sub" href="#s9.1">9.1 GameNGen：第一个&quot;神经游戏引擎&quot;</a>
+    <a class="sub" href="#s9.2">9.2 Genie 系列：能力边界的量化</a>
+    <a class="sub" href="#s9.3">9.3 NVIDIA Cosmos：把世界模型做成基础设施</a>
+    <a class="sub" href="#s9.4">9.4 Sora 是世界模型吗：这场争论怎么判</a>
+    <a class="sub" href="#s9.5">9.5 中国厂商（2025-12 至 2026-04）</a>
+    <a href="#ch10"><b>10</b> 产业落地：世界模型现在真正在赚什么钱</a>
+    <a class="sub" href="#s10.1">10.1 自动驾驶：最成熟的落地场景</a>
+    <a class="sub" href="#s10.2">10.2 具身智能：数据瓶颈之争</a>
+    <a class="sub" href="#s10.3">10.3 一句话结论：钱在哪</a>
+    <a href="#ch11"><b>11</b> 冷水：世界模型到底会了什么</a>
+    <a class="sub" href="#s11.1">11.1 决定性的一篇批评：视频生成学不到物理定律</a>
+    <a class="sub" href="#s11.2">11.2 Benchmark 全景（挑三个记住就够）</a>
+    <a class="sub" href="#s11.3">11.3 一个可操作的判读清单</a>
+    <a href="#ch12"><b>12</b> 你的四周学习路径</a>
+    <a class="sub" href="#ch12">第 1 周：把重构派打穿（重点是动手）</a>
+    <a class="sub" href="#ch12">第 2 周：主干（重点是对比）</a>
+    <a class="sub" href="#ch12">第 3 周：另外两条路线（重点是理解分歧）</a>
+    <a class="sub" href="#ch12">第 4 周：当代与判读（重点是建立品味）</a>
+    <a class="sub" href="#ch12">必读四篇（如果只有四篇的预算）</a>
+    <a class="sub" href="#ch12">建议避开的坑</a>
+    <a href="#app-a"><b>A</b> 数学工具箱</a>
+    <a class="sub" href="#app-a">A.1 ELBO 与高斯 KL</a>
+    <a class="sub" href="#app-a">A.2 重参数化与两类梯度估计（这一节最值得反复看）</a>
+    <a class="sub" href="#app-a">A.3 混合密度网络（MDN）</a>
+    <a class="sub" href="#app-a">A.4 CMA-ES（够用的理解）</a>
+    <a class="sub" href="#app-a">A.5 λ-return / TD(λ)</a>
+    <a class="sub" href="#app-a">A.6 symlog / twohot（DreamerV3）</a>
+    <a class="sub" href="#app-a">A.7 复合误差界（第 1.3 节）</a>
+    <a href="#app-b"><b>B</b> 文献表（按讲义顺序）</a>
+    <a class="sub" href="#app-b">前史</a>
+    <a class="sub" href="#app-b">经典</a>
+    <a class="sub" href="#app-b">价值等价路线</a>
+    <a class="sub" href="#app-b">JEPA 路线</a>
+    <a class="sub" href="#app-b">生成式交互世界模型</a>
+    <a class="sub" href="#app-b">落地</a>
+    <a class="sub" href="#app-b">批评与评测（我认为最该读的一组）</a>
+    <a class="sub" href="#app-b">综述</a>
+    <a href="#x1e01c1"><b>·</b> 附：本讲义中标注为&quot;未查证&quot;的项</a>
+    <a href="#x89dab7"><b>·</b> 附：三条已被广泛误传、请勿采用的说法</a>
+    <a href="#x4f6372"><b>·</b> 怎么把你的豆瓣笔记接进来</a>
+</nav>
+
+<main>
+
+<header class="hero">
+  <h1>世界模型系统讲义</h1>
+  <p class="lead">从 Schmidhuber 1990 的「让世界可微」，到 Ha &amp; Schmidhuber 2018 的 V/M/C 三件套，到 Dreamer 四代与 JEPA 路线，到 2026 年的能力边界与批评性证据。含完整数学推导、一份纯 CPU 两分钟可跑的最小实现，以及一份可操作的判读清单。</p>
+  <div class="meta">
+    <span><b>面向</b> 深度学习基础扎实 · 熟悉强化学习 · 工程/架构出身</span>
+    <span><b>数据截止</b> 2026-08-25</span>
+    <span><b>篇幅</b> 13 章 + 附录 A/B</span>
+    <span><b>配套代码</b> <code>worldmodel_min/</code></span>
+  </div>
+  <div class="tags">
+    <span class="tag">World Models</span><span class="tag">VAE / ELBO</span><span class="tag">MDN-RNN</span>
+    <span class="tag">PlaNet / RSSM</span><span class="tag">Dreamer v1–v4</span><span class="tag">MuZero</span>
+    <span class="tag">TD-MPC2</span><span class="tag">JEPA / LeJEPA</span><span class="tag">Genie / Cosmos</span>
+    <span class="tag">物理泛化批评</span>
+  </div>
+</header>
+
+
+<!-- ============ 世界模型系统讲义 ============ -->
+<section id="x0e5aae">
+  <h2 class="sec"><span class="num">·</span>世界模型系统讲义</h2>
+<p><strong>面向读者</strong>：深度学习基础扎实、熟悉强化学习、工程/架构出身。
+<strong>编写日期</strong>：2026-08-25。第 8–11 章涉及大量 2025–2026 的进展，都标了来源与可信度。
+<strong>读法建议</strong>：第 1–4 章是地基，必须按顺序读，第 4 章要动手跑。第 5–7 章是主干。第 8–11 章可跳读。附录 A 是随查手册。</p>
+<div class="note"><p>说明：你给的豆瓣日志链接（<code>douban.com/people/bryan1986/notes</code>）豆瓣对抓取返回 403，浏览器扩展也没连上，所以这版讲义没能结合你已有的笔记来调整深浅。想让我对齐你的既有知识，见文末「怎么把你的笔记接进来」。</p></div>
+
+<h3>目录</h3>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>部分</th>
+<th>章节</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>一 地基</strong></td>
+<td>0 导览与三条路线地图 · 1 为什么需要模型：数学骨架 · 2 前史 1990–1991</td>
+</tr>
+<tr>
+<td><strong>二 经典</strong></td>
+<td>3 Ha &amp; Schmidhuber 2018 完整拆解 · 4 动手实现（含我的实测结果与调试记录）</td>
+</tr>
+<tr>
+<td><strong>三 主干</strong></td>
+<td>5 PlaNet · 6 Dreamer v1→v4 · 7 不重构的世界模型：MuZero / TD-MPC</td>
+</tr>
+<tr>
+<td><strong>四 当代</strong></td>
+<td>8 JEPA 路线 · 9 生成式交互世界模型 · 10 产业落地 · 11 冷水：它到底会了什么</td>
+</tr>
+<tr>
+<td><strong>五 收尾</strong></td>
+<td>12 你的四周学习路径 · 附录 A 数学工具箱 · 附录 B 文献表</td>
+</tr>
+</tbody>
+</table></div>
+
+</section>
+
+
+<!-- ============ 第 0 章 导览：世界模型到底是什么问题 ============ -->
+<section id="ch00">
+  <h2 class="sec"><span class="num">0</span>导览：世界模型到底是什么问题</h2>
+<h3 id="s0.1">0.1 一句话定义与它的三个身份</h3>
+<p><strong>世界模型 = 一个可以被查询的、关于「如果我做 $a$，接下来会怎样」的可计算对象。</strong></p>
+<p>注意这句话里没有"预测像素"。这是整个领域最容易被误解的地方。同一个词在不同论文里指三种不同的东西，混用是读文献时最大的困惑源：</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>身份</th>
+<th>输出什么</th>
+<th>谁在做</th>
+<th>判据</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Renderer（渲染器）</strong></td>
+<td>给人看的像素</td>
+<td>Sora、Veo、Genie 3</td>
+<td>好不好看、时序一不一致</td>
+</tr>
+<tr>
+<td><strong>Simulator（模拟器）</strong></td>
+<td>程序可以在上面做计算的状态</td>
+<td>PlaNet/Dreamer 的 latent、World Labs Marble 的 Gaussian splats + collision mesh</td>
+<td>能不能支撑规划、几何/物理是否可查询</td>
+</tr>
+<tr>
+<td><strong>Planner（规划器）</strong></td>
+<td>直接给动作</td>
+<td>VLA、π0.6</td>
+<td>任务成功率</td>
+</tr>
+</tbody>
+</table></div>
+<p>这个三分法是我按 World Labs（李飞飞团队）2026-06 的公开表述整理的，他们的判断是 <strong>Simulator 是枢纽（the linchpin）</strong>（原始表述的一手来源我没能直接核到，见文末未查证清单）：物理知识一旦在这一层被抓住，既能往上喂渲染，也能往下喂规划。这个框架非常好用，后面每读一篇论文都可以先问一句"它在做哪一个"。</p>
+<h3 id="s0.2">0.2 三条技术路线（读文献前先记住这张地图）</h3>
+<p>所有世界模型工作都在回答同一个问题：<strong>用什么信号来学 latent？</strong> 三个答案，三条路线，互相不服气了八年：</p>
+<pre><code>                     用什么信号训练 latent？
+                              |
+        +---------------------+---------------------+
+        |                     |                     |
+   重构观测              预测价值/奖励          预测自身的表示
+   (generative)         (value-equivalent)      (self-predictive)
+        |                     |                     |
+  VAE + MDN-RNN          MuZero                I-JEPA / V-JEPA
+  PlaNet / Dreamer       TD-MPC / TD-MPC2      V-JEPA 2 / 2.1
+  GameNGen / Genie       (Grimm 2020 理论)      LeJEPA
+  Cosmos / GAIA-2
+        |                     |                     |
+  ✅ 可视化、可从无标签    ✅ 只学任务相关的，   ✅ 不浪费容量在
+     视频学、能力上限高      样本效率最高          不可预测的细节
+  ❌ 容量浪费在无关像素   ❌ latent 无语义，    ❌ 防塌缩是硬骨头，
+     易被 agent 钻空子      不能拿视频预训练      评测困难
+</code></pre>
+<p>三条路线的核心分歧可以用一个思想实验说清：<strong>画面里有一片随风摇动的树叶阴影。</strong></p>
+<ul>
+<li>重构派必须把这片阴影的每一帧都预测对，否则重构损失就下不去 —— 而阴影和你的任务毫无关系，模型容量被白白吃掉。这是 TD-MPC 论文里的原话式批评："it forces the network to model <strong>everything</strong> in the environment, <strong>including task-irrelevant quantities</strong>"。</li>
+<li>价值等价派干脆不管阴影，只要它不影响 reward 和 value 就完全不建模 —— 代价是 latent 变成一堆没有语义的数，你没法拿一段无标签的 YouTube 视频来预训练它（因为没有 reward）。</li>
+<li>JEPA 派说：阴影<strong>本质上不可预测</strong>，你既不该逐像素预测它，也不该完全无视它带来的表示；应该在一个抽象的表示空间里预测，让不可预测的细节自然被抹平。</li>
+</ul>
+<p><strong>记住这三句话，你就有了读任何一篇世界模型论文的坐标系。</strong></p>
+<h3 id="s0.3">0.3 本讲义的推进节奏</h3>
+<p>第 1–4 章我们把第一条路线（重构派）从数学到代码彻底打穿，因为：它是历史起点、公式最完整、坑最经典，而且其中的 ELBO / 重参数化 / 混合密度 / 想象中训练这四件工具在另外两条路线里也照样用。打穿它之后，第 5–7 章就是"换零件"，读起来会非常快。</p>
+
+</section>
+
+
+<!-- ============ 第 1 章 为什么需要模型：数学骨架 ============ -->
+<section id="ch01">
+  <h2 class="sec"><span class="num">1</span>为什么需要模型：数学骨架</h2>
+<p>这一章的目的是让你在看到任何世界模型论文时，能立刻定位它在改哪一项。</p>
+<h3 id="s1.1">1.1 问题设定：POMDP</h3>
+<p>世界模型的存在理由全部来自"观测不等于状态"。所以起点必须是 POMDP 而不是 MDP：</p>
+<p>$$
+\mathcal{P} = \langle \mathcal{S}, \mathcal{A}, \mathcal{O}, T, R, \Omega, \gamma \rangle
+$$</p>
+<ul>
+<li>$T(s'\mid s,a)$ 转移，$R(s,a)$ 奖励，$\Omega(o\mid s)$ 观测函数</li>
+<li>智能体只能看到 $o_t$，看不到 $s_t$</li>
+</ul>
+<p>关键结论（这是整个领域的出发点）：<strong>在 POMDP 里，最优策略一般不是 $\pi(a\mid o_t)$ 的形式，而必须依赖整段历史</strong> $h_t = (o_1,a_1,\dots,o_t)$。因为单帧观测通常不含速度、不含遮挡后的物体、不含刚才发生过什么。</p>
+<p>对历史做充分统计量的压缩，就得到 <strong>belief state</strong>：</p>
+<p>$$
+b_t(s) = P(s_t = s \mid o_{1:t}, a_{1:t-1})
+$$</p>
+<p><strong>belief state 是一个 MDP 的状态</strong>（这是 POMDP 理论的经典结论）。所以：</p>
+<div class="note"><p><strong>世界模型的第一性任务，是学一个可计算的 belief state 近似。</strong></p></div>
+<p>这句话解释了为什么每个世界模型都长成"一个编码器 + 一个循环状态"的样子：编码器 $q(z_t \mid o_t)$ 处理"当下这一帧告诉我什么"，循环状态 $h_t$ 处理"历史告诉我什么"。Ha &amp; Schmidhuber 的 $(z_t, h_t)$、PlaNet 的 $(h_t, s_t)$、Dreamer 的 $(h_t, z_t)$、MuZero 的 $s^0 = h_\theta(o_1{:}o_t)$ —— 全是同一件事的不同实现。</p>
+<h3 id="s1.2">1.2 有了模型能干三件事（别混淆）</h3>
+<p>论文里说"我们学了一个世界模型"，用途可能是完全不同的三件事。这三件事的技术要求差异极大：</p>
+<p><strong>用途 A：规划（planning / MPC）</strong>
+在线搜索动作序列，用模型评估：</p>
+<p>$$
+a_{t:t+H}^\star = \arg\max_{a_{t:t+H}} \mathbb{E}\Big[\sum_{k=0}^{H} \gamma^k \hat r_{t+k} + \gamma^{H+1}\hat V(\hat s_{t+H+1})\Big]
+$$</p>
+<p>代表：PlaNet（CEM）、TD-MPC（MPPI）、V-JEPA 2-AC。
+<strong>要求</strong>：模型必须在 $H$ 步内<strong>数值准确</strong>，因为优化器会直接去找模型的极值点 —— 模型哪里有虚假高值，规划器就往哪里钻。</p>
+<p><strong>用途 B：在想象中训练策略（learning in imagination）</strong>
+用模型生成的假数据跑 RL。代表：Ha &amp; Schmidhuber 的"梦"、Dreamer 全系、Dreamer 4。
+<strong>要求</strong>：模型的<strong>分布</strong>要对，尤其是坏事件（撞车、死亡）的概率不能被低估。低估一次，策略就会学到一个在现实中致命的行为。第 4 章我会给你看这个失败的实测。</p>
+<p><strong>用途 C：只当表示学习器（representation learning）</strong>
+根本不 rollout，只把学到的 $(h_t,z_t)$ 当特征喂给一个普通 model-free 策略。
+代表：Ha &amp; Schmidhuber 的 CarRacing 实验其实主要靠这个（下面 3.6 会点明）、V-JEPA 的 frozen probe。
+<strong>要求</strong>：最低。只要特征有信息就行，模型的多步预测可以很烂。</p>
+<div class="key"><p><strong>读论文技巧</strong>：看到"world model 让性能提升了 X"，先判定它属于 A/B/C 哪一类。很多论文的增益其实来自 C（表示更好），却被叙述成 A 或 B（会推演未来）。这是这个领域最常见的归因错误。</p></div>
+<h3 id="s1.3">1.3 复合误差：为什么长 horizon 一定会炸</h3>
+<p>这是 model-based RL 唯一真正的敌人，也是理解后面所有技术细节（latent overshooting、terminal Q、shortcut forcing、noise augmentation）的钥匙。</p>
+<p>设两条轨迹用<strong>同一策略</strong>、奖励函数<strong>已知且精确</strong>（若奖励也是学的，还要再加一项 $H\epsilon_r$），学到的转移 $\hat T$ 与真实 $T$ 的单步误差以全变差距离度量（TV 取 $\tfrac12 L_1$ 约定）且一致有界：</p>
+<p>$$
+\sup_{s,a}\ \mathrm{TV}\big(T(\cdot\mid s,a),\ \hat T(\cdot\mid s,a)\big) \le \epsilon
+$$</p>
+<p>那么 $H$ 步后的状态分布误差满足（用 telescoping + TV 的次可加性）：</p>
+<p>$$
+\mathrm{TV}\big(P_H,\ \hat P_H\big)\ \le\ H\epsilon
+$$</p>
+<p>进而，若奖励有界 $|r|\le R_{\max}$，$H$ 步累积回报的估计偏差是</p>
+<p>$$
+\big|\,\hat J_H - J_H\,\big| \ \le\ 2R_{\max}\sum_{k=1}^{H} k\,\epsilon \ =\ R_{\max}\,\epsilon\,H(H+1) \ =\ O(\epsilon H^2)
+$$</p>
+<p><strong>两个可直接用于判读论文的推论：</strong></p>
+<ol>
+<li>
+<p><strong>偏差随 horizon 平方增长。</strong> 所以"把 horizon 拉长"从来不是免费的。这解释了为什么 PlaNet 只敢规划 12 步、Dreamer 只想象 15 步、TD-MPC 只规划 3–5 步。凡是论文声称能长程 rollout，一定要去查它用了什么手段压 $\epsilon$（噪声增广？多步监督？还是干脆换了监督信号）。</p>
+</li>
+<li>
+<p><strong>接一个学到的 value 函数，可以把无穷 horizon 折成一个很短的有限 $H$，剩下的交给 $Q$。</strong> 这正是 TD-MPC 的名字来源：
+$$
+\phi = \sum_{t=0}^{H-1}\gamma^t \hat R(z_t,a_t) + \gamma^H Q_\theta(z_H,a_H)
+$$
+$Q$ 承接 $H$ 步之外的全部回报，于是 $H$ 可以取到 3–5。误差项的<strong>形式</strong>仍是 $O(\epsilon H^2)$，但 $H$ 从 15+ 降到 3–5，实际量级小一到两个数量级；剩下的偏差被挪进了 $Q$ 的估计误差里（而 $Q$ 是靠真实数据 TD 学的，误差不随 horizon 复合）。<strong>这是一个把"复合误差"换成"函数近似误差"的交易。</strong></p>
+</li>
+</ol>
+<p>再补一个更实用的直觉：上面的界是最坏情况。实践中真正致命的不是平均误差，而是<strong>误差的方向性</strong> —— 优化器（CEM/CMA-ES/梯度）会主动搜索模型误差最有利于自己的方向。这就是所谓 <strong>model exploitation</strong>，第 3.6 与 4.4 节会用实测数字给你看它长什么样。</p>
+
+</section>
+
+
+<!-- ============ 第 2 章 前史：1990–1991，这件事从一开始就想清楚了 ============ -->
+<section id="ch02">
+  <h2 class="sec"><span class="num">2</span>前史：1990–1991，这件事从一开始就想清楚了</h2>
+<p>读早期论文的价值不在于技术（技术已完全过时），而在于：<strong>问题的提法在 1990 年就已经是正确的</strong>，后面三十年主要是在补算力和补工程。</p>
+<h3 id="s2.1">2.1 "Making the World Differentiable" —— 标题就是全部思想</h3>
+<ul>
+<li><strong>Schmidhuber, J. (1990).</strong> <em>Making the world differentiable: On using fully recurrent self-supervised neural networks for dynamic reinforcement learning and planning in non-stationary environments.</em> Technical Report <strong>FKI-126-90</strong>, TU München, Feb 1990（Nov 1990 修订版）。</li>
+</ul>
+<p>架构就是两个全递归网络：</p>
+<ul>
+<li><strong>控制网络 C</strong>：吃感知输入，吐动作</li>
+<li><strong>模型网络 M</strong>：预测未来输入，<strong>并且包括 reinforcement 单元和 pain 单元的取值</strong></li>
+</ul>
+<p>论文符号：$C$ = 控制网络的非输入单元，$A\subset C$ = 动作单元，$I$ = 普通输入单元，$P$ = pain 与 reinforcement 单元，$M$ = 模型网络单元。</p>
+<p>目标函数极简：</p>
+<p>$$
+\min \sum_{t}\sum_{i}\big(c_i - y_i(t)\big)^2
+$$</p>
+<p>其中 pain 单元的期望激活 $c_i = 0$，reinforcement 单元的期望激活为正。翻译成人话：<strong>"别疼、要爽"</strong>。</p>
+<p>在线更新（RTRL 式，$p^{k}_{ij}\approx \partial y_k/\partial w_{ij}$ 逐步累积）：</p>
+<p>$$
+\text{M: } w_{ij} \leftarrow w_{ij} + \alpha_M \sum_{k\in I\cup P}\big(y_{k}^{\text{new}} - y_{k\text{pred}}^{\text{old}}\big)\,p^{k\text{pred}}_{ij,\text{old}}
+$$</p>
+<p>$$
+\text{C: } w_{ij} \leftarrow w_{ij} + \alpha_C \sum_{k\in P}\big(c_k - y_{k}^{\text{new}}\big)\,p^{k\text{pred}}_{ij,\text{old}}
+$$</p>
+<p><strong>请注意 C 的更新式</strong>：误差信号定义在 pain/reinforcement 的<strong>预测单元</strong>上，用的偏导 $p^{k\text{pred}}$ 来自<strong>模型网络</strong>。也就是说，梯度路径是</p>
+<p>$$
+\frac{\partial(\text{预测的痛苦})}{\partial(\text{C 的权重})} = \frac{\partial \hat P}{\partial(\text{M 的输入})}\cdot\frac{\partial(\text{动作})}{\partial W_C}
+$$</p>
+<p>真实环境不可微，但 M 是一个神经网络，<strong>可微</strong>。于是把环境换成 M，C→环境→奖励这条断掉的信用分配路径就被接通了。Schmidhuber 自己的说法是 M "provides complete <strong>credit assignment paths</strong> into the past"。</p>
+<p><strong>这就是"让世界可微"的字面含义，也是这条路线三十年不变的内核。</strong> 2019 年 Dreamer 那篇论文的核心卖点 —— "让 actor 的解析梯度穿过 world model" —— 在数学结构上和这个 1990 年的更新式是同一件事，区别只是 RTRL 换成了 BPTT、确定性 M 换成了重参数化的随机 M。</p>
+<p>报告里还有一节 <strong>"Augmenting the Algorithm by Temporal Difference Methods"</strong>，把 TD 方法与基于梯度的世界模型结合，为独立的控制网络算权重更新。1990 年。</p>
+<h3 id="s2.2">2.2 好奇心：内在奖励为什么不能正比于预测误差</h3>
+<ul>
+<li><strong>Schmidhuber, J. (1991).</strong> <em>A possibility for implementing curiosity and boredom in model-building neural controllers.</em> In <em>From Animals to Animats (SAB)</em>, MIT Press。</li>
+</ul>
+<p>做法：在 reinforcement 单元集合 $P$ 里加一个 <strong>curiosity unit</strong>，它"gets activated by a process which at every time step measures the Euclidian distance between reality and prediction of the model network"。</p>
+<p><strong>但关键在于论文明确反对"奖励 = 预测误差"这种朴素做法</strong>，原文：</p>
+<div class="note"><p>"Zero reinforcement should be given in case of perfect matches, high reinforcement should be given in case of <strong>'near-misses'</strong>, and low reinforcement again should be given in case of <strong>strong mismatches</strong>."</p></div>
+<p>也就是说，奖励对预测误差的响应应该是<strong>倒 U 形</strong>的：</p>
+<pre><code>内在奖励
+   ^
+   |        ___
+   |      /     \
+   |    /         \
+   |  /             \____
+   +--+------+--------+-----&gt; 预测误差
+   完全会了  差一点    完全学不会
+   (boredom) (最有   (噪声/随机源，
+             价值)    学不动，别浪费时间)
+</code></pre>
+<p>右半边下降那一段就是 <strong>noisy-TV 问题的解</strong>。一台永远播放随机噪声的电视机预测误差永远最大，如果奖励正比于误差，agent 会坐在电视机前直到宇宙热寂。1991 年就意识到并给出了修法方向。论文也很诚实地承认："at the moment the precise nature of a good mapping between (mis)matches and reinforcement is unclear"，初步实验只用了线性映射。</p>
+<p><strong>1991 IJCNN 版（Curious model-building control systems）</strong>给出了更成熟的答案：不奖励预测误差本身，而是奖励 <strong>"the temporal derivative of the adaptive assumed reliability of future predictions"</strong> —— 也就是今天所说的 <strong>learning progress</strong>（学习进展）。误差在下降 → 有奖励；误差高但不下降（纯噪声）→ 没奖励。这是 2017 年前后一大批 intrinsic motivation 论文（RND、ICM 及其后续讨论）的直接祖先。</p>
+<h3 id="s2.3">2.3 2015：C 学会"查询"M</h3>
+<ul>
+<li><strong>Schmidhuber, J. (2015).</strong> <em>On Learning to Think: Algorithmic Information Theory for Novel Combinations of RL Controllers and Recurrent Neural World Models.</em> <strong>arXiv:1511.09249</strong>。</li>
+</ul>
+<p>这篇的增量很具体，而且是理解 Dreamer 4 那类"agent tokens"设计的前置。1990 年的方案里，C 用 M 的方式是<strong>沿时间 step-by-step 地 rollout</strong>。2015 年提出：C 与 M 通过<strong>可学习的连接</strong>合成一个新的 RNN，记作 <strong>CM</strong>，然后：</p>
+<div class="note"><p>"C's relatively small candidate programs are given time to <strong>'think'</strong> by feeding sequences of activations into M, and reading activations out of M, <strong>before and while</strong> interacting with the environment."</p></div>
+<p>区别是什么？rollout 是"一步一步模拟未来"；query 是"往 M 里写一段东西，读回一段东西"，不必对应任何物理时间。这允许<strong>抽象推理</strong>而非仅仅时序模拟。今天你在 Dreamer 4 里看到的 agent tokens + causal isolation（策略 token 可以读世界模型但不污染它的预测），结构上就是这个想法。</p>
+<p>论文的另一半是 AIT（算法信息论）论证：一个 RNN 类系统主动学习去利用另一个系统的<strong>算法信息含量</strong>。第 6 节标题是 "Exploration: Rewarding C for Experiments that Improve M" —— 1991 好奇心的 AIT 版。</p>
+<h3 id="s2.4">2.4 平行线：Sutton 的 Dyna（以及一个要纠正的误传）</h3>
+<ul>
+<li><strong>Sutton, R. S. (1990).</strong> <em>Integrated Architectures for Learning, Planning, and Reacting Based on Approximating Dynamic Programming.</em> ICML 1990, pp. 216–224.</li>
+<li><strong>Sutton, R. S. (1991).</strong> <em>Dyna, an Integrated Architecture for Learning, Planning, and Reacting.</em> ACM SIGART Bulletin 2(4): 160–163.</li>
+</ul>
+<p>Dyna 的核心洞见一句话：<strong>planning 就是拿模型生成的模拟经验，跑与真实经验完全相同的 RL 更新。</strong></p>
+<pre><code>真实经验 ──┬──&gt; 直接 RL 更新 (value / policy)
+           └──&gt; 训练模型 ──&gt; 模拟经验 ──&gt; 同一套 RL 更新
+</code></pre>
+<p>这正是 Ha &amp; Schmidhuber "在梦里训练"的直系祖先，也是 Dreamer 全系的骨架。</p>
+<div class="warn"><p>⚠️ <strong>一个要纠正的常见误传</strong>：网上很多讲解说"Ha &amp; Schmidhuber 2018 引用了 Sutton 1991 的 Dyna"。<strong>不对。</strong> 该论文参考文献里 Sutton 只有 1998 年的教科书，Dyna 只是通过引用 Silver (2017) 的讲义间接相关。写笔记/做分享时别把这条当事实。</p></div>
+<p>顺手把另外两条常见误传也钉死（我逐字核过原文）：</p>
+<ul>
+<li>论文开篇确实用了 "mental model" 这个词 —— Introduction 第一句就是 "Humans develop a <strong>mental model</strong> of the world based on what they are able to perceive with their limited senses"，紧接着引 <strong>Jay Wright Forrester (1971)</strong> 那段 "...is just a model" 来定义它。但请注意：<strong>它指的是人类的心智模型，不是 V/M/C 里的任何技术组件</strong> —— 别把它当成这篇论文的技术术语来引用。</li>
+<li>论文引用 Werbos 用的措辞是 "a good <strong>predictive model of the future</strong>"（Werbos, 1987; Silver, 2017），<strong>"model of reality" 这个短语在全文中查不到</strong>。</li>
+</ul>
+<h3 id="s2.5">2.5 小结：1990 年就位的四件事</h3>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>概念</th>
+<th>1990/1991 的表述</th>
+<th>今天的名字</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>C-M 分离</td>
+<td>control network + model network</td>
+<td>policy / world model</td>
+</tr>
+<tr>
+<td>通过模型反传</td>
+<td>$p^{k\text{pred}}$ 给 C 提供 credit assignment path</td>
+<td>Dreamer 的 latent imagination 梯度</td>
+</tr>
+<tr>
+<td>内在动机</td>
+<td>curiosity unit，倒 U 形响应</td>
+<td>intrinsic motivation / learning progress</td>
+</tr>
+<tr>
+<td>用模型规划</td>
+<td>"plan ahead for several time steps"</td>
+<td>MPC / CEM / MPPI</td>
+</tr>
+</tbody>
+</table></div>
+<h2><strong>缺的只有三样：算力、深度卷积编码器、大规模数据。</strong> 这三样在 2015 年前后到位，于是 2018 年那篇论文就成了。</h2>
+</section>
+
+
+<!-- ============ 第 3 章 Ha & Schmidhuber 2018 完整拆解 ============ -->
+<section id="ch03">
+  <h2 class="sec"><span class="num">3</span>Ha &amp; Schmidhuber 2018 完整拆解</h2>
+<ul>
+<li><strong>Ha, D. &amp; Schmidhuber, J. (2018).</strong> <em>World Models.</em> <strong>arXiv:1803.10122</strong>（v4, 2018-05-09）</li>
+<li>NeurIPS 2018 版标题不同：<em>Recurrent World Models Facilitate Policy Evolution</em>（spotlight）</li>
+<li>交互版全文：https://worldmodels.github.io/</li>
+</ul>
+<p>这一章我们把它拆到能重写出来的程度。</p>
+<h3 id="s3.1">3.1 三件套与训练流程</h3>
+<p>$$
+\underbrace{V:\ o_t \mapsto z_t}_{\text{压缩空间}}\qquad
+\underbrace{M:\ (z_t,a_t,h_t)\mapsto P(z_{t+1})}_{\text{压缩时间}}\qquad
+\underbrace{C:\ [z_t;h_t]\mapsto a_t}_{\text{决策}}
+$$</p>
+<p>训练流程是严格分阶段的，<strong>没有端到端</strong>：</p>
+<pre><code>1. 用随机策略跑 10,000 条 rollout，存下所有帧
+2. 在这些帧上训 ConvVAE（只训 1 个 epoch）           &lt;- V 固定
+3. 把帧编码成 z 序列，训 MDN-RNN（20 epochs，teacher forcing）  &lt;- M 固定
+4. 用 CMA-ES 进化 C（867 个参数）
+5. Doom 实验：第 4 步完全在 M 构成的&quot;梦&quot;里做，再迁移回真实环境
+</code></pre>
+<p><strong>为什么要分阶段？</strong> 这是一个被低估的设计决策。端到端训练会让 V 和 M 为了让 C 的 reward 变高而扭曲表示（表示塌缩到只保留 reward 相关信息），而分阶段训练强制 V/M 是<strong>任务无关的通用压缩器</strong>。代价是可能压缩掉任务关键信息 —— 论文自己也承认这是局限。今天 Dreamer 走的是联合训练（但 world model 的梯度不受 actor 影响），Dreamer 4 又回到了"先预训练世界模型再 finetune agent"的分阶段。<strong>这个钟摆值得注意。</strong></p>
+<h3 id="s3.2">3.2 V：ConvVAE 与 ELBO</h3>
+<h4>结构（论文正文 + 官方代码）</h4>
+<p>论文正文只说"encoder 4 层 stride-2 卷积 + ReLU，decoder 4 层 stride-2 反卷积 + ReLU，输出 sigmoid"，逐层通道数在正文里没有，以下来自官方实现 <code>hardmaru/WorldModelsExperiments</code>：</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Encoder</th>
+<th>ch</th>
+<th>k</th>
+<th>s</th>
+<th></th>
+<th>Decoder</th>
+<th>ch</th>
+<th>k</th>
+<th>s</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>conv1</td>
+<td>32</td>
+<td>4</td>
+<td>2</td>
+<td></td>
+<td>dense</td>
+<td>1024</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>conv2</td>
+<td>64</td>
+<td>4</td>
+<td>2</td>
+<td></td>
+<td>deconv1</td>
+<td>128</td>
+<td>5</td>
+<td>2</td>
+</tr>
+<tr>
+<td>conv3</td>
+<td>128</td>
+<td>4</td>
+<td>2</td>
+<td></td>
+<td>deconv2</td>
+<td>64</td>
+<td>5</td>
+<td>2</td>
+</tr>
+<tr>
+<td>conv4</td>
+<td>256</td>
+<td>4</td>
+<td>2</td>
+<td></td>
+<td>deconv3</td>
+<td>32</td>
+<td>6</td>
+<td>2</td>
+</tr>
+<tr>
+<td>→flatten→ dense×2</td>
+<td>各 $N_z$</td>
+<td></td>
+<td></td>
+<td></td>
+<td>deconv4</td>
+<td>3</td>
+<td>6</td>
+<td>2, <strong>sigmoid</strong></td>
+</tr>
+</tbody>
+</table></div>
+<ul>
+<li>输入 <strong>64×64×3</strong></li>
+<li><strong>latent 维度</strong>：CarRacing $z\in\mathbb{R}^{32}$，VizDoom $z\in\mathbb{R}^{64}$</li>
+<li>后验是对角高斯 $\mathcal{N}(\mu_t,\sigma_t^2 I)$</li>
+<li>损失 = L² 重构 + KL</li>
+<li><strong>只训 1 个 epoch</strong>（数据够多，且不需要精细重构）</li>
+<li>参数量：CarRacing 4,348,547；Doom 4,446,915</li>
+</ul>
+<h4>ELBO 的完整推导（这一段建议自己推一遍）</h4>
+<p>我们想最大化 $\log p_\theta(x)$，但 $p_\theta(x)=\int p_\theta(x\mid z)p(z)\,dz$ 积不出来。引入任意分布 $q_\phi(z\mid x)$：</p>
+<p>$$
+\begin{aligned}
+\log p_\theta(x)
+&= \log \int p_\theta(x,z)\,dz
+= \log \int q_\phi(z\mid x)\,\frac{p_\theta(x,z)}{q_\phi(z\mid x)}\,dz \\[2pt]
+&= \log \mathbb{E}_{q_\phi}\!\left[\frac{p_\theta(x,z)}{q_\phi(z\mid x)}\right]
+\ \ \overset{\text{Jensen}}{\ge}\ \ \mathbb{E}_{q_\phi}\!\left[\log\frac{p_\theta(x,z)}{q_\phi(z\mid x)}\right] \;=:\; \mathcal{L}(\theta,\phi;x)
+\end{aligned}
+$$</p>
+<p>把 $p_\theta(x,z)=p_\theta(x\mid z)p(z)$ 拆开：</p>
+<p>$$
+\boxed{\ \mathcal{L} = \underbrace{\mathbb{E}_{q_\phi(z\mid x)}\big[\log p_\theta(x\mid z)\big]}_{\text{重构项}} \;-\; \underbrace{\mathrm{KL}\big[q_\phi(z\mid x)\,\|\,p(z)\big]}_{\text{正则项}}\ }
+$$</p>
+<p><strong>更有用的是另一个等式</strong>（把 gap 显式写出来）：</p>
+<p>$$
+\log p_\theta(x) = \mathcal{L}(\theta,\phi;x) + \mathrm{KL}\big[q_\phi(z\mid x)\,\|\,p_\theta(z\mid x)\big]
+$$</p>
+<p>由于 KL ≥ 0，ELBO 是下界，<strong>且 gap 恰好是近似后验与真后验的 KL</strong>。这个式子解释了变分推断的全部动机：我们没法算真后验 $p_\theta(z\mid x)$，就找一个参数化的 $q_\phi$ 去逼近它，逼近得越好，下界越紧。</p>
+<p><strong>高斯 KL 的解析式</strong>（$q=\mathcal{N}(\mu,\mathrm{diag}(\sigma^2))$，$p=\mathcal{N}(0,I)$，$d$ 维）：</p>
+<p>$$
+\mathrm{KL}[q\|p] = \frac12\sum_{j=1}^{d}\Big(\mu_j^2 + \sigma_j^2 - \log\sigma_j^2 - 1\Big)
+$$</p>
+<p>代码里就是那行 <code>-0.5 * (1 + logvar - mu^2 - logvar.exp()).sum()</code>。</p>
+<h4>为什么必须是 VAE 而不是普通 autoencoder</h4>
+<p>这是初学最容易滑过去的一点，但它决定了整套系统能不能工作：</p>
+<ol>
+<li><strong>KL 项把 latent 拉向 $\mathcal{N}(0,I)$，于是 latent 空间是稠密且有界的。</strong> 普通 AE 的 latent 可以散落在任意区域，中间是大片"没有意义"的空洞。而 M 是要在 latent 空间里<strong>生成新的 $z$</strong> 的 —— 如果它采样落进空洞，解码出来就是垃圾，梦就崩了。</li>
+<li><strong>随机编码 $z\sim\mathcal N(\mu,\sigma^2)$ 天然是一种数据增广。</strong> M 每次看到的 $z$ 都带噪声，被迫学一个平滑的转移函数，而不是背下确定的映射。论文附录里那个 trick（预存 $\mu,\sigma$，<strong>每个 batch 重新采样 $z_t$</strong> 来防止 M 过拟合）就是在刻意放大这个效果。</li>
+<li>顺带：$\sigma$ 本身携带了"这一帧我有多确定"的信息。</li>
+</ol>
+<div class="note"><p><strong>一个常被忽略的局限</strong>（论文自己指出）：V 是<strong>任务无关</strong>地训练的，它可能把与任务无关的细节（背景砖块纹理）编码进去，同时压掉与任务生死攸关的小物体（远处的一颗火球只占几个像素，重构损失不在乎它）。这是重构派的原罪，也是第 7 章 MuZero/TD-MPC 和第 8 章 JEPA 的出发点。</p></div>
+<h3 id="s3.3">3.3 M：MDN-RNN 与它存在的理由</h3>
+<h4>结构</h4>
+<p>$$
+h_t,\ (\text{MDN params}) = \mathrm{LSTM}\big([z_t;a_t],\ h_{t-1}\big)
+$$
+$$
+P(z_{t+1}\mid a_t,z_t,h_t) = \prod_{j=1}^{N_z}\sum_{k=1}^{K}\pi_{kj}\,\mathcal{N}\big(z_{t+1,j};\ \mu_{k j},\ \sigma_{k j}^2\big)
+$$</p>
+<ul>
+<li><strong>LSTM 隐单元</strong>：CarRacing <strong>256</strong>，VizDoom <strong>512</strong></li>
+<li><strong>混合分量 $K=5$</strong>，<strong>对角协方差</strong>（不建模维度间相关）</li>
+<li>VizDoom 版额外预测 <strong>done flag $d_{t+1}$</strong>（这一项极其关键，见 4.4）</li>
+<li>训练 <strong>20 epochs</strong>，teacher forcing，数据来自随机策略</li>
+<li>参数量：CarRacing 422,368；Doom 1,678,785</li>
+<li>（optimizer / lr / batch size / 序列长度 / 梯度裁剪：论文附录未给，<strong>未查证</strong>，只能看官方代码）</li>
+</ul>
+<h4>为什么一定要是混合密度，而不是一个 MSE 回归</h4>
+<p><strong>这是全篇最重要的设计决策，也是最值得内化的一点。</strong></p>
+<p>假设你用普通 MSE 回归 $\hat z_{t+1} = f(z_t,a_t,h_t)$。MSE 的最优解是条件期望：</p>
+<p>$$
+f^\star(x) = \mathbb{E}[z_{t+1}\mid x]
+$$</p>
+<p>现在考虑一个具体情形：Doom 里怪物<strong>可能</strong>发射火球，也可能不发。真实的 $P(z_{t+1})$ 是双峰的 —— 一个峰对应"有火球"，一个峰对应"没火球"。条件期望落在两峰之间，解码出来是<strong>一个半透明的、根本不存在的鬼影火球</strong>。用这种模型 rollout，agent 会学会对一个从不存在的东西做反应。</p>
+<p>再看我第 4 章那个环境：方块落地后<strong>在随机位置重新生成</strong>。下一帧的方块 x 坐标是 $[0,26]$ 上的均匀分布。MSE 会预测出一个恒定在正中间的方块 —— 完全错误，而且<strong>平均误差最小</strong>。</p>
+<p><strong>混合密度网络（MDN）的解</strong>：直接建模条件分布本身。负对数似然：</p>
+<p>$$
+\mathcal{L}_{\text{MDN}} = -\sum_{j=1}^{N_z}\log\sum_{k=1}^{K}\exp\Big(\log\pi_{kj} + \log\mathcal{N}\big(z_{t+1,j};\mu_{kj},\sigma_{kj}^2\big)\Big)
+$$</p>
+<p>实现上必须用 <code>logsumexp</code> 而不是先 exp 再 log（数值稳定）。单个高斯的对数密度：</p>
+<p>$$
+\log \mathcal{N}(x;\mu,\sigma^2) = -\frac{(x-\mu)^2}{2\sigma^2} - \log\sigma - \tfrac12\log 2\pi
+$$</p>
+<div class="note"><p><strong>工程提示</strong>：$\log\sigma$ 一定要 clamp（我在代码里用 <code>[-7, 3]</code>）。否则模型会让某个分量的 $\sigma\to 0$ 去精确套住一个训练点，NLL 趋于 $-\infty$，训练爆炸。这是 MDN 最经典的数值坑。</p></div>
+<p><strong>记住这条通用原则</strong>：<em>凡是未来存在多种可能，用 MSE 训练的预测器就会输出一个"所有可能的平均"，而这个平均往往是物理上不可能发生的状态。</em> 这条原则一路贯穿到今天 —— Dreamer v2 用 categorical latent 而非高斯，理由是"混合高斯的 prior 拟不上多模态转移"；扩散模型能做世界模型，本质上也是因为它天然建模分布而非均值。</p>
+<h3 id="s3.4">3.4 温度 $\tau$：可调的"梦有多难"</h3>
+<p>$M$ 采样时引入温度：</p>
+<p>$$
+\tilde\pi_k \propto \exp\!\big(\log\pi_k / \tau\big), \qquad \tilde\sigma_{kj} = \sigma_{kj}\cdot\sqrt{\tau}
+$$</p>
+<ul>
+<li>$\tau\to 0$：mixture 权重变成 one-hot，$\sigma\to 0$ → 梦变成<strong>确定性</strong>的，最可预测、也最容易被钻空子</li>
+<li>$\tau = 1$：忠实于模型学到的分布</li>
+<li>$\tau > 1$：<strong>注入超过模型信念的额外随机性</strong>，梦变得更"难"、更不可控</li>
+</ul>
+<p>论文原话："By making the temperature $\tau$ an adjustable parameter of M, we can see the effect of training C inside of virtual environments with different levels of uncertainty."</p>
+<p>测试取值 $\tau\in\{0.10,0.50,1.00,1.15,1.30\}$，Doom 最终用 <strong>1.15</strong>。</p>
+<p><strong>$\tau>1$ 的正确理解</strong>：它不是"让模型更准"，恰恰相反，它是<strong>故意让模型更不准，但朝着安全的方向不准</strong>。这在概念上等价于 sim-to-real 里的 <strong>domain randomization</strong>：既然我知道我的模拟器不对，那就把模拟器随机化到覆盖真实环境，逼策略学一个鲁棒解而不是一个针对模拟器缺陷的特化解。<strong>$\tau$ 是一个悲观化（pessimism）旋钮。</strong> 现代 offline model-based RL 里的各种 uncertainty penalty（MOPO、MOReL）在做同一件事，只是形式更精细。</p>
+<h3 id="s3.5">3.5 C：为什么只有 867 个参数</h3>
+<p>$$
+a_t = W_c\,[z_t;h_t] + b_c
+$$</p>
+<ul>
+<li>CarRacing：输入 $[z_t(32); h_t(256)]$，输出 3 维 → $(32+256)\times 3 + 3 = \mathbf{867}$</li>
+<li>Doom：输入 $[z_t(64); c_t(512); h_t(512)]$（<strong>注意 Doom 版把 LSTM 的 cell state 也用上了</strong>），单输出无 bias → $\mathbf{1088}$</li>
+<li>训练：<strong>CMA-ES</strong>，population <strong>64</strong>，每个个体在 <strong>16 个随机种子</strong>上跑，fitness 取 16 次平均，64 核并行</li>
+<li>CarRacing：<strong>1800 代</strong>后在 <strong>1024 条随机 rollout</strong> 上平均 900.46，每 25 代评估一次（注意这与下面结果表里"100 局平均 906 ± 21"是两套评测协议，别混用）</li>
+</ul>
+<p><strong>为什么故意做这么小？</strong> 三个理由，逐条都值得记：</p>
+<ol>
+<li><strong>参数量对比是论点本身。</strong> V 有 435 万参数，M 有 42 万，C 只有 867 个 —— 万分之二。论文想说的是：<strong>如果世界模型足够好，决策本身是简单的。</strong> 复杂性应该在建模里，不在策略里。这是整个 model-based 范式的宣言。</li>
+<li><strong>让 CMA-ES 可用。</strong> CMA-ES 要维护 $n\times n$ 协方差矩阵，$O(n^2)$ 存储、$O(n^3)$ 特征分解，几百维刚好，几万维就不可行了。</li>
+<li><strong>绕开信用分配。</strong> 进化算法只需要"这一整局得了多少分"这一个标量，<strong>完全不需要梯度</strong>，因此不受稀疏奖励、不可微环境、长时序信用分配的困扰。用小策略换掉整个 RL 的难题，是一笔很划算的交易。</li>
+</ol>
+<div class="key"><p><strong>这里有一个分水岭</strong>：Ha &amp; Schmidhuber 用进化算法<strong>绕过</strong>了"梯度怎么穿过世界模型"的问题；一年后 Dreamer 正面<strong>解决</strong>了它（重参数化 + BPTT）。解决之后策略可以做大，于是有了 Dreamer 4 的 2B 参数。第 6 章会展开。</p></div>
+<h3 id="s3.6">3.6 结果与"在梦里训练"</h3>
+<h4>CarRacing-v0（判定标准：100 局平均 900 分）</h4>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>方法</th>
+<th>分数</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>DQN</td>
+<td>343 ± 18</td>
+</tr>
+<tr>
+<td>A3C (continuous)</td>
+<td>591 ± 45</td>
+</tr>
+<tr>
+<td>A3C (discrete)</td>
+<td>652 ± 10</td>
+</tr>
+<tr>
+<td>Gym leaderboard 最好成绩</td>
+<td>838 ± 11</td>
+</tr>
+<tr>
+<td><strong>只用 V（$z$）</strong></td>
+<td>632 ± 251</td>
+</tr>
+<tr>
+<td><strong>V + 一个隐层</strong></td>
+<td>788 ± 141</td>
+</tr>
+<tr>
+<td><strong>完整世界模型（V + M）</strong></td>
+<td><strong>906 ± 21</strong></td>
+</tr>
+</tbody>
+</table></div>
+<div class="key"><p><strong>重要的读法</strong>：CarRacing 实验里 C 是在<strong>真实环境</strong>里进化的，M 在这里的作用主要是<strong>提供 $h_t$ 作为额外特征</strong>（回到 1.2 节的用途 C：表示学习）。真正的"在梦里训练"是 Doom 实验。很多二手讲解把这两个实验混为一谈。</p>
+<p>顺带看那三行对比：只有 $z$ 是 632，加个隐层是 788，加上 $h$ 是 906。<strong>$h$ 带来的增益（+118）比加非线性（+156）小但更稳（方差从 251→141→21）。</strong> $h$ 编码的是动力学信息（车在漂移、刚才转过弯），单帧 $z$ 里没有。</p></div>
+<h4>DoomTakeCover（判定标准：100 局平均存活 &gt; 750 步）</h4>
+<p><strong>完全在梦里训练，零真实环境交互</strong>，然后直接迁移：</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>$\tau$</th>
+<th>梦中得分</th>
+<th><strong>真实环境得分</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0.10</td>
+<td>2086 ± 140</td>
+<td><strong>193 ± 58</strong></td>
+</tr>
+<tr>
+<td>0.50</td>
+<td>2060 ± 277</td>
+<td><strong>196 ± 50</strong></td>
+</tr>
+<tr>
+<td>1.00</td>
+<td>1145 ± 690</td>
+<td>868 ± 511</td>
+</tr>
+<tr>
+<td><strong>1.15</strong></td>
+<td>918 ± 546</td>
+<td><strong>1092 ± 556</strong></td>
+</tr>
+<tr>
+<td>1.30</td>
+<td>732 ± 269</td>
+<td>753 ± 139</td>
+</tr>
+</tbody>
+</table></div>
+<p>对照：Gym leaderboard baseline 820 ± 58，随机策略 210 ± 108。</p>
+<p><strong>这张表要盯着看三分钟，它包含了这个领域最重要的经验事实：</strong></p>
+<ol>
+<li><strong>$\tau=0.1$ 时，梦中 2086（近乎完美），真实 193（比随机策略 210 还差）。</strong> 模型崇拜的极致形态。</li>
+<li><strong>随 $\tau$ 增大，梦中分数单调下降，真实分数先升后降。</strong> 存在一个甜点。</li>
+<li><strong>在甜点 $\tau=1.15$ 处，真实分数（1092）反而高于梦中分数（918）。</strong> 这是一个非常强的信号：说明梦已经比现实更难了，策略学到的是一个<strong>保守而鲁棒</strong>的解。</li>
+</ol>
+<h4>Agent 是怎么钻空子的</h4>
+<p>论文原文：</p>
+<div class="note"><p>"Our agent discovered an <strong>adversarial policy</strong> to move around in such a way so that the monsters in this virtual environment governed by M <strong>never shoots a single fireball</strong> during some rollouts."</p></div>
+<p>根因："Because M is only an <strong>approximate probabilistic model</strong> of the environment, it will occasionally generate trajectories that do not follow the laws governing the actual environment."</p>
+<p>翻译：CMA-ES 在 867 维（Doom 是 1088 维）空间里搜索，它并不知道自己在"作弊"，它只是<strong>忠实地最大化 fitness</strong>。而 fitness 由 M 定义。M 在某个 $(z,h,a)$ 组合下恰好把"火球生成"的概率预测得偏低 —— 这是一个训练数据没覆盖到的角落 —— 于是最优解就是<strong>把系统开到那个角落里去待着</strong>。</p>
+<div class="note"><p><strong>这是所有 model-based 方法的通病，而且是结构性的：优化器的目标函数就是模型，模型的每一个缺陷都是优化器眼里的免费午餐。</strong> 现代的应对手段有三类：(a) 悲观化 —— 温度、不确定性惩罚、ensemble 分歧；(b) 约束策略靠近数据 —— behavioral prior KL（Dreamer 4 就用了）；(c) 缩短 horizon —— terminal value（TD-MPC）。</p></div>
+<h3 id="s3.7">3.7 这篇论文真正的贡献</h3>
+<p>我认为可以概括成三条，按重要性排序：</p>
+<ol>
+<li><strong>证明了"完全在学到的模型里训练策略，再零样本迁移回现实"是可行的。</strong> 这在 2018 年是反直觉的 —— 当时主流认为模型误差会让这条路彻底走不通。</li>
+<li><strong>给出了一个干净到可以在一页纸上画完的分解（V/M/C）</strong>，让每个部件都可以被独立替换。后续十年的工作几乎全都可以描述为"替换其中一个部件"：V → RSSM / tokenizer / JEPA encoder；M → transformer / diffusion；C → actor-critic / MPC。</li>
+<li><strong>诚实地展示并分析了失败模式（模型钻空子），并给出了一个极简的解法（温度）。</strong> 一篇论文肯把自己方法的破绽用一整张表展示出来，这个学术品格值得学。</li>
+</ol>
+<p>它的局限也很清楚（论文自己列了）：V 是任务无关的、容量受限；分阶段训练无法迭代改进模型；LSTM 的记忆容量在复杂环境里不够。这三条正好对应后续三个方向：PlaNet 联合训练、Dreamer 的迭代式数据收集、Dreamer 4 换 transformer。</p>
+
+</section>
+
+
+<!-- ============ 第 4 章 动手：从零实现一个能迁移的世界模型 ============ -->
+<section id="ch04">
+  <h2 class="sec"><span class="num">4</span>动手：从零实现一个能迁移的世界模型</h2>
+<p>代码在附带的 <code>worldmodel_min/</code> 里，纯 CPU 可跑，全流程约 2 分钟（1500 episodes 数据 + 完整训练）。<strong>这一章的所有数字都是我在这台机器上实际跑出来的</strong>，包括失败的那次。</p>
+<pre><code>worldmodel_min/
+├── env_dodge.py       # 环境（80 行）
+├── world_model.py     # V + M + C + 梦 + 诊断（约 380 行）
+└── sweep_temp.py      # 温度扫描实验（复现下面那张表）
+</code></pre>
+<p>运行：</p>
+<pre><code class="language-bash"># 冒烟测试，约 1 分钟。数据少、模型弱，真实得分约 50（随机是 29），不会到满分
+python3 world_model.py --stage all --quick
+
+# 完整版，约 2 分钟。这条命令就是下面那张表里 τ=1.5 那一行（真实得分 300.0）
+python3 world_model.py --stage all --episodes 1500 --vae-epochs 6 \
+        --rnn-epochs 8 --generations 60 --temperature 1.5
+
+python3 world_model.py --stage diag        # 单独诊断世界模型质量
+python3 sweep_temp.py                      # 复现整张温度扫描表，约 10 分钟
+</code></pre>
+<h3 id="s4.1">4.1 环境设计：为什么是这个环境</h3>
+<p><code>Dodge-v0</code>：32×32 灰度图，底部一个宽 7 的"玩家"左右移动（3 个动作），上方掉落 6×6 的方块，被砸中即结束，每存活一步 +1，上限 300 步。</p>
+<p>设计上刻意对齐 DoomTakeCover 的三个特征，每一条都是为了让某个概念<strong>必须</strong>出现：</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>环境特征</th>
+<th>逼出来的技术点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>观测是纯像素，无结构化状态</td>
+<td>必须有 V（否则 C 面对 1024 维输入）</td>
+</tr>
+<tr>
+<td><strong>方块落地后在随机 x 重生</strong></td>
+<td>未来是多模态的 → <strong>必须有 MDN</strong>，MSE 一定失败</td>
+</tr>
+<tr>
+<td>存活即得分，被砸即终止</td>
+<td><strong>M 必须预测 done</strong>，否则梦里永生（4.4 节血泪）</td>
+</tr>
+<tr>
+<td>随机策略平均只活 24 步（上限 300）</td>
+<td>有足够改进空间，能看出效果</td>
+</tr>
+</tbody>
+</table></div>
+<p><code>random policy 平均存活步数: 23.99 ± 19.00</code>（iid 随机）。</p>
+<div class="note"><p>下文所有表格里作为基线的「随机策略 29.1 ± 26.4」指的是<strong>粘性随机策略</strong>（见下一段），不是这里的 iid 版本 —— 两个数字不冲突。</p></div>
+<p><strong>一个实践细节值得单独说</strong>：我把数据采集策略从 iid 随机改成了「粘性随机」（以 0.6 的概率重复上一个动作）。理由是 iid 随机在这个环境里平均只活 24 步，状态覆盖极窄 —— 世界模型永远没见过"玩家持续待在左边"这类状态。改成粘性后平均 29.8 步，轨迹更平滑。</p>
+<div class="note"><p><strong>这是一条通用经验：世界模型的能力上限由采集策略的状态覆盖决定，而不是由模型容量决定。</strong> Ha &amp; Schmidhuber 论文自己也承认这一点，并提出"迭代式训练"（用当前策略重新采数据、重训模型）作为未来工作。Dreamer 全系正是把这个循环做成了默认设置。</p></div>
+<h3 id="s4.2">4.2 关键实现细节（八个容易写错的地方）</h3>
+<p><strong>① 重参数化</strong></p>
+<pre><code class="language-python">z = mu + torch.exp(0.5 * logvar) * torch.randn_like(mu)
+</code></pre>
+<p>不要写 <code>torch.normal(mu, sigma)</code> —— 那样梯度不通。为什么必须这样写，见附录 A.2。</p>
+<p><strong>② MDN 的形状</strong>
+每个 latent 维度<strong>各自</strong>一个 $K$ 分量混合（与 hardmaru 官方实现一致，等价于对角协方差）：</p>
+<pre><code class="language-python">p = y[..., :-1].view(B, T, 3, K, Z)          # 3 = (logpi, mu, logsigma)
+logpi  = F.log_softmax(p[:,:,0], dim=2)      # 沿 K 归一化，不是沿 Z！
+logsig = torch.clamp(p[:,:,2], -7.0, 3.0)    # 必须 clamp，否则 sigma-&gt;0 训练爆炸
+</code></pre>
+<p><code>log_softmax</code> 的维度写错是最常见的 bug，而且它<strong>不会报错</strong>，只会让模型悄悄变差。</p>
+<p><strong>③ NLL 用 logsumexp</strong></p>
+<pre><code class="language-python">logN = -0.5*((t-mu)/logsig.exp())**2 - logsig - LOG_SQRT_2PI
+nll  = -torch.logsumexp(logpi + logN, dim=2).sum(-1)
+</code></pre>
+<p><strong>④ 温度采样的两处</strong></p>
+<pre><code class="language-python">pi = F.softmax(logpi / temperature, dim=-2)         # 权重
+s  = sigma_selected * np.sqrt(temperature)          # 方差
+</code></pre>
+<p>只改一处是不完整的。</p>
+<p><strong>⑤ 论文附录那个防过拟合 trick</strong>
+存 $(\mu,\log\sigma^2)$ 而不是 $z$，每个 batch 重新采样：</p>
+<pre><code class="language-python">Z[j, :ln+1] = m + torch.exp(0.5*lv) * torch.randn_like(m)
+</code></pre>
+<p>效果等价于一种免费的数据增广，实测对 M 的泛化有明显帮助。</p>
+<p><strong>⑥ 把整批个体的梦并行推进</strong>
+CMA-ES 要评估 32 个个体 × 4 个种子 = 128 条轨迹 × 300 步。逐条 Python 循环会慢到不能用。因为梦不需要解码像素，所有轨迹可以直接作为一个 batch 塞进 LSTM：</p>
+<pre><code class="language-python">h = torch.zeros(1, P, RNN_HID)                       # P = 个体数
+a = Controller.act_batch(Ws, bs, torch.cat([z, h[0]], -1))
+logpi, mu, logsig, dlogit, _, (h,c) = rnn(z.unsqueeze(1), onehot(a).unsqueeze(1), (h,c))
+z = mdn_sample(logpi[:,0], mu[:,0], logsig[:,0], tau)
+alive = alive * (1 - (torch.sigmoid(dlogit[:,0]) &gt; 0.5).float())
+ret  += alive                                        # 死了就不再累加
+</code></pre>
+<p><strong>这是"在 latent 空间做梦"最直接的好处：不渲染像素，所以快到可以当健身房用。</strong> 128 条 300 步的梦在 CPU 上不到一秒。</p>
+<p><strong>⑦ 梦的初始状态从真实数据里取</strong></p>
+<pre><code class="language-python">pool = torch.cat([vae.encode(obs_i[:3])[0] for i in range(300)])
+</code></pre>
+<p>不要用 $z\sim\mathcal N(0,I)$ 起梦 —— 先验采样出来的 $z$ 大概率不在真实数据的流形上，$M$ 从没在那里训练过，梦一开始就是垃圾。</p>
+<p><strong>⑧ 迁移回真实环境时，V 和 M 都要在线跑</strong>
+$C$ 的输入是 $[z_t; h_t]$，$h_t$ 只能靠真实地推进 LSTM 得到。也就是说部署时你需要跑完整的 V+M+C，<strong>世界模型不只是训练期的脚手架</strong>。</p>
+<h3 id="s4.3">4.3 我的实测结果</h3>
+<p>配置：1500 episodes（43,165 步）、$N_z=16$、LSTM 128、$K=5$、$C$ 有 435 个参数、CMA-ES pop 32、60 代、每个个体 4 个种子。</p>
+<p><strong>训练日志</strong>（$\tau=1.0$ 那一档）：</p>
+<pre><code>[1/4] 随机策略采集 1500 条 rollout -&gt; 44665 帧, 平均 episode 长度 29.8
+[2/4] ConvVAE
+      epoch 1: -ELBO=  210.56  recon=  199.69  KL= 10.87
+      epoch 6: -ELBO=   45.36  recon=   29.79  KL= 15.57
+[3/4] MDN-RNN  (死亡事件 1500 个 / 43165 步 = 3.5%)
+      epoch 1: MDN-NLL=  17.918  done-BCE=0.2801
+      epoch 8: MDN-NLL=   9.736  done-BCE=0.0166
+      [诊断] done 预测 precision=0.855 recall=1.000
+</code></pre>
+<p>注意第二行 VAE 的 KL 是<strong>上升</strong>的（10.87 → 15.57）：训练早期模型还没学会用 latent，KL 被压得很低（后验塌向先验），随着重构项开始起作用，模型才逐渐"敢"用 latent 携带信息。<strong>看 VAE 训练曲线时要分开看 recon 和 KL，只看总的 -ELBO 会漏掉这个现象。</strong></p>
+<p><strong>温度扫描结果（100 局评估，全部零真实环境交互）</strong>：</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>$\tau$</th>
+<th>梦中得分</th>
+<th><strong>真实环境得分</strong></th>
+<th>落差（梦−真）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0.25</td>
+<td>170.4</td>
+<td><strong>39.1</strong></td>
+<td>+131.3</td>
+</tr>
+<tr>
+<td>0.50</td>
+<td>50.1</td>
+<td>38.3</td>
+<td>+11.8</td>
+</tr>
+<tr>
+<td>1.00</td>
+<td>38.4</td>
+<td>38.3</td>
+<td>0.0</td>
+</tr>
+<tr>
+<td>1.15</td>
+<td>91.9</td>
+<td>50.5</td>
+<td>+41.4</td>
+</tr>
+<tr>
+<td><strong>1.50</strong></td>
+<td>217.5</td>
+<td><strong>300.0 ± 0.0</strong></td>
+<td><strong>−82.5</strong></td>
+</tr>
+<tr>
+<td>随机策略</td>
+<td>—</td>
+<td>29.1 ± 26.4</td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>$\tau=1.5$ 这一档拿到了满分 300.0，标准差 0.0 —— 100 局全部活到上限，而策略从未见过一帧真实画面。</strong></p>
+<p>对照论文的表，定性结论完全一致，而且更极端：</p>
+<ul>
+<li><strong>低温 → 模型崇拜</strong>：$\tau=0.25$ 梦中 170、真实 39（≈ 随机策略水平）。落差 +131。</li>
+<li><strong>落差随 $\tau$ 单调收窄</strong>，到 $\tau=1.0$ 时梦与真实几乎相等（38.4 vs 38.3）—— 这说明模型的<strong>平均</strong>质量其实不错，问题从来只在尾部和被主动搜索的角落。</li>
+<li><strong>甜点在高温</strong>：$\tau=1.5$ 时梦（217）比现实（300）<strong>更难</strong>，于是策略学到的是保守解，迁移后反而超出。这与论文 $\tau=1.15$ 时"梦 918 / 真实 1092"是同一个现象。</li>
+</ul>
+<div class="note"><p>我的甜点（1.5）比论文的（1.15）更高，合理的解释是我的 M 训练数据少得多（4.3 万步 vs 论文的百万级），模型更不可靠，所以需要更大的悲观化力度。<strong>这给了一个可操作的启发式：模型越弱，$\tau$ 应该越大。</strong></p></div>
+<h3 id="s4.4">4.4 我踩的两个坑（这一节比结果重要）</h3>
+<p>第一次跑完，输出是这样的：</p>
+<pre><code>gen  15: 梦中均值= 300.0  梦中最好= 300.0 | 真实环境= 19.8 ± 17.5
+===== 最终评估 =====
+随机策略           :  29.1 ± 26.4
+梦中训练的 C（梦里）: 300.0
+梦中训练的 C（真实）:  28.6 ± 21.0
+</code></pre>
+<p><strong>梦里满分，现实等于随机。</strong> 而且从第 1 代起梦里就是满分 —— 连进化都不需要，随便一个随机初始化的控制器在梦里都是不死之身。这是 3.6 节那个失败模式的教科书级复现，而且是我自己不小心造出来的。</p>
+<p>诊断很快定位到 done 头：<code>done-BCE</code> 迅速掉到 0.0011，看起来"很好"，实际上是模型学会了<strong>永远预测"不会死"</strong> —— 因为在它见到的数据里死亡只占 3.5%，全预测 0 就有 96.5% 准确率。梦里没有死亡，存活奖励自然拉满。</p>
+<p><strong>坑一：训练窗口的筛选造成了系统性选择偏差。</strong>
+我原本写的是"只用长度 &gt; seq+1 = 33 的 episode"，日志赫然写着：</p>
+<pre><code>可用 episode: 93/300 (长度 &gt; 33)
+</code></pre>
+<p><strong>只有 93/300 的 episode 进了训练集，而且是最长的那批 —— 也就是死得最少的那批。</strong> 死亡事件被这一行筛选逻辑几乎清空了。</p>
+<p>修法：所有 episode 都用，不足 <code>seq</code> 的做 padding + mask，逐步 loss 按 mask 加权平均：</p>
+<pre><code class="language-python">step_nll = -torch.logsumexp(logpi + logN, dim=2).sum(-1)
+nll = (step_nll * M).sum() / M.sum()        # M 是 mask
+</code></pre>
+<p><strong>坑二：done 是极不平衡标签，需要正类加权。</strong></p>
+<pre><code class="language-python">bce = F.binary_cross_entropy_with_logits(dlogit, D, pos_weight=torch.tensor(8.0))
+loss = nll + 10.0 * bce                      # 且要给 done 项足够权重
+</code></pre>
+<p>修完之后诊断变成 <code>precision=0.855 recall=1.000</code> —— 会<strong>误报</strong>（fp=34，把没死判成死了）但<strong>从不漏死</strong>（fn=0，recall 满分）。对"在梦里训练"这个用途来说，这个偏向是<strong>正确的</strong>：宁可让梦比现实更凶险。</p>
+<p><strong>从这两个坑里能提炼出的一般教训，我认为有三条：</strong></p>
+<ol>
+<li><strong>世界模型里，「稀有但后果严重的事件」的建模质量，决定了整个系统的成败，而它几乎不体现在平均 loss 上。</strong> <code>done-BCE = 0.0011</code> 看起来是完美收敛，实际是彻底失效。<strong>训练指标好看是最危险的状态。</strong></li>
+<li><strong>必须在训 C 之前单独诊断世界模型。</strong> 我后来把 <code>stage_diag()</code> 做成流水线的强制一步，直接打印 done 的 precision/recall，recall &lt; 0.3 就报警。<strong>梦中得分和真实得分的落差，是免费且极其灵敏的模型质量指标 —— 落差大就说明有漏洞在被利用。</strong></li>
+<li><strong>数据处理里任何"筛掉一部分样本"的操作都要问一句：我筛掉的样本和标签相关吗？</strong> 这个坑的本质是 survivorship bias，和你在业务系统里做用户留存分析踩的是同一个坑。</li>
+</ol>
+<h3 id="s4.5">4.5 给你的六道练习（按难度递增）</h3>
+<ol>
+<li><strong>【必做，30 分钟】</strong> 把 MDN 换成普通 MSE 回归（<code>loss = ((mu_pred - z_next)**2).mean()</code>，$K=1$ 且固定 $\sigma$），跑一遍看梦里发生什么。<strong>预期</strong>：模型无法表达"方块在随机位置重生"，梦会退化。用 VAE 的 decoder 把梦解码成图像看看（<code>vae.decode(z)</code>）—— 你应该能亲眼看到那个"平均态鬼影"。</li>
+<li><strong>【必做，20 分钟】</strong> 把 <code>stage_diag()</code> 扩展成"开环 rollout 误差 vs 步数"曲线：从真实 $z_0$ 出发，让 M 自己走 $k$ 步，与真实 $z_k$ 比 L2 距离，画 $k=1..30$。<strong>这是在实测第 1.3 节那条 $O(\epsilon H^2)$ 的曲线。</strong> 记下误差开始爆炸的 $k$，它就是你这个模型的可信 horizon。</li>
+<li><strong>【推荐】</strong> 让 M 也预测奖励 $\hat r_t$（本环境奖励恒为 1，所以先把奖励改成"离方块越远得分越高"），然后就可以把 CMA-ES 换成 CEM 规划（用途 A），对比进化 vs 规划的样本效率。</li>
+<li><strong>【推荐】</strong> 实现<strong>迭代式数据收集</strong>：用当前最好的 C 再采 500 条 rollout，混进数据重训 V/M，再进化 C。看能不能在 $\tau=1.0$ 就达到 300。<strong>这一步做完，你就已经把 Ha &amp; Schmidhuber 2018 升级成 PlaNet/Dreamer 的训练循环了</strong>，接第 5 章正好。</li>
+<li><strong>【进阶】</strong> 把 V+M 换成一个 RSSM（第 5.1 节的公式），联合训练，对比 latent 质量。</li>
+<li><strong>【进阶】</strong> 把 CMA-ES 换成"梯度穿过世界模型"（第 6.1 节）：因为 MDN 采样可以重参数化，整条梦是可微的，直接对 $\sum_t \hat r_t$ 求 $\nabla_\theta$。对比一下同样墙钟时间下两者的效果 —— 你会得到 2018 到 2019 那一年的进步的第一手体感。</li>
+</ol>
+
+</section>
+
+
+<!-- ============ 第 5 章 PlaNet：把 ELBO 铺开到整条序列上 ============ -->
+<section id="ch05">
+  <h2 class="sec"><span class="num">5</span>PlaNet：把 ELBO 铺开到整条序列上</h2>
+<ul>
+<li><strong>Hafner, D. et al. (2019).</strong> <em>Learning Latent Dynamics for Planning from Pixels.</em> <strong>arXiv:1811.04551</strong></li>
+</ul>
+<p>Ha &amp; Schmidhuber 的 V 和 M 是<strong>分开训</strong>的，这意味着 V 不知道自己压缩出的 $z$ 好不好预测。PlaNet 的第一个改动就是<strong>联合训练</strong>，于是需要把单帧 VAE 的 ELBO 推广到序列。</p>
+<h3 id="s5.1">5.1 RSSM：为什么必须有两条状态通道</h3>
+<p>$$
+\begin{aligned}
+\text{确定性通道:}\quad & h_t = f(h_{t-1},\, s_{t-1},\, a_{t-1}) \quad (\text{GRU})\\
+\text{随机通道:}\quad & s_t \sim p(s_t \mid h_t)\\
+\text{观测模型:}\quad & o_t \sim p(o_t \mid h_t, s_t)\\
+\text{奖励模型:}\quad & r_t \sim p(r_t \mid h_t, s_t)\\
+\text{编码器（后验）:}\quad & s_t \sim q(s_t \mid h_t, o_t)
+\end{aligned}
+$$</p>
+<p>模型状态是 $(h_t, s_t)$ <strong>两者拼起来</strong>用的 —— 观测模型、奖励模型、规划器都同时接收两者。</p>
+<p><strong>这个设计是这篇论文最值得记的贡献，理由是消融实验证明缺一不可：</strong></p>
+<ul>
+<li><strong>纯随机模型不行。</strong> 论文原话："the purely stochastic transitions make it difficult for the transition model to reliably remember information for multiple time steps"。每步都从分布里采样，等于每步给信息通路注入一次噪声，$T$ 步后早期信息被噪声淹没。</li>
+<li><strong>纯确定性模型（就是个 RNN）也不行。</strong> 两个理由：① 无法 capture multiple futures（回到 3.3 节那个多模态问题）；② 更隐蔽的一条 —— 论文明确指出确定性 RNN 会让 <strong>"the planner to exploit inaccuracies"</strong>。确定性模型给出的是点估计，规划器可以精确地找到那个点估计最有利的动作序列；而随机模型每次评估都给不同的采样，虚假极值点会被平均掉。</li>
+</ul>
+<p><strong>换句话说：$h_t$ 负责长程记忆（信息无损、梯度通畅），$s_t$ 负责表达不确定性（多模态 + 抗规划器钻空子）。</strong> 你可以把这看成 3.4 节温度旋钮的架构化版本 —— 把悲观化直接写进模型结构里，而不是采样时外挂一个 $\tau$。</p>
+<h3 id="s5.2">5.2 序列 ELBO 的推导</h3>
+<p>生成模型是 $p(o_{1:T}, s_{1:T}\mid a_{1:T}) = \prod_t p(s_t\mid s_{t-1},a_{t-1})\,p(o_t\mid s_t)$，近似后验取滤波形式 $q(s_{1:T}\mid o_{1:T},a_{1:T}) = \prod_t q(s_t\mid o_{\le t},a_{<t})$。照第 3.2 节同样的 Jensen 步骤：</p>
+<p>$$
+\ln p(o_{1:T}\mid a_{1:T}) \ \ge\ \sum_{t=1}^{T}\Big(\underbrace{\mathbb{E}_{q}\big[\ln p(o_t\mid s_t)\big]}_{\text{重构}} \;-\; \underbrace{\mathbb{E}_{q}\Big[\mathrm{KL}\big[q(s_t\mid o_{\le t})\,\big\|\,p(s_t\mid s_{t-1},a_{t-1})\big]\Big]}_{\text{一步预测}}\Big)
+$$</p>
+<p><strong>注意 KL 项的两侧分别是什么，这是整个式子的灵魂：</strong></p>
+<ul>
+<li>$q(s_t\mid o_{\le t},\dots)$ 是<strong>后验</strong>：它看得到 $o_t$，所以知道真相</li>
+<li>$p(s_t\mid s_{t-1},a_{t-1})$ 是<strong>先验 / 转移模型</strong>：它看不到 $o_t$，只能靠上一步预测</li>
+</ul>
+<p><strong>这个 KL 就是"预测损失"。</strong> 它逼迫转移模型（不看当前观测）去匹配编码器（看了当前观测）的判断。<strong>世界模型的"预测能力"完完全全长在这一项里</strong> —— 重构项只保证 latent 有信息，KL 项才保证 latent 可预测。</p>
+<p>实现上 KL 用 <strong>free nats = 3</strong> 截断：$\max(3,\ \mathrm{KL})$。KL 低于 3 nats 就不再优化，避免后验塌陷到先验（posterior collapse）。</p>
+<h3 id="s5.3">5.3 Latent overshooting：一步监督撑不起十二步规划</h3>
+<p>上面那个 ELBO <strong>只训练了一步预测</strong>。但规划时要 rollout 12 步。第 1.3 节告诉我们误差会以 $O(\epsilon H^2)$ 复合，而多步预测<strong>从未被直接监督过</strong>。</p>
+<p>定义 $d$ 步预测分布：</p>
+<p>$$
+p_d(s_t \mid s_{t-d}) = \int p(s_t\mid s_{t-1})\,p(s_{t-1}\mid s_{t-2})\cdots p(s_{t-d+1}\mid s_{t-d})\; \mathrm{d}s_{t-1:t-d+1}
+$$</p>
+<p>Latent overshooting 目标：</p>
+<p>$$
+\frac{1}{D}\sum_{d=1}^{D}\ln p_d(o_{1:T}) \ \ge\ \sum_{t=1}^{T}\Big(\mathbb{E}_{q}\big[\ln p(o_t\mid s_t)\big] - \frac{1}{D}\sum_{d=1}^{D}\beta_d\,\mathbb{E}_{\,p(s_{t-1}\mid s_{t-d})\;q(s_{t-d}\mid o_{\le t-d})}\Big[\mathrm{KL}\big[\,\mathrm{sg}\big(q(s_t\mid o_{\le t})\big)\,\big\|\,p(s_t\mid s_{t-1},a_{t-1})\big]\Big]\Big)
+$$</p>
+<p><strong>注意 $d$ 的依赖藏在哪里</strong>：KL 本身写出来还是一步 KL，但<strong>外层期望的下标</strong>变了 —— $s_{t-1}$ 不再来自真实后验，而是由从 $s_{t-d}$ 出发的 <strong>$d$ 步先验链</strong>推出来的。如果只看 KL 括号里的部分，会误以为 $\frac1D\sum_d$ 退化成 $d=1$ 那一项。</p>
+<p><strong>改动只有三点，但每一点都有讲究：</strong></p>
+<ol>
+<li><strong>重构项一份都没变</strong>，改的只是 KL 项：从只有 $d=1$ 变成对 $d=1..D$ 求平均。每个 $d$ 都拉一次"$d$ 步先验 → 后验"。</li>
+<li><strong>对 $d>1$ 的后验加 stop-gradient</strong>（式中的 $\mathrm{sg}$）。原文：多步预测是"trained towards the <strong>informed</strong> posteriors"。为什么必须 sg？如果不加，后验会为了让多步预测变容易而<strong>自我塌缩</strong>（把状态变得平凡无信息，那当然好预测）。<strong>这是自监督里的通用手法：拿一个更有信息的分支当固定教师。</strong> 你在第 8 章 JEPA 的 EMA target encoder 里会看到同一个思想的另一个形态。</li>
+<li><strong>全程在 latent 空间做，不解码图像</strong>，所以几乎不增加计算。论文明确对比了 observation overshooting（把所有多步预测都解码出来算重构损失）："This is typically <strong>too expensive</strong> in image domains."</li>
+</ol>
+<p>$\beta_d$：论文说"类比 β-VAE 引入权重 $\{\beta_d\}$"，且"为简单起见把所有 $\beta_{>1}$ 设为同一值"。<strong>具体数值和实验用的 $D$：论文未给，未查证。</strong></p>
+<div class="warn"><p>⚠️ <strong>一个必须知道的限定，很多讲解会漏</strong>：论文原话是 "We found that several dynamics models benefit from latent overshooting, <strong>although our final agent using the RSSM model does not require it</strong>（see Appendix D）"。也就是说 latent overshooting 主要救的是<strong>纯随机 SSM</strong>；出主结果的那个 RSSM agent <strong>并没有用它</strong>。所以这一节的正确读法是：它提出了一个通用的多步监督工具，并顺带证明了 <strong>RSSM 的确定性通道已经把多步预测撑住了</strong> —— 后者才是 PlaNet 真正的答案。</p></div>
+<h3 id="s5.4">5.4 CEM 规划（PlaNet 完全没有 policy 网络）</h3>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>参数</th>
+<th>值</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>规划 horizon $H$</td>
+<td>12</td>
+</tr>
+<tr>
+<td>每轮候选序列数 $J$</td>
+<td>1000</td>
+</tr>
+<tr>
+<td>优化迭代 $I$</td>
+<td>10</td>
+</tr>
+<tr>
+<td>精英数 $K$</td>
+<td>100</td>
+</tr>
+</tbody>
+</table></div>
+<p>流程：对动作序列维护一个对角高斯 belief（初始 mean=0、var=1）→ 采 1000 条 → 用模型算累积预测奖励 → 取 top-100 重新拟合均值方差 → 迭代 10 轮 → 只执行当前时刻的均值动作，<strong>下一步重新规划</strong>（MPC）。</p>
+<p>其他超参：GRU 200 单元、$s_t$ 是 30 维对角高斯、Adam lr $10^{-3}$、batch 50 段 × 每段 50 步、free nats 3、seed episodes 5、探索噪声 $\sigma=0.3$、action repeat 按任务 2–8。</p>
+<p><strong>PlaNet 没有 policy 也没有 value。</strong> 每一步都现场搜索。这是它与 Dreamer 的分界线：Dreamer 的第一句话就是"把在线规划换成学到的 policy"。</p>
+<h3 id="s5.5">5.5 三代对比</h3>
+<div class="tw"><table>
+<thead>
+<tr>
+<th></th>
+<th>Ha &amp; Schmidhuber 2018</th>
+<th>PlaNet 2019</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>V 与 M</td>
+<td>分阶段，各自训</td>
+<td><strong>联合训练</strong>（一个 ELBO）</td>
+</tr>
+<tr>
+<td>latent 结构</td>
+<td>$z$（VAE）+ $h$（LSTM），概念上独立</td>
+<td>$(h_t, s_t)$ 一体，<strong>互相知道对方</strong></td>
+</tr>
+<tr>
+<td>概率建模</td>
+<td>混合高斯（MDN）</td>
+<td>单高斯，但有确定性通道兜底</td>
+</tr>
+<tr>
+<td>多步预测监督</td>
+<td>无（teacher forcing 一步）</td>
+<td>提出 <strong>latent overshooting</strong>，但最终 RSSM agent 未采用</td>
+</tr>
+<tr>
+<td>行为获取</td>
+<td>CMA-ES 进化一个 867 参数的线性策略</td>
+<td><strong>CEM 在线规划</strong>，无策略网络</td>
+</tr>
+<tr>
+<td>悲观化手段</td>
+<td>采样温度 $\tau$</td>
+<td>随机通道 $s_t$（结构性）</td>
+</tr>
+<tr>
+<td>数据收集</td>
+<td>一次性（随机策略）</td>
+<td><strong>迭代</strong>（每 100 次更新收一集）</td>
+</tr>
+</tbody>
+</table></div>
+
+</section>
+
+
+<!-- ============ 第 6 章 Dreamer v1 → v4：把梯度打穿世界模型 ============ -->
+<section id="ch06">
+  <h2 class="sec"><span class="num">6</span>Dreamer v1 → v4：把梯度打穿世界模型</h2>
+<p>Dreamer 系列是这个领域最完整的一条演进线，四代论文同一个作者（Danijar Hafner），每一代解决上一代最痛的那个点。<strong>如果你只精读三篇世界模型论文，我建议是 Ha&amp;Schmidhuber 2018、DreamerV3、V-JEPA 2。</strong></p>
+<h3 id="s6.1">6.1 v1 的核心：解析梯度穿过世界模型</h3>
+<ul>
+<li><strong>Hafner, D. et al. (2020).</strong> <em>Dream to Control: Learning Behaviors by Latent Imagination.</em> <strong>arXiv:1912.01603</strong></li>
+</ul>
+<p>从真实经验编码出的状态 $s_t$ 出发，在 latent 里 rollout $H=15$ 步，<strong>不解码图像</strong>：</p>
+<p>$$
+s_\tau \sim q(s_\tau\mid s_{\tau-1},a_{\tau-1}),\quad \hat r_\tau \sim q(r_\tau\mid s_\tau),\quad a_\tau \sim q_\phi(a_\tau\mid s_\tau)
+$$</p>
+<p>动作模型写成 tanh 压缩的重参数化形式：</p>
+<p>$$
+a_\tau = \tanh\big(\mu_\phi(s_\tau) + \sigma_\phi(s_\tau)\odot\epsilon\big),\qquad \epsilon\sim\mathcal{N}(0,I)
+$$</p>
+<p><strong>现在把三件事串起来看：</strong> (a) 动作采样可重参数化；(b) 转移 $q(s_\tau\mid s_{\tau-1},a_{\tau-1})$ 是可重参数化的高斯；(c) 奖励和价值都是可微网络。于是<strong>整条想象轨迹是一个完整的可微计算图</strong>，可以直接写：</p>
+<p>$$
+\nabla_\phi\,\mathbb{E}\Big(\sum_{\tau=t}^{t+H} V_\lambda(s_\tau)\Big)
+$$</p>
+<p>梯度路径：$V_\lambda$ → 奖励/价值预测 → imagined states → actions → $\phi$。</p>
+<p><strong>这是与 CMA-ES 的分水岭，也是与 PPO/REINFORCE 的分水岭。</strong> 说清楚为什么重要，得对比两类梯度估计（详见附录 A.2）：</p>
+<ul>
+<li><strong>score function 估计（REINFORCE / policy gradient）</strong>：$\nabla_\phi\mathbb{E}[R] = \mathbb{E}[R\,\nabla_\phi\log\pi_\phi]$。只需要 $R$ 是标量，<strong>不需要环境可微</strong>。代价是方差极大，方差随 horizon 和动作维度增长。</li>
+<li><strong>pathwise 估计（重参数化）</strong>：$\nabla_\phi\mathbb{E}[R] = \mathbb{E}[\nabla_\phi R]$。需要 $R$ 对 $\phi$ 可微 —— 真实环境不满足，<strong>但世界模型满足</strong>。方差低得多，因为它用到了 $R$ 的一阶信息，而不只是它的取值。</li>
+</ul>
+<p><strong>"拥有一个可微的世界模型" = "把高方差的 score function 估计换成低方差的 pathwise 估计"。</strong> 这是世界模型在 RL 里最硬的一条收益，也是第 2.1 节 Schmidhuber 1990 那个更新式在现代的完整形态。</p>
+<h3 id="s6.2">6.2 λ-return：在 15 步之外看得更远</h3>
+<p>$k$ 步 bootstrap 回报（$h = \min(\tau+k,\ t+H)$）：</p>
+<p>$$
+V_N^k(s_\tau) \doteq \mathbb{E}\Big(\sum_{n=\tau}^{h-1}\gamma^{n-\tau}\hat r_n + \gamma^{h-\tau}v_\psi(s_h)\Big)
+$$</p>
+<p>指数加权混合各 bootstrap horizon：</p>
+<p>$$
+V_\lambda(s_\tau) \doteq (1-\lambda)\sum_{n=1}^{H-1}\lambda^{n-1}V_N^{n}(s_\tau) \;+\; \lambda^{H-1}V_N^{H}(s_\tau)
+$$</p>
+<p>两个目标（value 的 target 是 stop-gradient 的）：</p>
+<p>$$
+\max_\phi \mathbb{E}\Big(\sum_{\tau=t}^{t+H} V_\lambda(s_\tau)\Big),
+\qquad
+\min_\psi \mathbb{E}\Big(\sum_{\tau=t}^{t+H}\tfrac12\big\|v_\psi(s_\tau) - V_\lambda(s_\tau)\big\|^2\Big)
+$$</p>
+<p><strong>为什么需要 value 而不是纯 rollout 回报？</strong> 因为 $H=15$ 之外的回报被完全忽略了。$v_\psi$ 是靠真实数据学的，它承接 15 步之外的所有信息 —— <strong>这与 1.3 节 TD-MPC 的 terminal $Q$ 是同一个把戏</strong>：用一个学到的价值函数把无穷 horizon 折叠成有限 horizon。消融显示 $V_\lambda$ 明显优于纯 rollout 回报 $V_R$。</p>
+<p>超参：$H=15$、$\lambda=0.95$、$\gamma=0.99$、world model lr $6\times10^{-4}$、actor/value lr $8\times10^{-5}$、batch 50×50、$s_t$ 30 维、dense 300 单元 ELU、free nats 3。</p>
+<h3 id="s6.3">6.3 v2：离散 latent 与 KL balancing</h3>
+<ul>
+<li><strong>Hafner, D. et al. (2021).</strong> <em>Mastering Atari with Discrete World Models.</em> <strong>arXiv:2010.02193</strong></li>
+</ul>
+<p>组件（相比 v1 新增 discount/continue predictor 处理 episode 终止）：</p>
+<p>$$
+\begin{aligned}
+h_t &= f_\phi(h_{t-1}, z_{t-1}, a_{t-1}) & \text{(recurrent)}\\
+z_t &\sim q_\phi(z_t\mid h_t, x_t) & \text{(representation)}\\
+\hat z_t &\sim p_\phi(\hat z_t\mid h_t) & \text{(transition)}\\
+\hat x_t,\ \hat r_t,\ \hat\gamma_t &\sim p_\phi(\cdot\mid h_t, z_t) & \text{(image / reward / discount)}
+\end{aligned}
+$$</p>
+<h4>Categorical latents：32 个变量 × 32 类</h4>
+<p>$z_t$ 是 32 个 one-hot 向量（各 32 类）拼接 → 1024 维稀疏向量。论文给了 5 条理由，<strong>注意它自己标明这些是 hypotheses，没有逐条消融</strong>：</p>
+<ol>
+<li>"A categorical prior can perfectly fit the aggregate posterior, because <strong>a mixture of categoricals is again a categorical</strong>."</li>
+<li>"In contrast, a Gaussian prior <strong>cannot</strong> match a mixture of Gaussian posteriors, which could make it difficult to predict multi-modal changes between one image and the next."</li>
+<li>稀疏性可能有利于泛化。</li>
+<li>可能比高斯<strong>更容易优化</strong>，因为 straight-through 估计忽略了一个本来会缩放梯度的项。</li>
+<li>对 Atari 这种非平滑动力学，离散可能是更好的 inductive bias。</li>
+</ol>
+<p><strong>第 1、2 条是核心，而且和 3.3 节 MDN 那个论证是同一件事的第二次出现。</strong> 你可以这样串起来记：</p>
+<div class="note"><p>真实的 $P(z_{t+1}\mid \cdot)$ 是多模态的。
+单高斯拟不上 → Ha&amp;Schmidhuber 用<strong>高斯混合</strong>（MDN），DreamerV2 用<strong>分类分布</strong>。
+两者都是在解同一个问题，只是分类分布更彻底：它对 mixture 封闭，所以 prior 可以<strong>精确</strong>拟合 aggregate posterior。</p></div>
+<h4>Straight-through 梯度</h4>
+<p>一行实现，非常值得记住：</p>
+<pre><code class="language-python">sample = sample + probs - stop_grad(probs)   # 前向是硬 one-hot，反向是 probs 的梯度
+</code></pre>
+<p>前向值 = 硬采样（离散、稀疏），反向梯度 = softmax 概率的梯度（连续、可导）。</p>
+<h4>KL balancing</h4>
+<p>标准 ELBO 里的 KL 项同时被两个方向优化：既把 prior 拉向 posterior，也把 posterior 拉向 prior。但<strong>只有 posterior 有信息</strong>（它看了 $x_t$），所以应该主要让 prior 去追 posterior：</p>
+<p>$$
+\mathcal{L}_{\mathrm{KL}} = \alpha\,\mathrm{KL}\big[\mathrm{sg}(q_\phi)\,\|\,p_\phi\big] + (1-\alpha)\,\mathrm{KL}\big[q_\phi\,\|\,\mathrm{sg}(p_\phi)\big]
+$$</p>
+<p>原文："we minimize the KL loss faster with respect to the prior than the representations by using different learning rates, <strong>α = 0.8</strong> for the prior and 1 − α for the approximate posterior."</p>
+<p>即 80% 的力气训 prior 追 posterior，20% 训 posterior 向 prior 靠。KL 整体系数 $\beta=0.1$（Atari）。</p>
+<p><strong>这个 trick 的意义超出 Dreamer</strong>：它是"表示学习"与"动力学学习"的一个显式配比旋钮。$\alpha$ 越大，越倾向"表示随便定，动力学去适应"；越小，越倾向"为了好预测而牺牲表示的信息量"（极端情况就是 posterior collapse）。</p>
+<h4>Actor loss：三项混合</h4>
+<p>$$
+\mathcal{L}(\psi) = \mathbb{E}\Big[\underbrace{-\rho\,\ln p_\psi(\hat a_t\mid \hat z_t)\,\mathrm{sg}\big(V_t^\lambda - v_\xi(\hat z_t)\big)}_{\text{Reinforce}} \underbrace{-\,(1-\rho)\,V_t^\lambda}_{\text{dynamics backprop}} \underbrace{-\,\eta\,\mathrm{H}[a_t\mid \hat z_t]}_{\text{entropy}}\Big]
+$$</p>
+<ul>
+<li><strong>Atari：$\rho=1$</strong>（纯 Reinforce）—— 因为动作离散，straight-through 穿离散动作的偏差太大</li>
+<li><strong>连续控制：$\rho=0$</strong>（纯 dynamics backprop，即 v1 的做法）</li>
+<li>熵系数 $\eta=10^{-3}$</li>
+</ul>
+<p><strong>这一行配置很有信息量</strong>：它说明 6.1 节那个"pathwise 优于 score function"的结论<strong>只在动作连续时成立</strong>。离散动作下，可微性是伪的（straight-through 是有偏估计），此时高方差但无偏的 REINFORCE 反而赢。</p>
+<p>结果：在 <strong>55 个游戏组成的 Atari benchmark</strong> 上达到 human-level（human gamer normalized <strong>中位数</strong>；注意是聚合指标达标，不是 55 个游戏逐个达标），200M frames，<strong>单 GPU</strong>，超过同期最好单 GPU agent（IQN、Rainbow）的最终性能。</p>
+<h3 id="s6.4">6.4 v3：让超参消失（这一代的贡献是工程学）</h3>
+<ul>
+<li><strong>Hafner, D. et al. (2023/2025).</strong> <em>Mastering Diverse Domains through World Models.</em> <strong>arXiv:2301.04104</strong></li>
+</ul>
+<p>论文的主张："a general algorithm that outperforms specialized methods across <strong>over 150 diverse tasks, with a single configuration</strong>." 覆盖 8 个 benchmark suite（当前版本是 Atari 57 / ProcGen 16 / DMLab 30 / Atari100k 26 / Proprio Control 18 / Visual Control 20 / BSuite 23 / Minecraft 1；arXiv v1 的列表里还有 Crafter），连续/离散动作、视觉/低维输入、2D/3D、稠密/稀疏奖励全都有。</p>
+<p><strong>"一套超参跨 150 个任务"是怎么做到的？四个技巧，每一个都在解决同一类问题：不同域的数值尺度差几个数量级。</strong></p>
+<h4>① symlog / symexp</h4>
+<p>$$
+\mathrm{symlog}(x) \doteq \mathrm{sign}(x)\ln(|x|+1),\qquad \mathrm{symexp}(x) \doteq \mathrm{sign}(x)\big(\exp(|x|)-1\big)
+$$</p>
+<p>性质：0 附近 $\approx x$（不扭曲小值），大值处压成对数尺度，<strong>对正负对称、在 0 处可微</strong>（这是相对 $\log(1+x)$ 的关键改进）。用法：</p>
+<p>$$
+\mathcal{L}(\theta) = \tfrac12\big[f(x,\theta) - \mathrm{symlog}(y)\big]^2,\qquad \hat y = \mathrm{symexp}\big(f(x,\theta)\big)
+$$</p>
+<p>用在 encoder 输入、向量观测的 decoder 目标、reward、value 上。<strong>这是"免调参"最重要的一块</strong> —— Atari 的奖励是几百，DMC 是 0~1，symlog 把它们归到同一量级。</p>
+<h4>② two-hot 编码：把回归变成分类</h4>
+<p>不做标量回归，输出 bin 上的 softmax，用 twohot 目标做交叉熵：</p>
+<p>$$
+\mathrm{twohot}(x)_i \doteq \begin{cases}
+\dfrac{|b_{k+1} - x|}{|b_{k+1} - b_k|} & i = k\\[6pt]
+\dfrac{|b_{k} - x|}{|b_{k+1} - b_k|} & i = k+1\\[4pt]
+0 & \text{else}
+\end{cases}
+\qquad k = \sum_{j}\mathbb{1}\{b_j < x\}
+$$</p>
+<p>只有相邻两个 bin 非零、权重线性插值、和为 1；预测值 = bin 位置按预测概率加权平均。</p>
+<ul>
+<li><strong>bin 数 $K=255$</strong>，取值 $\mathcal{B}\doteq\mathrm{symexp}(-20\dots+20)$ —— 在 symlog 空间等距，映回真实空间就是<strong>指数间隔</strong>，覆盖极大动态范围</li>
+<li>Critic loss：$\mathcal{L}(\psi)\doteq-\sum_t\ln p_\psi(R_t^\lambda\mid s_t)$，另加一个"向自身参数 EMA 输出回归"的正则项做稳定</li>
+</ul>
+<p><strong>好处的本质</strong>：分类的梯度尺度<strong>与目标数值大小解耦</strong>。MSE 回归里目标是 1000 时梯度就比目标是 1 时大 1000 倍；交叉熵不会。</p>
+<h4>③ Free bits</h4>
+<p>$$
+\mathcal{L}_{\text{dyn}} \doteq \max\Big(1,\ \mathrm{KL}\big[\mathrm{sg}(q_\phi)\,\|\,p_\phi\big]\Big),
+\qquad
+\mathcal{L}_{\text{rep}} \doteq \max\Big(1,\ \mathrm{KL}\big[q_\phi\,\|\,\mathrm{sg}(p_\phi)\big]\Big)
+$$</p>
+<p>$$
+\mathcal{L}(\phi) = \mathbb{E}\Big[\sum_t \big(\beta_{\text{pred}}\mathcal{L}_{\text{pred}} + \beta_{\text{dyn}}\mathcal{L}_{\text{dyn}} + \beta_{\text{rep}}\mathcal{L}_{\text{rep}}\big)\Big]
+$$</p>
+<p><strong>free bits = 1 nat</strong>：KL 低于 1 nat 就不再优化，避免在简单环境里 KL 塌到 0 或主导 loss。
+<strong>$\beta_{\text{pred}}=1$，$\beta_{\text{rep}}=0.1$；$\beta_{\text{dyn}}$ 有版本差异 —— arXiv v1（2023-01）是 0.5，当前 arXiv / Nature 版改成了 1.0</strong>，引用时务必标明版本。</p>
+<div class="note"><p>这里要纠正一个常见说法：v2 的 $\alpha=0.8$ KL balancing 与 v3 的 $\beta_{\text{dyn}}:\beta_{\text{rep}}$ <strong>不是等价关系</strong>，只是同一思想的两种写法。$\alpha=0.8$ 是凸组合（两项和为 1，比例 4:1），而 $\beta$ 是各自独立的绝对 loss scale。数值上 $0.5:0.1=5:1$、$1.0:0.1=10:1$，都不等于 4:1。</p></div>
+<h4>④ Percentile return normalization</h4>
+<p>$$
+S \doteq \mathrm{EMA}\Big(\mathrm{Per}(R_t^\lambda, 95) - \mathrm{Per}(R_t^\lambda, 5),\ 0.99\Big)
+$$
+$$
+\mathcal{L}(\theta) = -\sum_t \mathrm{sg}\!\left[\frac{R_t^\lambda - v_\psi(s_t)}{\max(1,\,S)}\right]\ln\pi_\theta(a_t\mid s_t) - \eta\,\mathrm{H}\big[\pi_\theta\big]
+$$</p>
+<p>三个细节都很讲究：</p>
+<ol>
+<li>用 <strong>5th–95th 百分位差</strong>而不是标准差 → 对稀疏奖励的极端离群值鲁棒（大部分回报为 0 时，std 会被少数大值带偏）</li>
+<li>EMA decay 0.99 平滑</li>
+<li><strong>$\max(1,S)$</strong>：只在回报尺度 &gt; 1 时才缩小，小回报时<strong>不放大</strong> → 避免在近零回报（纯噪声）上放大梯度</li>
+</ol>
+<h4>Minecraft 与 scaling</h4>
+<ul>
+<li><strong>Dreamer 是第一个从零开始在 Minecraft 里采到钻石的算法</strong>，不用人类数据、不用 curriculum</li>
+<li>原文："All the Dreamer agents we trained on Minecraft discover diamonds in <strong>100M environment steps</strong>"（所有 seed 都在 1 亿步内挖到钻石）</li>
+<li>用<strong>默认超参、开箱即用</strong></li>
+<li>对照：VPT 需要 <strong>720 GPU × 9 天</strong> 加大量人类行为数据</li>
+<li>成功率：<strong>0.4% 的 episode 采到钻石</strong>（Minecraft 跑 10 个 seed 以可靠报告 fraction of runs）。<strong>记住这个数字</strong>，它让第 6.5 节 Dreamer 4 的"离线 0.7%"变得非常有信息量 —— 纯离线反而高于在线。</li>
+</ul>
+<p><strong>一个值得单独记的 scaling 观察</strong>：模型从 12M 放大到 400M，不仅最终分数更高，<strong>样本效率也单调提升</strong>。这在 model-free RL 里很不常见 —— 大模型通常更难训、更耗样本。<strong>世界模型这条路线似乎有一条更友好的 scaling 曲线，这是它在 2024 年后被大规模投资的技术依据。</strong></p>
+<p>超参：twohot 255 bins、horizon 15、$\gamma=0.997$（注意比 v1/v2 的 0.99 大）、$\lambda=0.95$、entropy $3\times10^{-4}$、free bits 1 nat、lr $4\times10^{-5}$、batch 16×64、latent 32×32 categorical、模型档位 12M/25M/50M/100M/200M/400M（hidden $d$ 从 256 到 1536，GRU units = $8d$）。</p>
+<h3 id="s6.5">6.5 Dreamer 4：换掉 RSSM，实时可交互，纯离线学会挖钻石</h3>
+<ul>
+<li><strong>Hafner, D.*, Yan, W.*, Lillicrap, T. (2025).</strong> <em>Training Agents Inside of Scalable World Models.</em> <strong>arXiv:2509.24527</strong>（论文自称 Dreamer 4）</li>
+</ul>
+<p>摘要里最硬的三句：</p>
+<div class="note"><p>"The world model achieves <strong>real-time interactive inference on a single GPU</strong> through a <strong>shortcut forcing objective</strong> and an efficient transformer architecture."
+"the world model learns general action conditioning from <strong>only a small amount of data</strong>, allowing it to extract the majority of its knowledge from <strong>diverse unlabeled videos</strong>."
+"Dreamer 4 is the <strong>first agent to obtain diamonds in Minecraft purely from offline data, without environment interaction</strong>."</p></div>
+<h4>三个关键改动</h4>
+<p><strong>① 架构：RSSM/GRU → tokenizer + transformer</strong>
+- 约 <strong>2B 参数</strong>（tokenizer 400M + dynamics 1.6B）
+- 输入 <strong>640×360</strong>，16×16 patch → 960 tokens → reshape 为 <strong>256 个 spatial tokens</strong>（这几个数字忠实于论文，但 960 除不尽：$360/16=22.5$，而 $960=40\times24$ 对应高 384；论文此处大概省略了 padding/裁剪细节，不是我算错）；tokenizer 用 masked autoencoding 训练，中间有 tanh bottleneck，<strong>有 encoder 也有 decoder</strong>（注意：这与第 7 章 TD-MPC 的 decoder-free 路线是相反的选择）
+- dynamics 是 <strong>block-causal transformer</strong>，时空<strong>分解注意力</strong>，<strong>每 4 层才插一个时间层</strong>，全程 GQA，context <strong>192 帧</strong></p>
+<p><strong>② Shortcut forcing</strong>（替代 teacher forcing / diffusion forcing）
+基于 flow matching，网络<strong>同时以噪声水平 $\tau$ 和步长 $d$ 为条件</strong>。最细步长用 flow matching loss；对 $d_{\min}<d\le 1$ 用 <strong>bootstrap loss 把两个小步蒸馏成一个大步</strong>。于是少数（甚至 4 步）去噪就能生成一帧 → <strong>单 GPU 实时交互</strong>。
+Dreamer 4 的关键调整：从预测 velocity 改为<strong>预测干净表示</strong>（x-space 而非 v-space），理由是防止长 rollout 中"高频网络输出导致的误差累积"；ramp 权重 $w(\tau)=0.9\tau+0.1$。</p>
+<p><strong>③ 三阶段训练（注意这是向 Ha&amp;Schmidhuber 的分阶段思路回摆）</strong>
+1. <strong>World model pretraining</strong> —— 视频上训 tokenizer，再在 tokenized 视频（+可选动作）上训 world model
+2. <strong>Agent finetuning</strong> —— 加 task input，训 policy head 和 reward head，用 <strong>agent tokens + causal isolation</strong> 使世界模型的预测不被 task 污染（回看 2.3 节 Schmidhuber 2015 那个 "learning to think" 的 CM 结构）
+3. <strong>Imagination training</strong> —— 在想象轨迹上优化 policy/value head。policy 用 <strong>PMPO</strong> 目标 + <strong>对 behavioral prior 的 KL 约束</strong>（这是 3.6 节"防钻空子"的现代形态：不让策略跑出数据支撑的区域）；value 用 TD + λ-returns；head 是小 MLP，带 multi-token prediction（$L=8$），reward 用 <strong>symexp twohot</strong>（延续 v3）</p>
+<h4>结果</h4>
+<ul>
+<li>数据：<strong>2541 小时</strong> VPT contractor 游戏数据，<strong>完全无环境交互</strong></li>
+<li>Dreamer 4 钻石成功率 <strong>0.7% 的 episode</strong>（1000 集评估，每集 60 分钟）</li>
+<li>基线：VPT (finetuned) 卡在 stick（53%），<strong>0 钻石</strong>；BC 只到木镐；VLA (Gemma 3) 到铁镐 11%，<strong>0 钻石</strong></li>
+<li>原文称比 OpenAI 的 VPT offline agent 好得多，同时用 <strong>100× 更少的数据</strong></li>
+</ul>
+<div class="note"><p><strong>0.7% 听起来很低，但要看对照：所有基线都是 0。</strong> 这个任务需要"从原始像素里选出超过 20,000 个鼠标键盘动作的序列"。真正的信号是：<strong>世界模型让离线数据的价值被榨得更干</strong> —— 同样的数据，BC 只能学到模仿，在世界模型里做 RL 能学到超出数据的行为。</p></div>
+<h3 id="s6.6">6.6 四代演进一张表</h3>
+<div class="tw"><table>
+<thead>
+<tr>
+<th></th>
+<th>v1 (arXiv 2019)</th>
+<th>v2 (arXiv 2020)</th>
+<th>v3 (arXiv 2023)</th>
+<th>v4 (arXiv 2025)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>骨架</td>
+<td>RSSM (GRU)</td>
+<td>RSSM (GRU)</td>
+<td>RSSM (GRU)</td>
+<td><strong>tokenizer + transformer</strong></td>
+</tr>
+<tr>
+<td>latent</td>
+<td>30 维高斯</td>
+<td><strong>32×32 categorical</strong></td>
+<td>32×32 categorical</td>
+<td>256 spatial tokens</td>
+</tr>
+<tr>
+<td>生成目标</td>
+<td>高斯 NLL</td>
+<td>高斯/离散 NLL</td>
+<td>同 v2 + free bits</td>
+<td><strong>shortcut forcing (flow matching)</strong></td>
+</tr>
+<tr>
+<td>actor 梯度</td>
+<td>纯 pathwise</td>
+<td>$\rho$ 混合 Reinforce/pathwise</td>
+<td>Reinforce + percentile norm</td>
+<td><strong>PMPO + behavioral prior KL</strong></td>
+</tr>
+<tr>
+<td>尺度处理</td>
+<td>free nats</td>
+<td>KL balancing $\alpha=0.8$</td>
+<td><strong>symlog + twohot + free bits</strong></td>
+<td>延续 v3</td>
+</tr>
+<tr>
+<td>招牌成绩</td>
+<td>DMC 20 任务</td>
+<td>Atari 55 游戏 human-level（中位数）</td>
+<td><strong>150+ 任务一套超参 / Minecraft 钻石</strong></td>
+<td><strong>纯离线 Minecraft 钻石 / 单 GPU 实时</strong></td>
+</tr>
+<tr>
+<td>数据来源</td>
+<td>在线交互</td>
+<td>在线交互</td>
+<td>在线交互</td>
+<td><strong>无标签视频为主</strong></td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>看这张表的正确方式</strong>：v1 解决"梯度怎么穿模型"，v2 解决"latent 用什么分布"，v3 解决"超参怎么消失"，v4 解决"怎么吃无标签视频 + 怎么跑得快"。<strong>每一代都不是把上一代做得更大，而是解决上一代暴露出的具体瓶颈。</strong> 这是一条非常健康的研究线，值得当作方法论来学。</p>
+
+</section>
+
+
+<!-- ============ 第 7 章 不重构的世界模型：MuZero 与 TD-MPC ============ -->
+<section id="ch07">
+  <h2 class="sec"><span class="num">7</span>不重构的世界模型：MuZero 与 TD-MPC</h2>
+<p>前面六章全在第一条路线上（重构派）。现在换到第二条：<strong>latent 完全不需要能还原观测，只需要能算对价值。</strong></p>
+<h3 id="s7.1">7.1 MuZero：hidden state 不必对应真实状态</h3>
+<ul>
+<li><strong>Schrittwieser, J. et al. (2020).</strong> <em>Mastering Atari, Go, Chess and Shogi by Planning with a Learned Model.</em> <strong>arXiv:1911.08265</strong></li>
+</ul>
+<p>三个函数：</p>
+<p>$$
+\begin{aligned}
+s^0 &= h_\theta(o_1,\dots,o_t) & \text{(representation)}\\
+r^k,\ s^k &= g_\theta(s^{k-1}, a^k) & \text{(dynamics)}\\
+\mathbf{p}^k,\ v^k &= f_\theta(s^k) & \text{(prediction)}
+\end{aligned}
+$$</p>
+<p>Loss（$K=5$ 步展开）：</p>
+<p>$$
+l_t(\theta) = \sum_{k=0}^{K}\Big[l^r\big(u_{t+k},\, r_t^k\big) + l^v\big(z_{t+k},\, v_t^k\big) + l^p\big(\pi_{t+k},\, \mathbf{p}_t^k\big)\Big] + c\|\theta\|^2
+$$</p>
+<p>$u$ = 真实观测到的 reward，$z$ = MCTS/n-step 得到的 value target，$\pi$ = MCTS 搜索得到的访问分布。</p>
+<p><strong>三项全部是标量/分布级的预测目标，没有任何一项涉及观测。</strong> 论文的两句原文值得抄下来：</p>
+<div class="note"><p>"There is <strong>no direct constraint or requirement for the hidden state to capture all information necessary to reconstruct the original observation</strong>, drastically reducing the amount of information the model has to maintain and predict."</p>
+<p>"The hidden states are <strong>free to represent state in whatever way is relevant to predicting current and future values and policies</strong> ... nor is there any requirement for the hidden state to match the unknown, true state."</p></div>
+<p><strong>这是一个观念上的大转弯。</strong> 前面六章我们一直在努力让 latent "忠实地"表示世界；MuZero 说：不必忠实，只需<strong>有用</strong>。它的 hidden state 甚至没有语义 —— 没有任何 loss 逼它对应真实状态，它可能是一个完全"外星"的编码，只要在这个编码上算 reward/value/policy 是对的。</p>
+<h3 id="s7.2">7.2 Value equivalence 原则：这件事为什么是对的</h3>
+<ul>
+<li><strong>Grimm, C. et al. (2020).</strong> <em>The Value Equivalence Principle for Model-Based Reinforcement Learning.</em> <strong>arXiv:2011.03506</strong></li>
+</ul>
+<p>这篇把 MuZero 的做法理论化了，值得记住定义和一条性质。</p>
+<p><strong>定义</strong>：模型 $m$ 与 $\tilde m$ 对策略集 $\Pi$ 和价值函数集 $\mathcal{V}$ 是 <strong>value equivalent</strong>，当且仅当</p>
+<p>$$
+\mathcal{T}_\pi v = \tilde{\mathcal{T}}_\pi v \qquad \forall\, \pi \in \Pi,\ \forall\, v \in \mathcal{V}
+$$</p>
+<p>其中 $\mathcal{T}_\pi,\tilde{\mathcal{T}}_\pi$ 分别是真实模型和学到模型诱导的 Bellman 算子。翻译：<strong>两个模型只要在你关心的那些策略和价值函数上给出相同的 Bellman 更新，它们就一样好用 —— 哪怕它们对世界的描述完全不同。</strong></p>
+<p><strong>Property 3（模型空间的收缩）</strong>：</p>
+<p>$$
+\Pi' \subseteq \Pi,\ \mathcal{V}' \subseteq \mathcal{V} \;\Longrightarrow\; \mathcal{M}(\Pi, \mathcal{V}) \subseteq \mathcal{M}(\Pi', \mathcal{V}')
+$$</p>
+<p>$\Pi$ 和 $\mathcal V$ 越大，value-equivalent 模型的集合越小；取到极限就只剩完美模型。<strong>反过来读才是重点：如果你只关心一小组策略和价值函数，一个粗糙得多、根本不像真实环境的模型也完全够用。</strong></p>
+<p>这条原则给了整个第二路线的许可证，也给了一个非常实用的判断标准：</p>
+<div class="note"><p><strong>问一篇世界模型论文："你的模型需要对多大的策略集正确？"</strong>
+只服务当前策略附近的一小簇 → 模型可以很糙（MuZero、TD-MPC）。
+要服务任意策略、任意任务、还要给人看 → 模型必须几乎是完美的（Genie、Cosmos）。<strong>这就是为什么后者需要千百倍的算力，也是为什么后者到今天还不够好。</strong></p></div>
+<h3 id="s7.3">7.3 TD-MPC / TD-MPC2：decoder-free 的极简形态</h3>
+<ul>
+<li><strong>Hansen, N., Wang, X., Su, H. (2022).</strong> <em>Temporal Difference Learning for Model Predictive Control.</em> <strong>arXiv:2203.04955</strong></li>
+<li><strong>Hansen, N. et al. (2024).</strong> <em>TD-MPC2: Scalable, Robust World Models for Continuous Control.</em> <strong>arXiv:2310.16828</strong></li>
+</ul>
+<p><strong>TOLD = Task-Oriented Latent Dynamics.</strong> 核心主张的原话已经在第 0.2 节引过："learning to predict future observations is an extremely hard problem as it forces the network to model <strong>everything</strong> in the environment, <strong>including task-irrelevant quantities</strong>"。</p>
+<p>五个组件，<strong>没有 decoder</strong>：</p>
+<p>$$
+z_t = h_\theta(s_t),\quad
+z_{t+1} = d_\theta(z_t, a_t),\quad
+\hat r_t = R_\theta(z_t, a_t),\quad
+\hat q_t = Q_\theta(z_t, a_t),\quad
+\hat a_t \sim \pi_\theta(z_t)
+$$</p>
+<p>目标（时间上按 $\lambda^{i-t}$ 加权，多步 rollout 反传）：</p>
+<p>$$
+\mathcal{J}(\theta) = \sum_{i=t}^{t+H}\lambda^{i-t}\Big(
+\underbrace{c_1\|R_\theta(z_i,a_i) - r_i\|^2}_{\text{reward}}
++ \underbrace{c_2\|Q_\theta(z_i,a_i) - (r_i + \gamma Q_{\theta^-}(z_{i+1},\pi_\theta(z_{i+1})))\|^2}_{\text{TD}}
++ \underbrace{c_3\|d_\theta(z_i,a_i) - h_{\theta^-}(s_{i+1})\|^2}_{\text{latent consistency}}\Big)
+$$</p>
+<p>$c_1=0.5,\ c_2=0.1,\ c_3=2$。</p>
+<p><strong>注意第三项：latent consistency 的 target 用 EMA target encoder $h_{\theta^-}$。</strong> 重构损失被换成了"我预测的下一个 latent，要等于编码器对下一帧编码出的 latent"。这就打开了塌缩的可能 —— 如果 $h_\theta\equiv 0$，consistency 项直接为 0，完美解。防御手段就是 EMA target（不走梯度）+ reward/value 项提供的信息约束。</p>
+<div class="key"><p><strong>这里请停一下，因为一个重要的连接出现了：</strong> TD-MPC 的 latent consistency + EMA target，和第 8 章 JEPA 的"在表示空间预测 + EMA target encoder"是<strong>同一个东西</strong>。区别只在于 TD-MPC 有 reward/value 项兜底防塌缩，而 JEPA 没有奖励可用，所以必须靠更精巧的机制（掩码策略、方差正则、乃至 LeJEPA 的理论最优分布）。<strong>理解了这个连接，第 8 章会容易很多。</strong></p></div>
+<p><strong>规划：MPPI</strong>（CEM 的加权变体，用 softmax 温度加权而不是硬 top-K）
+- <strong>horizon $H=5$（全任务统一，无 per-task 例外）</strong>；采 $N=512$ 条，<strong>其中 5% 来自 policy prior $\pi_\theta$</strong>，elites top-64，温度 0.5；<strong>MPPI 迭代次数</strong> 6（默认）/ 8（Dog，像素输入）/ 12（Humanoid）
+- <strong>terminal value 截断</strong>（名字里 TD 的来源，见 1.3 节）：
+$$
+\phi = \gamma^H Q_\theta(z_H,a_H) + \sum_{t=0}^{H-1}\gamma^t R_\theta(z_t,a_t)
+$$</p>
+<p><strong>那个 5% 的 policy prior 采样是个很聪明的小设计</strong>：规划器纯随机采样在高维动作空间里几乎找不到好序列，而 policy 给出的"还不错的猜测"作为种子，让 MPPI 从一个合理起点开始改进。这是"学到的策略"与"在线搜索"的互补 —— 和 AlphaGo 里 policy network 给 MCTS 提供先验是同一个结构。</p>
+<p><strong>TD-MPC2</strong> 加了 task embedding $e$（$z=h(s,e)$ 等），reward/value 改用<strong>对数变换空间的交叉熵</strong>（与 DreamerV3 的 symlog+twohot 思路同源，两条独立的线得出了同一个结论，这是个强信号），horizon 降到 3。结果：<strong>104 个任务 / 4 个域</strong>（DMControl、Meta-World、ManiSkill2、MyoSuite），<strong>单个 317M 参数 agent 掌握 80 个任务</strong>（跨 embodiment、跨动作空间），一套固定超参打败各域调参的 baseline。</p>
+<h3 id="s7.4">7.4 三条路线对比总表</h3>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>维度</th>
+<th>重构派 (Dreamer v1–v3)</th>
+<th>价值等价派 (MuZero / TD-MPC)</th>
+<th>自预测派 (JEPA)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>latent 的训练信号</td>
+<td>重构像素 + KL</td>
+<td>reward + value (+ latent consistency)</td>
+<td>预测自身表示（EMA target）</td>
+</tr>
+<tr>
+<td>有 decoder 吗</td>
+<td><strong>有</strong>，且是主要信号</td>
+<td><strong>没有</strong></td>
+<td><strong>没有</strong></td>
+</tr>
+<tr>
+<td>能用无标签视频预训练吗</td>
+<td><strong>能</strong></td>
+<td><strong>不能</strong>（需要 reward）</td>
+<td><strong>能</strong></td>
+</tr>
+<tr>
+<td>latent 可解释/可视化吗</td>
+<td><strong>能</strong>（解码出来看）</td>
+<td>不能</td>
+<td>部分（探针）</td>
+</tr>
+<tr>
+<td>是否防钻空子</td>
+<td>弱，需外挂悲观化</td>
+<td>中（短 horizon + Q 兜底）</td>
+<td>不适用（不做 RL rollout）</td>
+</tr>
+<tr>
+<td>主要失效模式</td>
+<td>容量浪费在无关像素；被 agent 钻空子</td>
+<td>无法迁移/预训练；exploration 难</td>
+<td>表示塌缩；难评测</td>
+</tr>
+<tr>
+<td>代表成绩</td>
+<td>150+ 任务一套超参</td>
+<td>104 任务 / 单 agent 80 任务</td>
+<td>62 小时视频 → 机器人零样本 65–80%</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>我个人的判读</strong>（供参考，不是共识）：这三条路线正在收敛，而不是分裂。证据是 Dreamer 4 用了 behavioral prior KL（价值等价派的保守思想），TD-MPC2 用了 symlog+twohot（重构派的工程学），V-JEPA 2-AC 用了 MPC（价值等价派的规划方式）。<strong>分歧从"用什么信号"逐渐变成了"在什么抽象层级上做预测"</strong>，而那个问题目前还没有答案。</p>
+
+</section>
+
+
+<!-- ============ 第 8 章 JEPA：LeCun 的赌注 ============ -->
+<section id="ch08">
+  <h2 class="sec"><span class="num">8</span>JEPA：LeCun 的赌注</h2>
+<h3 id="s8.1">8.1 2022 的架构提案</h3>
+<ul>
+<li><strong>LeCun, Y. (2022).</strong> <em>A Path Towards Autonomous Machine Intelligence.</em> OpenReview: <code>BZ5a1r-kVsf</code></li>
+</ul>
+<p>提出模块化认知架构：configurator（配置器）、perception（感知）、<strong>world model</strong>、cost（内在 + 可训练 critic）、actor、short-term memory。世界模型负责在<strong>抽象表示空间</strong>预测未来状态，供 Mode-2（推理式、带规划）行为使用，区别于 Mode-1（反应式）。并提出 <strong>H-JEPA</strong>（分层 JEPA），不同层级在不同时间尺度和抽象度上预测。</p>
+<p><strong>核心论点一句话</strong>：生成式像素重构会把容量浪费在<strong>本质上不可预测</strong>的细节上；应改为在表示空间预测，并用正则化（而非对比学习）来防塌缩。</p>
+<p>对比第 3.2 节我们讨论过的 VAE 的原罪，你会发现 LeCun 的批评和 TD-MPC 的批评指向同一个病灶，只是处方不同：TD-MPC 说"用 reward 来筛"，LeCun 说"在表示空间预测，让不可预测的自然被抹平"。</p>
+<h3 id="s8.2">8.2 三个防塌缩的门派（这是理解 JEPA 的关键）</h3>
+<p>自预测有一个致命的平凡解：<strong>编码器输出恒定 → 预测器完美 → loss 为 0 → 什么都没学到。</strong> 这叫 representation collapse。整个自监督学习的技术史，很大程度上就是防塌缩史。三个门派：</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>门派</th>
+<th>机制</th>
+<th>代表</th>
+<th>代价</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>对比（contrastive）</strong></td>
+<td>显式拉开负样本</td>
+<td>SimCLR、MoCo</td>
+<td>需要大量负样本 / 大 batch</td>
+</tr>
+<tr>
+<td><strong>不对称（asymmetric）</strong></td>
+<td>EMA target encoder + stop-gradient，让 teacher 与 student 不同步</td>
+<td>BYOL、<strong>I-JEPA、V-JEPA</strong>、TD-MPC</td>
+<td>一堆启发式（EMA 系数、schedule），没有理论保证</td>
+</tr>
+<tr>
+<td><strong>正则（regularization）</strong></td>
+<td>直接约束表示的统计量（方差、协方差、分布）</td>
+<td>VICReg、Barlow Twins、<strong>LeJEPA</strong></td>
+<td>需要知道"什么样的分布是好的"</td>
+</tr>
+</tbody>
+</table></div>
+<div class="warn"><p>⚠️ <strong>一个常见的混淆</strong>：LeCun 在 2022 年的提案里主张的是<strong>正则</strong>路线（VICReg 类），但 <strong>I-JEPA 和 V-JEPA 实际走的是 EMA + stop-gradient 这条不对称路线</strong>。二手讲解经常把两者混为一谈。这个不一致到 2025 年底才被 LeJEPA 补上（见 8.5）。</p></div>
+<h3 id="s8.3">8.3 I-JEPA → V-JEPA → V-JEPA 2 → V-JEPA 2.1</h3>
+<p><strong>I-JEPA (2023, Meta, CVPR)</strong>
+三件套：context encoder（ViT，可训练）+ <strong>target encoder（EMA 更新，不走梯度）</strong> + predictor（窄 ViT，按位置 token 预测目标 block 的表示）。
+掩码策略是 multi-block：<strong>预测足够大的 target block</strong>，且 context block 需在空间上分散且信息充分 —— 这是学到语义而非纹理的关键（如果 target 很小，靠局部插值就能猜出来，学不到语义）。
+数字：ViT-H/14 预训练 <strong>&lt; 1200 GPU 小时</strong>，比 MAE <strong>效率高 10 倍以上</strong>；ImageNet-1K linear probing 优于 MAE。</p>
+<p><strong>V-JEPA (2024-02, Meta)</strong>
+视频版，3D 时空 tubelet 掩码，<strong>掩码率约 90%</strong>。数据 VideoMix2M（约 200 万公开视频）。ViT-L/16 (~300M) → ViT-H/16 (~630M)。
+<strong>冻结评测（frozen probe，不微调 backbone）</strong>：Kinetics-400 <strong>81.9%</strong>、Something-Something v2 <strong>72.2%</strong>、ImageNet-1K <strong>77.4%</strong>（均为 ViT-H/16-384 那一行）。相对逐像素预测的模型约有 <strong>2× 加速</strong>（我在别处看到的"1.5–6 倍"没能在原文核到，<strong>未查证</strong>）。</p>
+<p><strong>V-JEPA 2 (2025-06-11, FAIR + Mila)</strong> ← 这一篇建议精读
+- encoder <strong>ViT-g，1B 参数</strong>；预训练 <strong>&gt;100 万小时</strong>视频 + 100 万张图像
+- 损失：<strong>表示空间的 L1 loss</strong>，目标由 EMA target encoder 给出 + stop-gradient
+- 四个 scaling 轴的消融增益：数据 VideoMix22M（2200 万视频）<strong>+1.4</strong>；模型 300M→1B <strong>+1.5</strong>；训练时长 90K→252K iter <strong>+0.8</strong>；分辨率（16 帧 256² → 64 帧 384²）<strong>+0.7</strong>
+- 位置编码从绝对 sincos 换成 <strong>3D RoPE</strong>（大规模训练稳定性）
+- 成绩：Something-Something v2 <strong>77.3%</strong> top-1；Epic-Kitchens-100 动作预判 <strong>39.7 recall@5</strong>（SOTA）；接 8B LLM 后 PerceptionTest <strong>84.0</strong>、TempCompass <strong>76.9</strong></p>
+<p><strong>V-JEPA 2-AC（动作条件版）—— 这是全篇最值得注意的结果</strong>
+- <strong>300M</strong> 参数 transformer，block-causal attention，<strong>冻结</strong> V-JEPA 2 encoder
+- 训练数据：<strong>仅 62 小时</strong>无标注 DROID 机器人视频，<strong>无奖励、无任务专属训练</strong>
+- 训练目标：teacher-forcing loss + <strong>2-step rollout loss</strong>（回看 5.3 节 latent overshooting，同一个思想）
+- 部署：Franka 机械臂，<strong>两个全新实验室</strong>，image-goal 条件 + <strong>MPC</strong>（每步重规划，最小化能量）
+- 成绩：pick-and-place 成功率 <strong>65%–80%</strong>；杯子抓取移动 <strong>80%</strong>（Octo baseline 仅 <strong>15%</strong>）；规划耗时 <strong>16 秒/动作</strong>，对照 Cosmos 约 4 分钟（后两个数字来自二手解读，建议以 arXiv:2506.09985 正文 Table 复核）</p>
+<div class="key"><p><strong>为什么 62 小时这个数字很重要？</strong> 因为它把"世界模型"这件事的成本结构改写了。传统 VLA 路线需要几十万条带动作标注的机器人 episode（OpenVLA 用了约 100 万）。V-JEPA 2 的主张是：<strong>关于物理世界的知识可以从纯视频里学（100 万小时无标签），动作条件只需要极少量数据来"对齐"（62 小时）。</strong> 如果这个主张成立，机器人数据瓶颈就被绕过了。1X World Model Lab 2026-06 成立时的宣言正是这一条："Robotics is <strong>not a fine-tuning problem</strong>. To build truly general humanoids, we need to pretrain on the most important data from the very beginning."</p></div>
+<p><strong>V-JEPA 2.1 (2026-03, arXiv:2603.14482)</strong>
+四点改动：① <strong>dense predictive loss</strong> —— 可见 token 和被掩码 token <strong>都</strong>参与监督，强制显式空间/时间 grounding；② <strong>deep self-supervision</strong> —— 中间层也算 loss；③ 模态专属 tokenizer（图像 2D、视频 3D）；④ 扩数据到 1.63 亿图像+视频。
+档位：ViT-G <strong>2B</strong>（旗舰）/ ViT-g 1B / ViT-L 300M / ViT-B 80M（后两者蒸馏）。
+数字：Ego4D 物体交互预测 <strong>7.71 mAP</strong>；EPIC-KITCHENS 动作预判 <strong>40.8 R@5</strong>；SSv2 <strong>77.7</strong>。<strong>以下两个来自二手解读，未从论文正文核实</strong>：机器人抓取比 V-JEPA 2-AC +20 个点、导航规划步数 128 → 8（约 10 倍加速）。
+<strong>note</strong>：LeCun 仍是这篇的署名作者，尽管他 2025-11 已离职 Meta。</p>
+<h3 id="s8.4">8.4 LeJEPA：从工程 trick 到定理</h3>
+<ul>
+<li><strong>Balestriero, R. &amp; LeCun, Y. (2025-11-11).</strong> <em>LeJEPA.</em> <strong>arXiv:2511.08544</strong></li>
+</ul>
+<p>我认为这是 JEPA 路线的分水岭，值得单独讲。</p>
+<p><strong>理论结果</strong>：证明<strong>各向同性高斯（isotropic Gaussian）</strong>是最小化下游预测风险的最优 embedding 分布。</p>
+<p>这句话解决了 8.2 节正则派那个"需要知道什么样的分布是好的"的问题 —— 以前 VICReg 之类是<strong>猜</strong>（方差别塌、协方差别相关），现在有了一个<strong>推导出来的</strong>目标分布。</p>
+<p><strong>方法：SIGReg</strong>（Sketched Isotropic Gaussian Regularization），约 <strong>50 行代码</strong>实现分布式训练，<strong>彻底去掉 stop-gradient、teacher-student、EMA、超参 schedule</strong> —— 论文自称 "heuristics-free"。</p>
+<p><strong>规模验证</strong>：10+ 数据集、60+ 架构（ResNet/ViT/ConvNet），最大 ViT-H/14 在 ImageNet-1K linear probe <strong>79%</strong>。</p>
+<p>后续：<strong>When Does LeJEPA Learn a World Model?</strong>（arXiv:2605.26379，2026-05-25，Klindt / LeCun / Balestriero）证明 LeJEPA 在特定条件下达成 <strong>linear identifiability</strong>（潜变量服从高斯、动力学为平稳可加噪声时，可恢复真实潜变量），<strong>证明用 Lean 4 形式化</strong>（这一条我只从二手报道核到，未读到论文正文，引用前建议自行确认）。</p>
+<div class="cmt"><p>用 Lean 4 给一个自监督目标做形式化证明，在 2026 年是个相当强的信号 —— 说明这条路线开始从"炼丹"转向"有定理可依"。<strong>这也是我建议你关注这条线的主要理由：它是三条路线里唯一在补理论的。</strong></p></div>
+<h3 id="s8.5">8.5 人事与路线：AMI Labs</h3>
+<p>因为这直接影响你未来两年读到什么论文，值得记录事实（全部有一手来源）：</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>项</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>离职</td>
+<td><strong>2025-11-19</strong> CNBC 报道 LeCun 离开 Meta 创业；他称 Meta <strong>不会投资</strong>该公司（Bloomberg 2025-12-04）</td>
+</tr>
+<tr>
+<td>公司</td>
+<td><strong>AMI Labs</strong>（Advanced Machine Intelligence），总部<strong>巴黎</strong>，另设蒙特利尔、纽约、新加坡</td>
+</tr>
+<tr>
+<td>融资</td>
+<td><strong>2026-03-09/10 宣布 10.3 亿美元种子轮</strong>，投前估值 <strong>35 亿美元</strong>；领投 Cathay Innovation、Greycroft、Hiro Capital、HV Capital、<strong>Bezos Expeditions</strong></td>
+</tr>
+<tr>
+<td>班底</td>
+<td>LeCun（执行主席）、<strong>Alexandre LeBrun（CEO，前 Nabla 联创）</strong>、Laurent Solly（COO，前 Meta 欧洲 VP）、<strong>谢赛宁 Saining Xie（首席科学官）</strong>、Pascale Fung、<strong>Michael Rabbat（世界模型 VP）</strong></td>
+</tr>
+<tr>
+<td>方向</td>
+<td>明确以 <strong>JEPA</strong> 为基础；强调持久记忆、推理、规划、面向传感器输入的安全性；面向工业过程控制、自动化、可穿戴、机器人、医疗</td>
+</tr>
+<tr>
+<td>节奏</td>
+<td>LeBrun 明确表示从理论到商用"<strong>可能需要数年</strong>"，拒绝几个月出产品</td>
+</tr>
+<tr>
+<td>至 2026-08 的产出</td>
+<td><strong>未查证到任何模型发布</strong></td>
+</tr>
+</tbody>
+</table></div>
+<div class="warn"><p>⚠️ 有些二手报道（Introl 博客）称 AMI 融 €5 亿、估值 €30 亿、基于 I-JEPA 架构，与 TechCrunch/SiliconANGLE 的 $1.03B / $3.5B <strong>冲突</strong>，以后者为准。</p></div>
+<p><strong>一个值得记的观察</strong>：LeCun 离职后 JEPA 线在 Meta <strong>仍在继续</strong>（V-JEPA 2.1 是 2026-03 发的，LeCun 还署名）。所以这是"路线扩散"而不是"路线切割"。</p>
+
+</section>
+
+
+<!-- ============ 第 9 章 生成式交互世界模型：把世界模型做成产品 ============ -->
+<section id="ch09">
+  <h2 class="sec"><span class="num">9</span>生成式交互世界模型：把世界模型做成产品</h2>
+<p>这一章的主角与前面完全不同：它们不服务于 RL，服务于<strong>人的交互</strong>（游戏、影视）和<strong>造训练数据</strong>。回到 0.1 节的三分法，它们主要是 Renderer，正在努力往 Simulator 走。</p>
+<h3 id="s9.1">9.1 GameNGen：第一个"神经游戏引擎"</h3>
+<ul>
+<li><strong>Valevski, D., Leviathan, Y., Arar, M., Fruchter, S. (2024-08).</strong> <em>Diffusion Models Are Real-Time Game Engines.</em> ICLR 2025。项目页 gamengen.github.io</li>
+</ul>
+<p>用 <strong>Stable Diffusion v1.4</strong> 微调成"神经游戏引擎"：条件是过去帧序列 + 玩家动作，自回归生成下一帧，<strong>完全没有传统游戏引擎参与</strong>。</p>
+<ul>
+<li>单块 <strong>TPU 上 20 FPS</strong>（论文原文 "runs at 20 frames per second on a single TPU"）</li>
+<li><strong>PSNR 29.4</strong>（约等于有损 JPEG 的画质）</li>
+<li>人类评测者区分真假游戏片段的准确率<strong>仅略高于随机猜测</strong></li>
+<li>数据来源：用 <strong>RL agent 自动玩 DOOM</strong> 记录动作-观测轨迹（人工采集不可行）</li>
+<li><strong>关键 trick：对编码帧加高斯噪声（noise augmentation）</strong> 以抑制自回归的长程 drift</li>
+</ul>
+<p><strong>那个 noise augmentation 值得单独说</strong>：训练时给输入的历史帧加噪，等价于让模型学会"从一个有误差的历史里恢复"。这正好对症第 1.3 节的复合误差 —— 自回归 rollout 时输入的历史必然带着模型自己的误差，如果训练时从未见过带误差的输入（teacher forcing 的通病），一步就飘。<strong>这个技巧在整个视频世界模型领域是标配，Dreamer 4 的 shortcut forcing 也可以看成它的一个精致版本。</strong></p>
+<h3 id="s9.2">9.2 Genie 系列：能力边界的量化</h3>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>版本</th>
+<th>时间</th>
+<th>分辨率</th>
+<th>帧率</th>
+<th>可交互时长<br>（画面不崩）</th>
+<th>记忆一致性<br>（回头看还对）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Genie 1</td>
+<td>2024-03</td>
+<td>未公布</td>
+<td><strong>1 FPS</strong></td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Genie 2</td>
+<td>2024-12</td>
+<td>360p</td>
+<td>未公布</td>
+<td><strong>10–20 秒</strong></td>
+<td>短</td>
+</tr>
+<tr>
+<td><strong>Genie 3</strong></td>
+<td><strong>2025-08-05</strong></td>
+<td><strong>720p</strong></td>
+<td><strong>24 FPS（实时）</strong></td>
+<td><strong>数分钟</strong></td>
+<td><strong>约 1 分钟</strong></td>
+</tr>
+<tr>
+<td><strong>Project Genie</strong>（产品）</td>
+<td><strong>2026-01-29</strong></td>
+<td>720p</td>
+<td>20–24 FPS</td>
+<td><strong>单次上限 60 秒</strong></td>
+<td>同 Genie 3</td>
+</tr>
+</tbody>
+</table></div>
+<p>Genie 1 只做 2D，30K 小时游戏视频训练，1 FPS 根本不可玩。Genie 2 支持 2D/3D、等距/第一人称。<strong>Genie 3 是第一个实时可交互的通用世界模型</strong>，并且有一个能力值得注意：<strong>promptable world events</strong> —— 用文本指令改天气、加入物体/角色，这超出了单纯的导航控制。还与 <strong>SIMA</strong> 具身 agent 联合测试目标导向任务学习。</p>
+<p><strong>Project Genie 是 Genie 3 的产品化</strong>（2026-01-29 上线，Google AI Ultra 订阅，美国，18+），World Sketching 用 Nano Banana Pro 生成预览图，接入 Street View。</p>
+<p><strong>官方自己承认的局限</strong>（Genie 3）：agent 动作空间受限、多智能体交互建模弱、真实地理位置不准、文字渲染不稳、<strong>无法维持数分钟以上的交互</strong>。Project Genie 的产品页也写明：不保证符合真实物理、不严格遵循 prompt、角色可控性不稳、有控制延迟。</p>
+<div class="key"><p><strong>两个数字值得记住并在讨论中引用</strong>：<strong>Genie 3 的视觉记忆一致性约 1 分钟；产品化之后单次交互仍限 60 秒。</strong> 这不是产品策略，这是技术边界 —— 自回归生成的一致性维持时间目前就在这个量级。任何声称"世界模型已经可以当模拟器用"的说法，都应该先回答"能撑多久"。</p>
+<p><strong>截至 2026-08-25，没有查证到 Genie 4 的任何公开发布或官方预告。</strong></p></div>
+<h3 id="s9.3">9.3 NVIDIA Cosmos：把世界模型做成基础设施</h3>
+<p>这条线的意义在于它是<strong>开放权重</strong>的，是你实际能上手的最大规模世界模型。</p>
+<p><strong>Cosmos 1.0（2025-01-06 CES 发布）</strong>
+- NVIDIA Open Model License（开放权重）
+- 自回归 4B/5B/12B/13B；扩散 7B/14B；Text2World 和 Video2World 两类
+- 训练数据约 <strong>2000 万小时</strong>原始视频，约 <strong>9000 万亿 token</strong>；驾驶/操作/空间感知类占 <strong>&gt;40%</strong></p>
+<p><strong>2025-03-18 GTC 三件套定型</strong>（这个分工很清晰，值得记）：
+- <strong>Cosmos Predict</strong> —— 生成未来世界状态
+- <strong>Cosmos Transfer</strong> —— 结构化输入 → 照片级视频（ControlNet 架构，支持分割图/深度图/lidar/姿态/轨迹）
+- <strong>Cosmos Reason</strong> —— 带时空感知的 CoT 推理，判断物理合理性</p>
+<p>早期采用者：1X、Agility Robotics、Figure AI、Skild AI、Foretellix、Parallel Domain、Nexar、Oxa、Linker Vision、Milestone、Virtual Incision、<strong>Uber、Waabi</strong>。</p>
+<p><strong>Cosmos 3（2026-06-22）—— 目前最新</strong>
+- 定位：<strong>首个全开放 omnimodal 世界模型</strong>，统一 text / image / video / audio / <strong>action</strong> 五模态
+- 架构：<strong>Mixture-of-Transformers</strong>，双通路 = <strong>Reasoner 塔（理解）+ Generator 塔（生成）</strong>
+- 档位：Edge 4B（dense 2B）/ Nano 16B（dense 8B）/ Super 64B（dense 32B）
+- 数据：Reasoner 2200 万预训练 + 220 万 SFT；Generator 预训练 <strong>7.67 亿图像 + 3.48 亿视频片段</strong>
+- 成绩：Artificial Analysis 上最佳开源 Text-to-Image 与 Image-to-Video；发布时 <strong>RoboArena 最佳 policy 模型</strong>
+- <strong>统一动作表示</strong>：把机器人、车辆、第一人称人体动作映射到共享几何分量
+- 许可 <strong>OpenMDW-1.1</strong>，代码/权重/合成数据集/评测基准全开</p>
+<p>技术报告里那句话很能说明这条路线的野心：</p>
+<div class="note"><p>"Cosmos 3 seamlessly unifies critical modalities for Physical AI—effectively <strong>subsuming vision-language models, video generators, world simulators, and world-action models into a single framework</strong>."</p></div>
+<h3 id="s9.4">9.4 Sora 是世界模型吗：这场争论怎么判</h3>
+<ul>
+<li>起点：2024-02 OpenAI 技术报告标题即《<strong>Video generation models as world simulators</strong>》；2025 Sora 2 继续强调物理合规性</li>
+<li>LeCun 多次公开称 Sora 类视频生成"注定失败"，核心论点：<strong>像素空间生成 ≠ 因果结构建模，无法支撑规划</strong></li>
+<li>TIME 2026-07-15 专题《World Models Are AI's Next Frontier》明确写 OpenAI 的 world simulator 说法<strong>仍属 contested（有争议）</strong></li>
+</ul>
+<p><strong>我建议你用一个可操作的判据代替立场表态。</strong> 回到 0.1 节的三分法，问三个问题：</p>
+<ol>
+<li><strong>能不能被查询？</strong> 我能不能问它"如果此刻施加 3N 的力，物体会移到哪"，并得到一个<strong>数值</strong>答案（而不是一段视频）？Renderer 不能，Simulator 能。</li>
+<li><strong>一致性能撑多久？</strong> Genie 3 是 1 分钟。如果我需要规划 5 分钟的任务，它就不够用 —— 无论画面多逼真。</li>
+<li><strong>OOD 上还成立吗？</strong> 见第 11 章。这是最狠的一刀。</li>
+</ol>
+<p><strong>我自己的判读</strong>：视频生成模型是 Renderer，正在长出 Simulator 的一部分（World Labs Marble 输出 collision mesh、腾讯 HY-World 2.0 输出 mesh/点云，都是生成派自己承认"纯渲染不够"的证据）。它们对物理 AI 的当期价值主要是<strong>造训练数据</strong>和<strong>做闭环评测</strong>，而不是直接做决策。这一点在第 10 章会被产业数据强化。</p>
+<h3 id="s9.5">9.5 中国厂商（2025-12 至 2026-04）</h3>
+<ul>
+<li><strong>腾讯 HY-World 1.5 / WorldPlay</strong>（2025-12-17，开源）：流式视频扩散 + 双动作表示 + <strong>Reconstituted Context Memory</strong>（从历史帧动态重建上下文）+ context forcing distillation。WorldPlay-8B / 5B，<strong>480P、24 FPS</strong>，支持 125+ 帧长程流式。PSNR 短程 21.92 / 长程 18.94。</li>
+<li><strong>腾讯 HY-World 2.0</strong>（2026-04-16，开源）：四阶段流水线（HY-Pano 2.0 + WorldNav + WorldStereo 2.0 + WorldMirror 2.0），输出 <strong>mesh / 3D Gaussian Splats / 点云</strong>，可直接进 Unity / Unreal / Blender / <strong>Isaac Sim</strong>；号称 Stanford WorldScore benchmark 开源模型第 1。</li>
+<li><strong>阿里巴巴</strong>同日（2026-04-16）发布世界模型，主打<strong>实时导演式控制</strong>，面向游戏/影视/互动剧；闭源、waitlist、无权重与技术规格（英文报道称代号 "Happy Oyster"，<strong>中文正式名称未核实</strong>）。</li>
+</ul>
+<p><strong>注意腾讯 2.0 那个输出格式的变化：从"视频"变成"mesh + splats + 点云"。</strong> 这是 0.1 节 Renderer → Simulator 那一步的实际发生。输出可以进 Isaac Sim，意味着它开始服务机器人训练而不只是给人看。</p>
+
+</section>
+
+
+<!-- ============ 第 10 章 产业落地：世界模型现在真正在赚什么钱 ============ -->
+<section id="ch10">
+  <h2 class="sec"><span class="num">10</span>产业落地：世界模型现在真正在赚什么钱</h2>
+<h3 id="s10.1">10.1 自动驾驶：最成熟的落地场景</h3>
+<p><strong>Wayve GAIA-1 → GAIA-2</strong>
+- GAIA-1（2023）：自回归 Transformer，<strong>9B 参数、4700 小时</strong>驾驶数据
+- <strong>GAIA-2（2025-03-26，arXiv:2503.20523）</strong>：<strong>架构大转向</strong> —— 从自回归 Transformer 换成 <strong>video tokenizer + latent diffusion</strong>（连续潜空间）。<strong>原生多相机</strong>生成，保持空间+时间一致性。条件控制维度很丰富：ego-action（车速、转向）+ 环境（天气、时段）+ 道路属性（车道、限速、人行横道、路口）。数据来自<strong>英国、美国、德国</strong>三国，多车型多传感器。（参数量与分辨率官方博客未披露，需查技术报告）</p>
+<p><strong>Tesla 神经世界模拟器</strong>（2025-10-24 公开，Ashok Elluswamy，AI 软件 VP 兼 Optimus 负责人）
+四大用途，这个清单非常能说明世界模型的产业价值定位：
+1. <strong>闭环评估</strong>新模型
+2. 用历史数据回放，并让 AI <strong>"diverge"</strong> 展示它会怎么开（反事实）
+3. 合成<strong>对抗性极端场景</strong>
+4. <strong>大规模 RL</strong>，追求超人表现</p>
+<p>关键点：Elluswamy 明确说该世界模拟器<strong>不只解决车，可无缝迁移到 Optimus</strong> —— 演示中 Optimus 在同一模拟器里的 Gigafactory 中导航。（具体算力/仿真小时数无公开数字）</p>
+<p><strong>Waabi</strong>：Copilot4D 是无监督世界模型，走<strong>离散扩散</strong>路线；Waabi World 可仿真传感器、端到端测试整套自动驾驶栈。</p>
+<p><strong>中国厂商 2025–2026</strong>（以下来自行业综述，属<strong>厂商宣称</strong>，请当作口径而非独立验证的数据）</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>厂商</th>
+<th>时间</th>
+<th>方案</th>
+<th>宣称数字</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>蔚来</td>
+<td>2026-06</td>
+<td>世界模型<strong>端到端直控</strong>（直接输出方向盘/油门/刹车）；三层 = 世界模型 + SFT + <strong>闭环强化学习</strong></td>
+<td>覆盖 70 万+ 用户、2 品牌 4 平台 2 套芯片</td>
+</tr>
+<tr>
+<td>小鹏</td>
+<td>2026 CVPR</td>
+<td><strong>X-Mind</strong> 框架，VLA + 世界模型共同构成物理 AI 基座；内嵌预测性世界模型做"脑内推演"</td>
+<td>第二代 VLA</td>
+</tr>
+<tr>
+<td>理想</td>
+<td>2026 CVPR</td>
+<td>深度建模、三维重建、交通规则理解；MindVLA-o1 与马赫 VLA 司机大模型</td>
+<td>CVPR 12 篇入选，其中 4 篇聚焦世界模型</td>
+</tr>
+<tr>
+<td>华为</td>
+<td>2026 (ADS 5)</td>
+<td><strong>WEWA 2.0 世界行为模型</strong>；云端多智能体博弈 + 车端安全风险场</td>
+<td>训练强度 ×10，在线 RL 效率 ×10</td>
+</tr>
+<tr>
+<td>Momenta</td>
+<td>2026-04</td>
+<td><strong>R7 世界模型</strong>，已量产上车</td>
+<td><strong>120 亿公里</strong>数据训练；误制动优化 &gt;3 倍，车道内避让提升近 5 倍</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="s10.2">10.2 具身智能：数据瓶颈之争</h3>
+<p><strong>走世界模型的：</strong>
+- <strong>V-JEPA 2-AC</strong>：62 小时视频 → 全新实验室 65–80% 成功率（见 8.3）
+- <strong>1X World Model Lab</strong>（2026-06-04 成立）：数据配方原文 "web-scale media + egocentric human videos + sim + dexterous remote operated robot data + on-policy NEO data → real-world deployment for robot data collection and RL → abundance of data → physical AI"。负责人 Sam Sinha（前 Luma AI）。（数据小时数与模型规模未公开）
+- <strong>Google DeepMind</strong>：组合拳 = <strong>Genie 3（生成环境）+ SIMA（agent）+ Gemini Robotics（真机）</strong>。Gemini Robotics 1.5（2025-09）是双脑架构（ER 1.5 负责具身推理/规划 + VLA 1.5 负责执行），支持 motion transfer 跨本体迁移。<strong>Gemini Robotics-ER 1.6</strong>（2026-04-14）是 reasoning-first 模型，<strong>仪表读数成功率 23% → 93%</strong>。Hassabis 已把世界模型置于通用 AI 战略核心。</p>
+<p><strong>不走世界模型的对照组：</strong>
+- <strong>Physical Intelligence（π）</strong>：Series A 4 亿（2024-11）+ Series B 6 亿（2025-11），累计 11 亿，估值约 56 亿。π0（2025-02 开源，flow matching，100 万+ episodes、10+ 本体）→ π0.5 → <strong>π0.6（2025-11，RECAP：RL with Experience &amp; Corrections via Advantage-conditioned Policies）</strong>，参数 3–5B。效果：意式咖啡机装滤网、折叠未见过的衣物、组装纸箱等任务<strong>吞吐量翻倍</strong>。
+- <strong>报道中未提及显式世界模型组件</strong> —— π 走的是 <strong>VLA + RL</strong> 路线。</p>
+<div class="key"><p><strong>这个对照非常重要，别忽略它。</strong> π0.6 在真实任务上的表现是当前最好的之一，而它不用世界模型。也就是说：<strong>"要做通用机器人必须先有世界模型"这个命题，目前还没有被实证。</strong> 它是一个赌注，不是一个结论。你在读任何鼓吹世界模型的材料时，都应该把 π 系列放在旁边作为对照。</p></div>
+<h3 id="s10.3">10.3 一句话结论：钱在哪</h3>
+<p>把 10.1 和 10.2 的事实摆在一起看，会得到一个和舆论口径不太一样的结论：</p>
+<p><strong>投入与成熟度严重错位。</strong>
+- AMI Labs 10.3 亿（<strong>0 模型发布</strong>，CEO 明说"要数年"）
+- World Labs 累计 12.3 亿（Marble 2026-02 发货，输出 splats + collision mesh）
+- Physical Intelligence 累计 11 亿（<strong>不走世界模型</strong>）</p>
+<p><strong>而唯一大规模真实落地的用途是：闭环仿真、数据生成、模型评测。</strong>
+- Tesla 的四大用途里，三个是评测/造数据，只有第四个是训练
+- NVIDIA Cosmos 的整个定位就是"给 Physical AI 造数据"
+- 腾讯 HY-World 2.0 的输出接 Isaac Sim
+- Momenta 的 120 亿公里是用来训练和验证的</p>
+<div class="note"><p><strong>所以，如果有人问你"世界模型现在的杀手级应用是什么"，最准确的回答是：造训练数据和做闭环评测，不是直接做决策。</strong> 直接做决策的最好证据仍然是 DreamerV3/Dreamer 4 这类研究成果和自动驾驶厂商的宣称，而不是已验证的大规模产品。</p></div>
+
+</section>
+
+
+<!-- ============ 第 11 章 冷水：世界模型到底会了什么 ============ -->
+<section id="ch11">
+  <h2 class="sec"><span class="num">11</span>冷水：世界模型到底会了什么</h2>
+<p>这一章我认为是整份讲义<strong>最有价值</strong>的一章。上面十章讲的是能力，这一章讲边界。<strong>在这个领域，能准确说出边界在哪，比能背出架构更有价值。</strong></p>
+<h3 id="s11.1">11.1 决定性的一篇批评：视频生成学不到物理定律</h3>
+<ul>
+<li><strong>Kang, B., Yue, Y., Lu, R. et al.（字节跳动 Seed，2024-11）.</strong> <em>How Far is Video Generation from World Model: A Physical Law Perspective.</em> <strong>arXiv:2411.02385</strong>，ICML 2025。项目页 phyworld.github.io</li>
+</ul>
+<p>一句话结论（原文）：<strong>"Video generation fails to learn physical laws from video data, even with scaling."</strong></p>
+<p><strong>实验设计非常干净，值得学习这个方法论：</strong> 三类经典力学任务 —— 匀速直线运动（惯性定律）、弹性碰撞（动量/能量守恒）、抛物运动（牛顿第二定律）；三种泛化设定 —— In-Distribution / Out-of-Distribution / Combinatorial。</p>
+<p><strong>关键数字（请记住这一组）：</strong></p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>设定</th>
+<th>速度误差</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>In-Distribution</strong></td>
+<td><strong>0.012</strong></td>
+</tr>
+<tr>
+<td><strong>Out-of-Distribution</strong></td>
+<td><strong>0.427</strong></td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>相差约 35 倍。</strong> 而且：数据从 30K 加到 3M、模型从 DiT-S 放大到 DiT-L，<strong>大幅改善 ID，但对 OOD "little or negative impact"</strong>。</p>
+<p><strong>核心洞见："case-based generalization"</strong> —— 模型不是学抽象物理定律，而是<strong>模仿最近邻的训练样本</strong>。论文还测出泛化时的属性优先级：<strong>颜色 &gt; 尺寸 &gt; 速度 &gt; 形状</strong>。也就是说，模型判断"这个新场景像训练集里哪一个"时，最看重颜色，最不看重形状 —— 这显然不是物理该有的优先级。</p>
+<p><strong>但论文也给了一个希望</strong>：组合泛化上，把模板多样性从 6 提到 60，人类评测的异常率从 <strong>67% 降到 10%</strong>。</p>
+<div class="key"><p><strong>这两个发现合起来指向一个很实际的结论：数据的多样性比数据的量更关键。</strong> scaling 数据量改善不了 OOD，但 scaling 数据的<strong>覆盖结构</strong>可以。这对你做工程有直接指导意义。</p></div>
+<h3 id="s11.2">11.2 Benchmark 全景（挑三个记住就够）</h3>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Benchmark</th>
+<th>时间/机构</th>
+<th>测什么</th>
+<th>关键结论</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Physion</td>
+<td>2021</td>
+<td>物理事件预测</td>
+<td>经典对照基线</td>
+</tr>
+<tr>
+<td>VideoPhy</td>
+<td>2024, UCLA+Google</td>
+<td>视频生成的物理常识</td>
+<td>前作</td>
+</tr>
+<tr>
+<td><strong>VideoPhy-2</strong></td>
+<td>2025-03, UCLA+Google</td>
+<td>200 个动作，人类评语义遵循 + 物理常识 + 物理规则接地</td>
+<td>最佳开源模型 <strong>Wan2.1-14B 仅 32.6%</strong>（hard 子集 <strong>21.9%</strong>）；<strong>尤其过不去质量与动量守恒</strong></td>
+</tr>
+<tr>
+<td>PhysBench</td>
+<td>2025-01</td>
+<td>VLM 的物理世界理解</td>
+<td>—</td>
+</tr>
+<tr>
+<td><strong>WorldModelBench</strong></td>
+<td>2025-02-27, Berkeley+UCSD+MIT+NVIDIA</td>
+<td>7 大领域 / 56 子领域 / 350 prompts；三维度 = Instruction Following + Common Sense + <strong>Physical Adherence（牛一、固体力学、流体力学、不可穿透性、重力）</strong></td>
+<td><strong>6.7 万条人类标注</strong>；微调的 2B judge 比 GPT-4o 准确率高 8.6%；评了 14 个前沿模型</td>
+</tr>
+<tr>
+<td><strong>IntPhys 2</strong></td>
+<td>2025-06-11, FAIR</td>
+<td>四条婴儿心理学原则：Permanence / Immutability / Spatio-Temporal Continuity / Solidity</td>
+<td><strong>人类接近满分（~95%+）；多数模型在复杂任务上处于 50% 随机水平</strong></td>
+</tr>
+<tr>
+<td>MVPBench</td>
+<td>2025-06, Meta</td>
+<td>最小改动配对多选题，<strong>堵死 shortcut</strong></td>
+<td>人类 85–95%，模型有 substantial gap</td>
+</tr>
+<tr>
+<td>CausalVQA</td>
+<td>2025-06, Meta</td>
+<td>反事实、预判、规划类问答</td>
+<td><strong>"预测未来世界状态"是最弱环节</strong></td>
+</tr>
+<tr>
+<td>WorldScore</td>
+<td>Stanford</td>
+<td>世界生成综合评分</td>
+<td>HY-World 2.0 称开源第一</td>
+</tr>
+<tr>
+<td><strong>WorldBench</strong></td>
+<td>2026-01/08, UCLA 等</td>
+<td><strong>解耦式物理概念评测</strong> —— 批评既有 benchmark "一道题同时考多条物理定律"（entanglement）</td>
+<td><strong>所有被测 SOTA 都有显著缺陷</strong>；结论：没有一个模型具备生成可靠真实世界交互所需的物理一致性</td>
+</tr>
+<tr>
+<td><strong>stable-worldmodel</strong></td>
+<td>2026-05-20, Mila/UdeM + LeCun、Balestriero</td>
+<td>可复现的世界模型研究与评测平台</td>
+<td>见下</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>如果只记三个数字，我建议是这三个：</strong></p>
+<ol>
+<li><strong>IntPhys 2：人类 ~95%，多数模型在复杂任务上 ~50%（= 随机猜）。</strong> 测的是婴儿都懂的四条直觉物理。</li>
+<li><strong>VideoPhy-2：最佳开源模型 32.6%。</strong> 而且最过不去的是守恒律。</li>
+<li><strong>stable-worldmodel（2026-05）：任务成功率从 ~50% 掉到 ~12%（仅改 agent 颜色），再掉到 ~6%（仅换背景）。</strong>（这组数字来自二手报道，我未定位到论文里的具体表号，引用前请自行核实）</li>
+</ol>
+<p>第 3 条最狠，值得展开：<strong>只改一个颜色</strong>，成功率腰斩再腰斩。这说明当前世界模型学到的不是"物体在空间中如何运动"，而是"这堆特定像素之后通常跟着那堆特定像素"。这与 11.1 节的 case-based generalization 是同一个病灶的两次独立确认 —— 一次在视频生成上，一次在控制任务上。</p>
+<h3 id="s11.3">11.3 一个可操作的判读清单</h3>
+<p>读到任何一篇/一条"世界模型"的宣传时，按顺序问这五个问题。这是我从上面所有材料里提炼的：</p>
+<ol>
+<li><strong>它是 Renderer / Simulator / Planner 哪一个？</strong>（0.1 节）— 很多混淆在这一步就消解了。</li>
+<li><strong>它的用途是 A 规划 / B 想象中训练 / C 只当表示？</strong>（1.2 节）— 决定了模型质量要求差几个数量级。</li>
+<li><strong>一致性/可信 horizon 是多久？</strong> — Genie 3 是 1 分钟；PlaNet 是 12 步；你自己的模型可以用第 4.5 节练习 2 测出来。</li>
+<li><strong>OOD 上掉多少？</strong> — 有没有报 OOD？没报就默认它掉了。ID 0.012 / OOD 0.427 是个参考刻度。</li>
+<li><strong>有没有对照组？</strong> — 尤其是"不用世界模型的最强基线"。π0.6 之于机器人、Rainbow/IQN 之于 Atari。<strong>很多"世界模型带来提升"的说法在加上强基线后就消失了。</strong></li>
+</ol>
+<p>第五条我想强调一下，因为它最容易被跳过。回看第 3.6 节那张 CarRacing 表：只用 $z$ 是 632，加一个隐层是 788 —— <strong>单纯增加策略容量就带来了 +156</strong>。如果论文只报"世界模型 906 vs 只用 VAE 632"，你会以为世界模型贡献了 274；实际上其中一半以上可能来自容量。Ha &amp; Schmidhuber 老实地把三行都列了出来，这是好论文的标志。<strong>很多论文不会。</strong></p>
+
+</section>
+
+
+<!-- ============ 第 12 章 你的四周学习路径 ============ -->
+<section id="ch12">
+  <h2 class="sec"><span class="num">12</span>你的四周学习路径</h2>
+<p>按你的背景（DL 基础扎实、熟悉 RL、工程出身），我建议这个节奏。每周的"产出"是硬要求 —— 只读不写会产生虚假的掌握感。</p>
+<h3>第 1 周：把重构派打穿（重点是动手）</h3>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>天</th>
+<th>做什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>读本讲义第 0–2 章。产出：用你自己的话写一段"世界模型是什么问题"，不超过 200 字，不许用"预测未来"这四个字。</td>
+</tr>
+<tr>
+<td>2–3</td>
+<td>读本讲义第 3 章 + 精读 https://worldmodels.github.io/（交互版，有可玩的 demo）。<strong>推公式</strong>：ELBO 从 Jensen 推到最终形式、高斯 KL 解析式、MDN 的 NLL。手推，别看答案。</td>
+</tr>
+<tr>
+<td>4</td>
+<td>跑 <code>worldmodel_min</code>。先跑通，再跑温度扫描，确认你复现出"低温 → 梦里满分现实垃圾"这个现象。</td>
+</tr>
+<tr>
+<td>5–6</td>
+<td>做第 4.5 节练习 1（MSE 替换 MDN）和练习 2（开环误差曲线）。<strong>这两个练习做完，你对 1.3 节和 3.3 节的理解会从"知道"变成"见过"。</strong></td>
+</tr>
+<tr>
+<td>7</td>
+<td>复盘。写下你踩的坑。</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>第 1 周结束时你应该能回答</strong>：为什么必须是 VAE 而不是 AE？为什么必须是 MDN 而不是 MSE？温度 $\tau$ 为什么能防钻空子？为什么控制器只要 867 个参数？</p>
+<h3>第 2 周：主干（重点是对比）</h3>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>天</th>
+<th>做什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1–2</td>
+<td>PlaNet (arXiv:1811.04551)。重点：RSSM 为什么要两条通道、序列 ELBO 里 KL 项两侧分别是什么、latent overshooting 为什么要 stop-gradient。</td>
+</tr>
+<tr>
+<td>3–4</td>
+<td><strong>DreamerV3 (arXiv:2301.04104)</strong> —— 这是必须精读的一篇。重点：symlog/twohot/free bits/percentile norm 四个技巧各自在解决什么尺度问题。</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Dreamer v1 (1912.01603) 与 v2 (2010.02193) 快读，只看与 v3 的差异。</td>
+</tr>
+<tr>
+<td>6</td>
+<td>做第 4.5 节练习 4（迭代式数据收集）和练习 6（梯度穿模型）。</td>
+</tr>
+<tr>
+<td>7</td>
+<td>画一张你自己的演进图（别抄我 6.6 那张表，自己画）。</td>
+</tr>
+</tbody>
+</table></div>
+<h3>第 3 周：另外两条路线（重点是理解分歧）</h3>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>天</th>
+<th>做什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1–2</td>
+<td>MuZero (1911.08265) + value equivalence (2011.03506)。只需读懂定义和 Property 3。</td>
+</tr>
+<tr>
+<td>3</td>
+<td>TD-MPC2 (2310.16828)。重点：为什么 decoder-free、terminal Q 如何换掉长 horizon。</td>
+</tr>
+<tr>
+<td>4–5</td>
+<td><strong>V-JEPA 2 (arXiv:2506.09985)</strong> —— 第三篇必读。重点：V-JEPA 2-AC 那 62 小时是怎么用的、MPC 怎么做的。</td>
+</tr>
+<tr>
+<td>6</td>
+<td>LeJEPA (2511.08544)。只需读懂"各向同性高斯是最优 embedding 分布"这个结论和 SIGReg 在替代什么。</td>
+</tr>
+<tr>
+<td>7</td>
+<td>写一份三条路线的对比（我第 7.4 节那张表，你自己重做一遍，加上你自己的判断列）。</td>
+</tr>
+</tbody>
+</table></div>
+<h3>第 4 周：当代与判读（重点是建立品味）</h3>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>天</th>
+<th>做什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Genie 3 官方博客 + Project Genie。重点是记住能力边界数字。</td>
+</tr>
+<tr>
+<td>2</td>
+<td>NVIDIA Cosmos 3 技术报告（research.nvidia.com/labs/cosmos-lab/cosmos3/technical-report.pdf）。这是最新最全的一份工程文档。</td>
+</tr>
+<tr>
+<td>3</td>
+<td><strong>arXiv:2411.02385（字节 Seed 的物理定律批评）</strong> —— 第四篇必读，而且我建议它是你读得最仔细的一篇。</td>
+</tr>
+<tr>
+<td>4</td>
+<td>stable-worldmodel (2605.21800) + IntPhys 2 (2506.09849)。</td>
+</tr>
+<tr>
+<td>5</td>
+<td>GAIA-2 (2503.20523) 或 Dreamer 4 (2509.24527)，看你更关心自动驾驶还是通用 agent。</td>
+</tr>
+<tr>
+<td>6</td>
+<td>World Action Models: A Survey (arXiv:2606.20781，57 页) —— 用来补全地图。</td>
+</tr>
+<tr>
+<td>7</td>
+<td>用第 11.3 节那五个问题，去审一篇你之前觉得很厉害的世界模型论文/发布。</td>
+</tr>
+</tbody>
+</table></div>
+<h3>必读四篇（如果只有四篇的预算）</h3>
+<ol>
+<li><strong>Ha &amp; Schmidhuber 2018</strong>（arXiv:1803.10122）—— 全貌与失败模式，读交互版</li>
+<li><strong>DreamerV3</strong>（arXiv:2301.04104）—— 工程学的巅峰</li>
+<li><strong>V-JEPA 2</strong>（arXiv:2506.09985）—— 另一条路线的最强证据</li>
+<li><strong>How Far is Video Generation from World Model</strong>（arXiv:2411.02385）—— 边界在哪</li>
+</ol>
+<h3>建议避开的坑</h3>
+<ul>
+<li><strong>别从视频生成模型入门世界模型。</strong> 它们是这个领域里最好看、最容易接触，但概念上最容易误导的部分（0.1 节的三分法混淆基本都源自这里）。</li>
+<li><strong>别跳过动手。</strong> 这个领域的核心直觉（多模态未来、复合误差、模型钻空子）不动手是建立不起来的。第 4 章那两个坑我如果只是"读到"，绝对不会有"自己造出来"的印象深刻。</li>
+<li><strong>别只读综述。</strong> 这个领域的综述很多且质量参差，而关键论文的原文都写得相当清楚（尤其 Hafner 的几篇）。</li>
+</ul>
+
+</section>
+
+
+<!-- ============ 附录 A 数学工具箱 ============ -->
+<section id="app-a">
+  <h2 class="sec"><span class="num">A</span>数学工具箱</h2>
+<h3>A.1 ELBO 与高斯 KL</h3>
+<p><strong>ELBO 的两种等价形式</strong>（第 3.2 节推过）：</p>
+<p>$$
+\log p_\theta(x) = \underbrace{\mathbb{E}_{q_\phi}\big[\log p_\theta(x\mid z)\big] - \mathrm{KL}\big[q_\phi(z\mid x)\|p(z)\big]}_{\mathcal{L}\ (\text{ELBO})} + \underbrace{\mathrm{KL}\big[q_\phi(z\mid x)\|p_\theta(z\mid x)\big]}_{\ge 0,\ \text{gap}}
+$$</p>
+<p><strong>对角高斯到标准高斯的 KL</strong>（$d$ 维）：</p>
+<p>$$
+\mathrm{KL}\big[\mathcal{N}(\mu,\mathrm{diag}(\sigma^2))\,\big\|\,\mathcal{N}(0,I)\big] = \frac12\sum_{j=1}^{d}\big(\mu_j^2 + \sigma_j^2 - \log\sigma_j^2 - 1\big)
+$$</p>
+<p><strong>两个一般对角高斯之间的 KL</strong>（PlaNet/Dreamer 的 KL 项用这个）：</p>
+<p>$$
+\mathrm{KL}\big[\mathcal{N}(\mu_1,\sigma_1^2)\,\|\,\mathcal{N}(\mu_2,\sigma_2^2)\big] = \sum_j\left(\log\frac{\sigma_{2j}}{\sigma_{1j}} + \frac{\sigma_{1j}^2 + (\mu_{1j}-\mu_{2j})^2}{2\sigma_{2j}^2} - \frac12\right)
+$$</p>
+<h3>A.2 重参数化与两类梯度估计（这一节最值得反复看）</h3>
+<p>问题：要算 $\nabla_\phi\,\mathbb{E}_{z\sim q_\phi}[f(z)]$，但期望依赖 $\phi$，不能直接把 $\nabla$ 换进去。</p>
+<p><strong>路线 1：score function / REINFORCE / likelihood ratio</strong></p>
+<p>$$
+\nabla_\phi\,\mathbb{E}_{q_\phi}[f(z)] = \int f(z)\nabla_\phi q_\phi(z)\,dz = \int f(z)\,q_\phi(z)\,\nabla_\phi\log q_\phi(z)\,dz = \mathbb{E}_{q_\phi}\big[f(z)\,\nabla_\phi\log q_\phi(z)\big]
+$$</p>
+<p>（用到 $\nabla q = q\nabla\log q$。）
+- <strong>优点</strong>：$f$ 可以完全是黑盒 —— 不可微、不连续、是个真实环境，都无所谓
+- <strong>缺点</strong>：方差大。直觉上它只用到了 $f$ 的<strong>取值</strong>，没用到 $f$ 的<strong>形状</strong>；方差随维度和 horizon 增长</p>
+<p><strong>路线 2：pathwise / 重参数化</strong></p>
+<p>若 $z = g_\phi(\epsilon)$，$\epsilon\sim p(\epsilon)$ 且 $p$ 不依赖 $\phi$（高斯：$z = \mu_\phi + \sigma_\phi\odot\epsilon$）：</p>
+<p>$$
+\nabla_\phi\,\mathbb{E}_{q_\phi}[f(z)] = \nabla_\phi\,\mathbb{E}_{p(\epsilon)}\big[f(g_\phi(\epsilon))\big] = \mathbb{E}_{p(\epsilon)}\big[\nabla_z f\cdot \nabla_\phi g_\phi(\epsilon)\big]
+$$</p>
+<ul>
+<li><strong>优点</strong>：方差小得多，因为用到了 $\nabla_z f$（$f$ 的局部形状）</li>
+<li><strong>缺点</strong>：<strong>要求 $f$ 对 $z$ 可微</strong></li>
+</ul>
+<p><strong>把整个第 6 章浓缩成一句</strong>：世界模型的作用，就是把不可微的真实环境 $f$ 替换成可微的模型 $\hat f$，从而让你能用路线 2 而不是路线 1。<strong>而这正是 Schmidhuber 1990 那篇标题的意思。</strong></p>
+<p><strong>离散变量的补充</strong>：离散采样无法重参数化。三个办法：Gumbel-Softmax（连续松弛）、straight-through（DreamerV2 用的，前向硬、反向软，<strong>有偏但实践中好用</strong>）、或者干脆退回路线 1（DreamerV2 在 Atari 上就是这么做的，$\rho=1$）。</p>
+<h3>A.3 混合密度网络（MDN）</h3>
+<p>$$
+p(y\mid x) = \sum_{k=1}^{K}\pi_k(x)\,\mathcal{N}\big(y;\mu_k(x),\sigma_k^2(x)\big),\qquad \sum_k\pi_k = 1
+$$</p>
+<p>网络输出 $3K$ 个数（每维），$\pi$ 过 softmax，$\sigma$ 过 exp（或 softplus）。NLL：</p>
+<p>$$
+-\log p(y\mid x) = -\mathrm{logsumexp}_k\Big(\log\pi_k - \frac{(y-\mu_k)^2}{2\sigma_k^2} - \log\sigma_k - \tfrac12\log2\pi\Big)
+$$</p>
+<p><strong>三个必须注意的实现点</strong>：① 必须用 logsumexp；② $\log\sigma$ 必须 clamp（否则 $\sigma\to0$，NLL $\to-\infty$）；③ 多维时若用"每维独立 mixture"，<code>log_softmax</code> 要沿 $K$ 维而不是特征维。</p>
+<p><strong>温度采样</strong>：$\tilde\pi_k\propto\exp(\log\pi_k/\tau)$，$\tilde\sigma_k = \sigma_k\sqrt{\tau}$。</p>
+<h3>A.4 CMA-ES（够用的理解）</h3>
+<p>维护一个多元高斯 $\mathcal{N}(m,\ \sigma^2 C)$ 在参数空间上：</p>
+<ol>
+<li>采 $\lambda$ 个个体 $\theta_i = m + \sigma\,C^{1/2}\epsilon_i$</li>
+<li>评估 fitness，按排名取前 $\mu$ 个</li>
+<li>更新均值：$m \leftarrow \sum_{i=1}^{\mu} w_i\,\theta_{(i)}$（加权重心）</li>
+<li>更新协方差 $C$：rank-$\mu$ 更新（用这一代精英的分布）+ rank-1 更新（用 evolution path，即历代均值移动的累积方向）</li>
+<li>用 evolution path 的长度自适应调 $\sigma$（走得远说明步长太小，反之太大）</li>
+</ol>
+<p><strong>为什么它适合这个场景</strong>：只需要 fitness 的<strong>排名</strong>（不需要数值、不需要梯度）；协方差自适应让它能处理各维尺度差异大、有相关性的问题。<strong>为什么用不了大模型</strong>：$O(n^2)$ 存储、$O(n^3)$ 特征分解。几百到几千维是舒适区。</p>
+<h3>A.5 λ-return / TD(λ)</h3>
+<p>$n$ 步回报：$G_t^{(n)} = \sum_{k=0}^{n-1}\gamma^k r_{t+k} + \gamma^n V(s_{t+n})$</p>
+<p>λ-return 是几何加权混合：</p>
+<p>$$
+G_t^\lambda = (1-\lambda)\sum_{n=1}^{\infty}\lambda^{n-1}G_t^{(n)}
+$$</p>
+<ul>
+<li>$\lambda=0$ → 一步 TD（低方差、高偏差，依赖 $V$ 准）</li>
+<li>$\lambda=1$ → Monte Carlo（无偏、高方差）</li>
+<li>Dreamer 用 $\lambda=0.95$，且截断在 $H$ 步（有限 horizon 版见 6.2 节）</li>
+</ul>
+<p><strong>为什么世界模型里必须有它</strong>：想象 rollout 只有 $H$ 步，$H$ 之后的回报靠 $v_\psi$ bootstrap。<strong>没有 value 就等价于假设 $H$ 步之后世界结束。</strong></p>
+<h3>A.6 symlog / twohot（DreamerV3）</h3>
+<p>$$
+\mathrm{symlog}(x) = \mathrm{sign}(x)\ln(|x|+1),\qquad \mathrm{symexp}(x) = \mathrm{sign}(x)(e^{|x|}-1)
+$$</p>
+<p>$$
+\mathrm{twohot}(x)_i = \begin{cases}
+\frac{|b_{k+1}-x|}{|b_{k+1}-b_k|} & i=k\\
+\frac{|b_k-x|}{|b_{k+1}-b_k|} & i=k+1\\
+0 & \text{else}
+\end{cases},\qquad k=\sum_j\mathbb{1}\{b_j<x\}
+$$</p>
+<p>bin 数 255，$\mathcal{B}=\mathrm{symexp}(-20\dots20)$。<strong>要点：把回归变成分类，让梯度尺度与目标数值大小解耦。</strong></p>
+<h3>A.7 复合误差界（第 1.3 节）</h3>
+<p>单步 TV 误差 $\le\epsilon$ ⟹ $H$ 步分布误差 $\le H\epsilon$ ⟹ 回报估计偏差 $\le R_{\max}\,\epsilon\,H(H+1) = O(\epsilon H^2)$。</p>
+<p><strong>两条推论</strong>：偏差随 horizon 平方增长；接 terminal value 可把无穷 horizon 折成有限 $H$，用函数近似误差换掉复合误差。</p>
+
+</section>
+
+
+<!-- ============ 附录 B 文献表（按讲义顺序） ============ -->
+<section id="app-b">
+  <h2 class="sec"><span class="num">B</span>文献表（按讲义顺序）</h2>
+<h3>前史</h3>
+<ul>
+<li>Schmidhuber, J. (1990). <em>Making the world differentiable...</em> TR <strong>FKI-126-90</strong>, TU München. <a href="https://people.idsia.ch/~juergen/world-models-planning-curiosity-fki-1990.html">页面</a></li>
+<li>Schmidhuber, J. (1991). <em>A possibility for implementing curiosity and boredom in model-building neural controllers.</em> SAB, MIT Press. <a href="https://people.idsia.ch/~juergen/curiositysab/curiositysab.html">全文</a></li>
+<li>Schmidhuber, J. (1991). <em>Curious model-building control systems.</em> IJCNN Singapore, vol.2, pp.1458–1463. <a href="https://people.idsia.ch/~juergen/curioussingapore/curioussingapore.html">全文</a></li>
+<li>Schmidhuber, J. (2015). <em>On Learning to Think.</em> <a href="https://arxiv.org/abs/1511.09249">arXiv:1511.09249</a></li>
+<li>Sutton, R. S. (1990). <em>Integrated Architectures for Learning, Planning, and Reacting...</em> ICML, pp.216–224.</li>
+<li>Sutton, R. S. (1991). <em>Dyna...</em> ACM SIGART Bulletin 2(4):160–163.</li>
+</ul>
+<h3>经典</h3>
+<ul>
+<li>Ha, D. &amp; Schmidhuber, J. (2018). <em>World Models.</em> <a href="https://arxiv.org/abs/1803.10122">arXiv:1803.10122</a> · <a href="https://worldmodels.github.io/">交互版</a> · <a href="https://github.com/hardmaru/WorldModelsExperiments">官方代码</a></li>
+<li>Hafner, D. et al. (2019). <em>Learning Latent Dynamics for Planning from Pixels</em> (PlaNet). <a href="https://arxiv.org/abs/1811.04551">arXiv:1811.04551</a></li>
+<li>Hafner, D. et al. (2020). <em>Dream to Control</em> (Dreamer). <a href="https://arxiv.org/abs/1912.01603">arXiv:1912.01603</a></li>
+<li>Hafner, D. et al. (2021). <em>Mastering Atari with Discrete World Models</em> (DreamerV2). <a href="https://arxiv.org/abs/2010.02193">arXiv:2010.02193</a></li>
+<li>Hafner, D. et al. (2023). <em>Mastering Diverse Domains through World Models</em> (DreamerV3). <a href="https://arxiv.org/abs/2301.04104">arXiv:2301.04104</a></li>
+<li>Hafner, D., Yan, W., Lillicrap, T. (2025). <em>Training Agents Inside of Scalable World Models</em> (Dreamer 4). <a href="https://arxiv.org/abs/2509.24527">arXiv:2509.24527</a></li>
+</ul>
+<h3>价值等价路线</h3>
+<ul>
+<li>Schrittwieser, J. et al. (2020). <em>MuZero.</em> <a href="https://arxiv.org/abs/1911.08265">arXiv:1911.08265</a></li>
+<li>Grimm, C. et al. (2020). <em>The Value Equivalence Principle.</em> <a href="https://arxiv.org/abs/2011.03506">arXiv:2011.03506</a></li>
+<li>Hansen, N., Wang, X., Su, H. (2022). <em>TD-MPC.</em> <a href="https://arxiv.org/abs/2203.04955">arXiv:2203.04955</a></li>
+<li>Hansen, N. et al. (2024). <em>TD-MPC2.</em> <a href="https://arxiv.org/abs/2310.16828">arXiv:2310.16828</a></li>
+</ul>
+<h3>JEPA 路线</h3>
+<ul>
+<li>LeCun, Y. (2022). <em>A Path Towards Autonomous Machine Intelligence.</em> <a href="https://openreview.net/pdf?id=BZ5a1r-kVsf">OpenReview</a></li>
+<li>I-JEPA (2023). arXiv:2301.08243</li>
+<li>V-JEPA (2024). <em>Revisiting Feature Prediction for Learning Visual Representations from Video.</em> <a href="https://arxiv.org/abs/2404.08471">arXiv:2404.08471</a></li>
+<li>Assran/Ballas et al. (2025-06). <em>V-JEPA 2.</em> <a href="https://arxiv.org/abs/2506.09985">arXiv:2506.09985</a> · <a href="https://ai.meta.com/blog/v-jepa-2-world-model-benchmarks/">Meta 博客</a></li>
+<li>V-JEPA 2.1 (2026-03). <a href="https://arxiv.org/abs/2603.14482">arXiv:2603.14482</a></li>
+<li>Balestriero, R. &amp; LeCun, Y. (2025-11). <em>LeJEPA.</em> <a href="https://arxiv.org/abs/2511.08544">arXiv:2511.08544</a> · <a href="https://github.com/rbalestr-lab/lejepa">代码</a></li>
+<li>Klindt, LeCun, Balestriero (2026-05). <em>When Does LeJEPA Learn a World Model?</em> arXiv:2605.26379</li>
+</ul>
+<h3>生成式交互世界模型</h3>
+<ul>
+<li>Valevski et al. (2024-08). <em>GameNGen / Diffusion Models Are Real-Time Game Engines.</em> <a href="https://gamengen.github.io/">项目页</a> · arXiv:2408.14837</li>
+<li>Google DeepMind (2025-08-05). <em>Genie 3.</em> <a href="https://deepmind.google/blog/genie-3-a-new-frontier-for-world-models/">博客</a></li>
+<li>NVIDIA (2026-06-22). <em>Cosmos 3 技术报告.</em> <a href="https://research.nvidia.com/labs/cosmos-lab/cosmos3/technical-report.pdf">PDF</a></li>
+<li>Tencent (2025-12 / 2026-04). <a href="https://github.com/Tencent-Hunyuan/HY-WorldPlay">HY-WorldPlay</a> · <a href="https://github.com/Tencent-Hunyuan/HY-World-2.0">HY-World 2.0</a></li>
+</ul>
+<h3>落地</h3>
+<ul>
+<li>Wayve (2025-03). <em>GAIA-2.</em> <a href="https://arxiv.org/abs/2503.20523">arXiv:2503.20523</a></li>
+<li>Waabi. <a href="https://waabi.ai/research/copilot-4d">Copilot4D</a></li>
+<li>Google DeepMind (2026-04). <em>Gemini Robotics-ER 1.6.</em> <a href="https://deepmind.google/blog/gemini-robotics-er-1-6/">博客</a></li>
+<li>1X (2026-06). <a href="https://www.1x.tech/discover/1x-world-model-lab">World Model Lab</a></li>
+</ul>
+<h3>批评与评测（我认为最该读的一组）</h3>
+<ul>
+<li>Kang, B. et al.（字节 Seed，2024-11）. <em>How Far is Video Generation from World Model: A Physical Law Perspective.</em> <a href="https://arxiv.org/abs/2411.02385">arXiv:2411.02385</a> · <a href="https://phyworld.github.io/">项目页</a></li>
+<li>Bordes et al. (2025-06). <em>IntPhys 2.</em> <a href="https://arxiv.org/abs/2506.09849">arXiv:2506.09849</a></li>
+<li><em>WorldModelBench</em> (2025-02). <a href="https://worldmodelbench-team.github.io/">项目页</a></li>
+<li><em>VideoPhy-2</em> (2025-03). <a href="https://videophy2.github.io/">项目页</a></li>
+<li><em>WorldBench</em> (2026-01). <a href="https://arxiv.org/abs/2601.21282">arXiv:2601.21282</a></li>
+<li>Maes, L. et al.（含 LeCun、Balestriero，2026-05）. <em>stable-worldmodel.</em> <a href="https://arxiv.org/abs/2605.21800">arXiv:2605.21800</a></li>
+</ul>
+<h3>综述</h3>
+<ul>
+<li><em>World Action Models: A Survey</em> (2026-06-18, 57 页). <a href="https://arxiv.org/abs/2606.20781">arXiv:2606.20781</a> · <a href="https://world-action-models.github.io/">主页</a></li>
+</ul>
+
+</section>
+
+
+<!-- ============ 附：本讲义中标注为"未查证"的项 ============ -->
+<section id="x1e01c1">
+  <h2 class="sec"><span class="num">·</span>附：本讲义中标注为&quot;未查证&quot;的项</h2>
+<p>写笔记或对外分享时请避开这些，或自行核实：</p>
+<ol>
+<li>Ha &amp; Schmidhuber 2018 的 MDN-RNN 的 optimizer / lr / batch size / 序列长度 / 梯度裁剪（论文附录未给）</li>
+<li>ConvVAE 训练时的 batch size</li>
+<li>Doom 实验的 CMA-ES 代数</li>
+<li>PlaNet 的 $\beta_d$ 具体数值与实验用的 $D$</li>
+<li>LeJEPA 后续那篇"用 Lean 4 形式化"（arXiv:2605.26379）与 stable-worldmodel 的 50%→12%→6%，均只从二手报道核到</li>
+<li>GAIA-2 的参数量与分辨率（官方博客未披露）</li>
+<li>V-JEPA 2-AC 的分任务成功率完整表与"16 秒 vs 4 分钟"规划耗时（来自二手解读）</li>
+<li>AMI Labs 的任何模型/论文产出（融资后至今未见发布）</li>
+<li>Genie 4 —— <strong>截至 2026-08-25 无任何公开发布或官方预告</strong></li>
+<li>阿里 2026-04-16 世界模型的中文正式名称</li>
+<li>第 0.1 节那个 Renderer / Simulator / Planner 三分法的一手来源（我按 World Labs 的公开表述整理）</li>
+<li>V-JEPA 2.1 的"抓取 +20 点""导航 128→8"；V-JEPA 的"1.5–6 倍加速"</li>
+<li>中国自动驾驶厂商的数字均为<strong>厂商宣称</strong>，非独立验证</li>
+</ol>
+</section>
+
+
+<!-- ============ 附：三条已被广泛误传、请勿采用的说法 ============ -->
+<section id="x89dab7">
+  <h2 class="sec"><span class="num">·</span>附：三条已被广泛误传、请勿采用的说法</h2>
+<ol>
+<li>❌「Ha &amp; Schmidhuber 2018 引用了 Sutton 1991 的 Dyna」—— 参考文献里 Sutton 只有 1998 教科书，Dyna 只经由 Silver (2017) 讲义间接相关。</li>
+<li>⚠️「World Models 论文里的 'mental model' 是个技术术语」—— 论文<strong>确实</strong>在 Introduction 第一句用了这个词，但它指的是<strong>人类的</strong>心智模型（随即引 Forrester 1971 定义），不对应 V/M/C 里的任何组件。别当技术术语引用。</li>
+<li>❌「论文引用 Werbos 的 'model of reality'」—— 全文无此短语，用的是 "predictive model of the future"。</li>
+</ol>
+
+</section>
+
+
+<!-- ============ 怎么把你的豆瓣笔记接进来 ============ -->
+<section id="x4f6372">
+  <h2 class="sec"><span class="num">·</span>怎么把你的豆瓣笔记接进来</h2>
+<p>我这次没读到你的笔记（豆瓣对抓取返回 403，浏览器扩展未连接）。三个办法，任选：</p>
+<ol>
+<li><strong>最简单</strong>：把你觉得相关的几篇笔记内容直接贴进对话，我据此调整深浅并补上与你既有知识的连接。</li>
+<li><strong>连浏览器</strong>：装好 Claude 的 Chrome 扩展并登录同一账号后告诉我，我可以在你的浏览器里打开那个页面读取。</li>
+<li><strong>给关键词就够</strong>：你只要告诉我你笔记里已经写过哪些主题（比如"我写过 VAE 和 GAN 的对比""写过 AlphaGo/MCTS""做过 CTR 模型"），我就能定位哪些章节可以压缩、哪些需要展开。</li>
+</ol>
+<p>另外，如果你想把这份讲义变成公式能正常渲染、可以反复回看和分享的网页版，跟我说一声，我发布成一个网页给你。</p>
+</section>
+
+
+<div class="foot">
+  <p><strong>报告信息</strong>：首次生成日期 2026-08-25 ｜ 最后更新日期 2026-08-25 ｜ 模型：Claude Opus 5（claude-opus-5）｜ 模式：Cowork 远程会话（默认模式）。</p>
+  <p>公式使用 MathJax 渲染，需联网加载。第 4 章的所有实验数字均在本次会话的容器内实测产出（纯 CPU，PyTorch 2.13），代码在同目录 <code>worldmodel_min/</code> 下，可自行复现。第 8–11 章涉及 2025–2026 年进展，已逐条标注可信度；文末列出 13 条「未查证」项与 3 条常见误传，对外引用前请先核实。全文经一轮独立事实核查，修正了 8 处问题（含 DreamerV3 的 β 系数版本差异、PlaNet 最终 agent 未采用 latent overshooting 等）。</p>
+</div>
+
+</main>
+</div>
+<a class="toplink" href="#top">↑ 回到顶部</a>
+</body>
+</html>

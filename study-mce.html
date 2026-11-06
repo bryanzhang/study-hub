@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Meta Context Engineering (MCE) 论文调研：用 Agentic Skill Evolution 超越 ACE</title>
+<script>
+  MathJax = {
+    tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$','$$'],['\\[','\\]']], tags: 'ams' },
+    svg: { fontCache: 'global' }
+  };
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js" id="MathJax-script" async></script>
+<style>
+  :root{
+    --bg:#0f1220; --panel:#171b2e; --panel2:#1e2440; --ink:#e8ecf5; --muted:#9aa4c0;
+    --accent:#6ea8fe; --accent2:#7ee0c0; --warn:#ffd166; --pink:#f78fb2; --line:#2a3150;
+    --code:#0b0e1a;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0; background:linear-gradient(180deg,#0c0f1c,#0f1220 40%); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    line-height:1.75; font-size:16px;
+  }
+  a{color:var(--accent); text-decoration:none}
+  a:hover{text-decoration:underline}
+  .layout{display:flex; max-width:1500px; margin:0 auto}
+  nav.toc{
+    position:sticky; top:0; align-self:flex-start; height:100vh; overflow-y:auto;
+    width:300px; flex:0 0 300px; padding:26px 18px; border-right:1px solid var(--line);
+    background:rgba(12,15,28,.6); backdrop-filter:blur(6px);
+  }
+  nav.toc h2{font-size:14px; letter-spacing:.12em; color:var(--muted); text-transform:uppercase; margin:18px 0 8px}
+  nav.toc a{display:block; color:var(--muted); padding:4px 10px; border-radius:8px; font-size:14px}
+  nav.toc a:hover{background:var(--panel2); color:var(--ink); text-decoration:none}
+  nav.toc a.sub{padding-left:24px; font-size:13px; opacity:.85}
+  .brand{font-weight:800; font-size:18px; background:linear-gradient(90deg,var(--accent),var(--accent2)); -webkit-background-clip:text; background-clip:text; color:transparent}
+  main{flex:1; min-width:0; padding:40px 54px 120px}
+  header.hero{
+    padding:46px 40px; border-radius:22px; margin-bottom:40px;
+    background:radial-gradient(1200px 400px at 10% -10%,rgba(110,168,254,.25),transparent),
+               radial-gradient(900px 400px at 90% 10%,rgba(126,224,192,.18),transparent),
+               var(--panel);
+    border:1px solid var(--line);
+  }
+  header.hero h1{margin:0 0 12px; font-size:34px; line-height:1.2}
+  header.hero p{margin:6px 0; color:var(--muted); max-width:80ch}
+  .meta{margin-top:20px; font-size:13px; color:var(--muted); border-top:1px dashed var(--line); padding-top:14px; display:flex; flex-wrap:wrap; gap:10px 22px}
+  .meta b{color:var(--accent2); font-weight:600}
+  .tags{margin-top:18px; display:flex; gap:8px; flex-wrap:wrap}
+  .tag{font-size:12px; padding:5px 12px; border-radius:999px; background:var(--panel2); border:1px solid var(--line); color:var(--accent2)}
+  section{margin:0 0 54px; scroll-margin-top:20px}
+  h2.sec{font-size:26px; margin:0 0 6px; padding-bottom:10px; border-bottom:2px solid var(--line); display:flex; align-items:center; gap:12px}
+  h2.sec .num{font-size:15px; color:#0b0e1a; background:linear-gradient(90deg,var(--accent),var(--accent2)); border-radius:8px; padding:3px 10px; font-weight:800}
+  h3{font-size:20px; margin:30px 0 8px; color:#dfe6f7}
+  h4{font-size:17px; margin:22px 0 6px; color:var(--accent2)}
+  p{margin:12px 0}
+  ul,ol{margin:12px 0; padding-left:26px}
+  li{margin:6px 0}
+  .lead{color:var(--muted)}
+  code{background:var(--code); padding:2px 6px; border-radius:6px; font-family:"SF Mono",Consolas,Menlo,monospace; font-size:.9em; color:#c7d2fe}
+  pre{background:var(--code); border:1px solid var(--line); border-radius:12px; padding:16px 18px; overflow:auto; font-family:"SF Mono",Consolas,Menlo,monospace; font-size:13.5px; line-height:1.6}
+  pre code{background:none; padding:0; color:#d7dcf0}
+  .card{background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:22px 26px; margin:20px 0}
+  .note{border-left:4px solid var(--accent); background:var(--panel2); padding:14px 18px; border-radius:0 12px 12px 0; margin:18px 0}
+  .warn{border-left:4px solid var(--warn); background:rgba(255,209,102,.08); padding:14px 18px; border-radius:0 12px 12px 0; margin:18px 0}
+  .key{border-left:4px solid var(--accent2); background:rgba(126,224,192,.08); padding:14px 18px; border-radius:0 12px 12px 0; margin:18px 0}
+  .bad{border-left:4px solid var(--pink); background:rgba(247,143,178,.08); padding:14px 18px; border-radius:0 12px 12px 0; margin:18px 0}
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:20px}
+  .grid3{display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px}
+  @media(max-width:1100px){.grid2,.grid3{grid-template-columns:1fr} nav.toc{display:none} main{padding:24px}}
+  figure{margin:26px 0; text-align:center}
+  figure svg{max-width:100%; height:auto; background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:10px}
+  figcaption{color:var(--muted); font-size:13.5px; margin-top:10px}
+  table{border-collapse:collapse; width:100%; margin:18px 0; font-size:14.5px}
+  th,td{border:1px solid var(--line); padding:10px 12px; text-align:left; vertical-align:top}
+  th{background:var(--panel2); color:var(--accent2)}
+  tr:nth-child(even) td{background:rgba(255,255,255,.02)}
+  .pill{display:inline-block; font-size:12px; padding:2px 8px; border-radius:6px; background:var(--panel2); color:var(--accent); margin-right:6px}
+  .mjx-container{overflow-x:auto; overflow-y:hidden; max-width:100%}
+  .foot{color:var(--muted); font-size:13px; border-top:1px solid var(--line); padding-top:20px; margin-top:40px}
+  svg text{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif}
+  details.deriv{margin:18px 0; border:1px solid var(--line); border-radius:14px; background:var(--panel); overflow:hidden}
+  details.deriv>summary{cursor:pointer; list-style:none; padding:14px 20px; font-weight:700; color:var(--accent2); background:var(--panel2); user-select:none}
+  details.deriv>summary::-webkit-details-marker{display:none}
+  details.deriv>summary::before{content:"▶"; display:inline-block; margin-right:10px; font-size:11px; color:var(--accent); transition:transform .2s}
+  details.deriv[open]>summary::before{transform:rotate(90deg)}
+  details.deriv .body{padding:8px 22px 18px}
+  .best{background:rgba(126,224,192,.10) !important; font-weight:650}
+  .cmt{border:1px dashed var(--warn); border-radius:12px; padding:14px 18px; margin:18px 0; background:rgba(255,209,102,.05)}
+  .cmt b.tagline{color:var(--warn)}
+</style>
+</head>
+<body>
+<div class="layout">
+
+<nav class="toc">
+  <div class="brand">Meta Context Engineering</div>
+  <h2>目录</h2>
+  <a href="#intro">0 · 一页纸速览</a>
+  <a href="#bg">1 · 从 ACE 到 MCE：问题脉络</a>
+  <a href="#formal">2 · 形式化：上下文函数与双层优化</a>
+  <a href="#meta">3 · Meta 层：Agentic Skill Evolution</a>
+  <a href="#base">4 · Base 层：全 Agentic 上下文优化</a>
+  <a href="#orch">5 · 算法编排：(1+1)-ES 与工程实现</a>
+  <a href="#exp">6 · 实验设置与主结果</a>
+  <a href="#eff">7 · 适应性 · 效率 · 迁移性</a>
+  <a href="#ablation">8 · 消融与混淆排除</a>
+  <a href="#case">9 · 五个任务的 Skill 演化史（案例研究）</a>
+  <a href="#vs">10 · MCE vs ACE 深度对比</a>
+  <a href="#evo">11 · 在 LLM×进化计算谱系中的位置</a>
+  <a href="#limits">12 · 局限、未来方向与批判性思考</a>
+  <a href="#repro">13 · 复现指南</a>
+  <a href="#refs">14 · 参考文献</a>
+</nav>
+
+<main>
+
+<header class="hero">
+  <h1>Meta Context Engineering (MCE)<br><span style="font-size:20px;color:var(--muted);font-weight:500">把"怎么做上下文工程"本身变成可学习、可进化的对象</span></h1>
+  <p>本报告精读北京大学 Ye, He, Arak, Dong, Song 的论文 <em>Meta Context Engineering via Agentic Skill Evolution</em>（arXiv:2601.21557v2，2026-01-27 首发，ICML 2026 收录）。MCE 是 ACE（Agentic Context Engineering, Zhang et al., ICLR 2026）的直接后继工作：它指出 ACE 的"生成-反思-整理"流水线只是所有可能 CE 策略空间中的<strong>一个点</strong>，并把 CE 重新表述为<strong>技能（skill）与上下文制品（context artifact）共同进化</strong>的双层优化问题。</p>
+  <p class="lead">预备知识：ACE 的 Generator–Reflector–Curator 流水线（你之前已学习）、GEPA / Dynamic Cheatsheet 的基本思路、进化策略 (ES) 的基本概念。公式由 MathJax 渲染。建议先读第 0 节拿全貌，第 9 节的五个案例是全文精华。</p>
+  <div class="tags">
+    <span class="tag">Context Engineering</span><span class="tag">双层优化</span>
+    <span class="tag">Agent Skills</span><span class="tag">Agentic Crossover</span>
+    <span class="tag">(1+1)-ES</span><span class="tag">Self-Improvement</span>
+    <span class="tag">ACE</span><span class="tag">GEPA</span><span class="tag">ICML 2026</span>
+  </div>
+  <div class="meta">
+    <span><b>首次生成日期：</b>2026-08-15</span>
+    <span><b>最后更新日期：</b>2026-08-15</span>
+    <span><b>模型：</b>Kimi K3（opencode/kimi-k3）</span>
+    <span><b>模式：</b>OpenCode 默认模式</span>
+  </div>
+</header>
+
+<!-- ============ 0 ============ -->
+<section id="intro">
+  <h2 class="sec"><span class="num">0</span>一页纸速览</h2>
+
+  <div class="key">
+    <p style="margin-top:0"><strong>一句话总结：</strong>ACE 手工固定了"如何学习上下文"的流程（Generator→Reflector→Curator + 条目式 playbook）；MCE 把这套流程本身也变成优化对象——一个 <strong>meta-agent 通过 agentic crossover 不断进化"上下文工程技能"（skill 文件夹）</strong>，另一个 <strong>base-agent 按照技能把上下文实现为文件和代码</strong>，两层用 (1+1) 进化策略协同。</p>
+    <p style="margin-bottom:0">形式化对比：<br>
+    传统 CE（含 ACE）：<code>固定工作流 → 优化后的上下文</code>，即 $c^*=\arg\max_c J(c)$<br>
+    MCE：$\;s^*=\arg\max_{s\in\mathcal{S}} J_{\text{val}}(c_s^*)\quad \text{s.t.}\quad c_s^*=\arg\max_{c_s} J_{\text{train}}(c_s;\,s)$ ——内层学"上下文是什么"，外层学"应该如何学上下文"。</p>
+  </div>
+
+  <div class="grid3">
+    <div class="card">
+      <h4>① 它解决了什么</h4>
+      <p style="margin-bottom:0">现有 CE 方法的<strong>结构性偏置</strong>：GEPA 偏向简短（brevity bias，丢掉细节知识），ACE/DC 偏向冗长（context bloat，条目堆积无全局整合）；两者都把上下文优化锁死在人类直觉划定的狭窄设计子空间里。</p>
+    </div>
+    <div class="card">
+      <h4>② 核心机制</h4>
+      <p style="margin-bottom:0"><strong>Meta 层</strong>：meta-agent 阅读历史（技能→实现→train/val 指标），用 agentic crossover 合成新技能。<strong>Base 层</strong>：base-agent 拿着技能、上轮最优上下文（warm-start）和训练 rollout，用 Read/Write/Edit/Bash 等工具把上下文写成"文件 + 检索代码"。</p>
+    </div>
+    <div class="card">
+      <h4>③ 关键数字</h4>
+      <p style="margin-bottom:0">5 个领域（金融/化学/医疗/法律/AI 安全）：对 SOTA 相对提升 <strong>5.6–53.8%</strong>（均值 16.9%）；训练加速 <strong>13.6×</strong>、rollout 省 <strong>4.8×</strong>；上下文长度按需伸缩 1.5K–86K tokens；强→弱模型迁移掉点比 ACE 少 4–7%。</p>
+    </div>
+  </div>
+
+  <div class="warn">
+    <strong>先澄清一个名字误解：</strong>MCE 里的 "Meta" <strong>不是 Meta（Facebook）公司</strong>——这篇论文来自<strong>北京大学</strong>通用人工智能重点实验室（通讯作者 Song Guojie）。"Meta" 指"元层级"：不再直接优化上下文，而是优化"产生上下文的技能"。同理，标题里的 "Agentic Skill" 借用了 Anthropic 2025 年 10 月提出的 <em>Agent Skills</em> 概念（<code>SKILL.md</code> + 脚本 + 资源的文件夹），代码实现直接基于 Claude Agent SDK。
+  </div>
+
+  <div class="note">
+    <strong>和你学过的 ACE 的关系（最重要的一个认知）：</strong>MCE 论文把 ACE 显式地定位为"技能流形上的一个单点"——在 meta-agent 的系统提示词里，"ACE 风格的反思与整理"只是给定的<strong>三个技能示例之一</strong>（Example Skill B）。也就是说，MCE 的搜索空间在定义上就包含 ACE；它既能重建 ACE 的流水线，也能发现 ACE 之外的策略（例如 FiNER 上的 8 阶段错误驱动泛化、LawBench 上的结构化案件分解）。这不是增量改进，而是抽象层级的抬升。
+  </div>
+</section>
+
+<!-- ============ 1 ============ -->
+<section id="bg">
+  <h2 class="sec"><span class="num">1</span>从 ACE 到 MCE：问题脉络</h2>
+
+  <h3>1.1 为什么优化上下文而不是权重</h3>
+  <p>论文沿用了 CE 领域的标准论证（Hua et al. 2025 的 <em>Context Engineering 2.0</em> 也有类似论述）：相对更新模型参数，优化推理时上下文有四个方法论优势——</p>
+  <ul>
+    <li><strong>可解释性</strong>：经验以自然语言/代码形式编码，而非不可读的权重；</li>
+    <li><strong>效率</strong>：无需昂贵的参数更新即可快速部署适配；</li>
+    <li><strong>模块化</strong>：已学上下文可组合、可迁移（MCE 实验验证了强模型→弱模型的迁移）；</li>
+    <li><strong>鲁棒性</strong>：能力获取与模型权重解耦，天然免疫灾难性遗忘。</li>
+  </ul>
+
+  <h3>1.2 MCE 对 CE 现状的诊断：两个层级上的结构性偏置</h3>
+  <p>MCE 的出发点是对现有方法的系统性批判，分两个层级：</p>
+
+  <div class="card">
+    <h4 style="margin-top:0">层级一：上下文表示（representation）的偏置</h4>
+    <table>
+      <tr><th>表示形态</th><th>代表方法</th><th>优势</th><th>固有缺陷</th></tr>
+      <tr><td>案例轨迹（case-based trajectories）</td><td>Zhou et al. 2025 等</td><td>保留丰富情景细节</td><td>缺乏泛化与抽象</td></tr>
+      <tr><td>条目式列表（itemized lists）</td><td><strong>ACE</strong>、DC</td><td>可积累抽象洞见</td><td>扁平、结构表达力差</td></tr>
+      <tr><td>图/层级记忆</td><td>MemoryBench 系、MemGPT 系</td><td>组织灵活</td><td>延迟高、复杂度大，且未稳定优于朴素检索</td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <h4 style="margin-top:0">层级二：上下文优化（optimization）的偏置——方向相反却同样受限</h4>
+    <div class="grid2">
+      <div class="bad" style="margin:0">
+        <strong>重写派 → 简短偏置（brevity bias）</strong><br>
+        以 GEPA（Agrawal et al. 2025）为代表：LLM 全文重写 prompt，反复提炼出简洁的高层规则。问题：需要<strong>详细策略和深度领域知识</strong>的任务上失败——细微差别被压缩掉了。
+      </div>
+      <div class="bad" style="margin:0">
+        <strong>累加派 → 冗长偏置（verbosity bias）</strong><br>
+        以 DC、<strong>ACE</strong> 为代表：生成-反思-整理流水线不断往 playbook 里加条目。问题：① 更新噪声大（curator 看不到全局）；② 逐实例优化开销巨大；③ 只加不整导致 <strong>context bloat</strong>。
+      </div>
+    </div>
+    <p style="margin-bottom:0; margin-top:14px">论文的论断：<em>没有任何单一的手工 agentic harness 是普遍最优的</em>。这些启发式选择把 CE 限制在狭窄的设计子空间内，排除了超出人类直觉的任务最优策略。</p>
+  </div>
+
+  <h3>1.3 MCE 赖以成立的两个时代趋势</h3>
+  <ul>
+    <li><strong>趋势一：Agent 架构从刚性多智能体脚手架走向统一自循环框架</strong>（Claude Agent SDK、Manus、DeepAgents、Codex agent loop）。在这类架构里，领域特异性被封装进 <strong>agent skills</strong>（可被动态发现和加载的"指令+脚本+资源"文件夹）。→ 启发 MCE 的 <em>meta 层</em>设计：CE 本身应该是无脚手架约束的全 agentic 过程，任务特异性通过学习到的技能注入。</li>
+    <li><strong>趋势二：编程工具与文件系统访问成为通用 agent 的标准装备</strong>。图灵完备的编程语言提供最大设计自由度，且代码天然可验证。→ 启发 MCE 的 <em>base 层</em>设计：上下文制品 = 文件 + 代码，是 agent 原生的、不受预定义 schema 约束的通用表示。</li>
+  </ul>
+
+  <div class="cmt">
+    <b class="tagline">笔者评注：</b>MCE 的批判与 ACE 内部的自我批判其实一脉相承——ACE 论文自己已经意识到 context bloat 并用"增量条目 + 去重"缓解。MCE 的激进之处在于：<strong>不再修补固定流程，而是连流程一起优化</strong>。这种"把设计选择上升为搜索空间"的思路，与深度学习史上"手工特征→特征学习→架构搜索（NAS）→训练算法搜索"的抽象层级抬升完全同构（论文 §3.1 也明确做了这个类比）。
+  </div>
+</section>
+
+<!-- ============ 2 ============ -->
+<section id="formal">
+  <h2 class="sec"><span class="num">2</span>形式化：上下文函数与双层优化</h2>
+
+  <h3>2.1 上下文函数：把"上下文"推广为"上下文的计算过程"</h3>
+  <p>MCE 的第一个概念升级：上下文不再是一坨静态文本，而是一个<strong>以查询为输入的函数</strong> $c:\mathcal{X}\to \text{Context}$，由二元组 $(\rho, F)$ 定义：</p>
+  $$c(x) = \big(F_k \circ \cdots \circ F_1\big)(x;\, \rho) \tag{1}$$
+  <ul>
+    <li><strong>静态组件</strong> $\rho=\{\rho_1,\dots,\rho_m\}$：system prompt、知识库、代码库、规则、示例……</li>
+    <li><strong>动态算子</strong> $F=\{F_1,\dots,F_k\}$：检索、选择、过滤、格式化、组合……按查询 $x$ 变换并装配静态组件。</li>
+  </ul>
+  <p>这个形式化统一了不同复杂度/动态性的 CE 实例：</p>
+  <ul>
+    <li><strong>静态 prompt</strong> = 常数函数 $c(x)=\rho_0$（恒等算子）；</li>
+    <li><strong>RAG</strong> = $c(x)=F_{\text{retrieve}}(x;\rho)$，固定资源上的单一检索算子；</li>
+    <li><strong>agentic 系统</strong> = 多个算子链式组合，推理过程中动态生成、修改、丢弃组件（pre/post-model hooks）。</li>
+  </ul>
+
+  <h3>2.2 CE 的标准目标</h3>
+  <p>给定产生输出 $\hat y = f_\theta(x, c(x))$ 的（冻结）agent $f_\theta$，CE 求最优上下文函数：</p>
+  $$c^* = \arg\max_{c\in\mathcal{C}} J(c) \tag{2}$$
+  <p>$J(c)$ 可以是监督目标 $J(c)=-\sum_i \ell(f_\theta(x_i,c(x_i)),y_i)$，也可以是 RL 目标 $J(c)=\mathbb{E}_x[R(f_\theta(x,c(x)))]$。</p>
+
+  <h3>2.3 双层优化：解耦"学什么"与"怎么学"</h3>
+  <p>以往方法（ACE、GEPA、DC）都是预定义 $(\rho,F)$ 的结构、用固定流程直接优化 $c$。MCE 引入<strong>技能</strong> $s\in\mathcal{S}$：<em>定义上下文函数应如何被表示、如何从数据中学习的可执行规范</em>。给定技能 $s$，base-agent 执行它得到 $c_s=(\rho_s, F_s)$。于是问题变成双层：</p>
+  $$s^* = \arg\max_{s\in\mathcal{S}} J_{\text{val}}\big(c_s^*\big) \quad \text{s.t.} \quad c_s^* = \arg\max_{c_s} J_{\text{train}}(c_s;\, s) \tag{3}$$
+  <ul>
+    <li><strong>内层</strong>（base-level）：给定技能 $s$，在训练集上把上下文函数学好；</li>
+    <li><strong>外层</strong>（meta-level）：搜索使<strong>验证集</strong>性能最大化的技能。注意外层目标是 $J_{\text{val}}$——泛化能力直接进入了技能选择压力。</li>
+  </ul>
+
+  <div class="key">
+    <strong>类比（论文原话的精神）：</strong>机器学习早已把"学参数"与"架构/训练算法"解耦，由此催生了 meta-learning、AutoML、NAS、超参优化、meta-black-box optimization 整个学科。MCE 把同样的解耦抬升到 CE 层——区别只是这里的"模型"（LLM）已经训练好且冻结，被优化的是它的上下文与产生上下文的技能。
+  </div>
+
+  <div class="cmt">
+    <b class="tagline">笔者评注：</b>注意式 (3) 中的 $J_{\text{val}}$ 选择——外层直接以验证性能为选择标准，配合 (1+1)-ES 的"优者保留"，本质上是在技能层面做带验证集早停精神的进化搜索。这意味着 <strong>skill 层面是会被"选择"出抗过拟合属性的</strong>（论文 §3.2 的第三个观察与此呼应：meta-agent 会监控 train/val gap 并把进化方向调向泛化）。第 9 节 Symptom2Disease 案例里"学会何时停止"的技能，正是这个机制的直接产物。
+  </div>
+</section>
+
+<!-- ============ 3 ============ -->
+<section id="meta">
+  <h2 class="sec"><span class="num">3</span>Meta 层：Agentic Skill Evolution</h2>
+
+  <h3>3.1 技能（skill）是什么：一个文件夹</h3>
+  <p>技能 $s$ 在物理上就是 base-agent 工作区里的一个文件夹（实现中路径为 <code>{iter}/.claude/skills/learning-context/SKILL.md</code>，沿用 Anthropic Agent Skills 的约定）。论文归纳了实践中技能包含的五类内容：</p>
+  <ol>
+    <li><strong>方法论</strong>（自然语言）：学习流程的核心哲学、多阶段方法、错误分析方式、上下文剪枝策略；</li>
+    <li><strong>可执行脚本</strong>：错误模式提取、LLM 批量反思、embedding 相似度分析等 Python 代码；</li>
+    <li><strong>结构化上下文模板</strong>：决策框架、消歧规则、gap 驱动的精炼模板；</li>
+    <li><strong>验证协议</strong>：评估上下文质量、度量泛化的函数；</li>
+    <li><strong>动态上下文算子</strong>：按查询特征选择性过滤/组合上下文的检索函数（关键词路由、embedding 匹配、易错模式的规则检测）。</li>
+  </ol>
+  <div class="note">
+    <strong>为什么"技能"是一个好的进化抽象层级（论文 §2.2 给出三点）：</strong>① 技能把指令、资源、脚本封装成统一表示，使<strong>不同抽象层级（文本规则 ↔ 代码）可以无缝共同进化</strong>，克服了以往共同进化框架的碎片化；② 技能是 agentic harness 的模块化接口，把优化目标与 agent 核心架构解耦，提升稳定性；③ 它支持更 agentic 的遗传算子——agent 可以自由检查祖先技能目录、按组件粒度选择性地重组。
+  </div>
+
+  <h3>3.2 Agentic Crossover：不是固定规则的重组</h3>
+  <p>meta-agent 维护<strong>技能数据库</strong> $\mathcal{H}_{k-1}=\{(s_i, c_i, J_i^{\text{train}}, J_i^{\text{val}})\}_{i=1}^{k-1}$——历史所有技能、它们产生的上下文函数、以及对应的训练/验证指标。第 $k$ 轮：</p>
+  $$s_k = \textsc{Crossover}(\tau,\, \mathcal{H}_{k-1}) \tag{4}$$
+  <p>其中 $\tau$ 是任务规范（任务描述、数据格式、评估标准）。与以往 LLM 驱动的进化算子（如"把两个程序合并成一个更好的"这类<strong>固定重组规则</strong>）不同，agentic crossover 是<strong>灵活的、审慎的（deliberative）过程</strong>：agent 推理任务规范、任意翻查工作区文件夹、识别成功与失败模式，然后组合出改进的技能。</p>
+
+  <details class="deriv">
+    <summary>展开看：meta-agent 系统提示词的关键设计（附录 B）</summary>
+    <div class="body">
+      <p>meta-agent 的工作目录结构（只读历史 + 限定写入位置）：</p>
+      <pre><code>{workspace_base}/
+  meta_agent/
+    train.jsonl          # 完整训练集（供整体理解任务，可能很大）
+    evaluations.json     # 汇总指标：所有迭代的 train_acc / val_acc
+    skills/
+      iter1/SKILL.md     # 历代技能
+      iter2/SKILL.md
+  {iter_name}/
+    iter1_sub0/, iter1_sub1/, …   # 子迭代文件夹（只读）
+    .claude/skills/learning-context/SKILL.md
+    context/             # 学到的上下文（markdown）
+    retrieve_context.py  # 检索逻辑
+    utils/ llm.py, embedding.py
+    data/train.json      # 本批次训练 rollouts</code></pre>
+      <p>写入权限仅限 <code>{iter_name}/.claude/skills/</code>。提示词中显式要求两项"体检"：</p>
+      <ul>
+        <li><strong>Overfitting Check</strong>：train acc 显著高于 val acc？→ 技能可能在记忆训练样本而非学习可泛化模式；</li>
+        <li><strong>Underfitting Check</strong>：两者都低？→ 技能没有从数据中榨出足够有用的上下文。</li>
+      </ul>
+      <p>并且给了三个技能示例作为种子直觉：<strong>A. 直接 agentic 整理</strong>（不借助重型 LLM 脚手架，自己读错误预测、归组错误类型、增量更新上下文文件）；<strong>B. ACE 式反思与整理</strong>（对每个错误样本调 LLM 反思"缺什么知识"，再增量 curate——<em>这就是 ACE 流水线被显式降格为一个示例技能</em>）；<strong>C. 聚类 + 批量合成</strong>（按特征归组训练样本，逐簇合成上下文）。</p>
+      <p>输出硬约束：必须含 <code>## Skill Overview</code> 小节；必须是自包含的完整学习流程；<strong>禁止引用具体迭代编号</strong>（保证技能可独立理解执行）；需提及可用工具 <code>utils/llm.py</code>、<code>utils/embedding.py</code>。</p>
+    </div>
+  </details>
+
+  <h3>3.3 演化出的技能所展现的三个技术优势（论文观察）</h3>
+  <ol>
+    <li><strong>动态调节自主性、表达力与粒度</strong>：学到的技能会按需指定"刚性工作流"或"完全放权"，可以做整体批量合成，也可以做针对性的实例级更新；</li>
+    <li><strong>按任务复杂度与模型容量定制上下文详略</strong>：简单任务/小容量模型 → 简洁规则；复杂任务 → 详细解释（对比：GEPA 永远简洁、ACE 永远膨胀）；</li>
+    <li><strong>监控 train/val 信号、检测过拟合并把进化导向泛化</strong>——外层目标直接是 $J_{\text{val}}$，这个观察与形式化互为印证。</li>
+  </ol>
+</section>
+
+<!-- ============ 4 ============ -->
+<section id="base">
+  <h2 class="sec"><span class="num">4</span>Base 层：全 Agentic 上下文优化</h2>
+
+  <h3>4.1 Base-agent 的工作区与输入</h3>
+  <p>给定 meta 层的技能 $s_k$，base-agent 执行它产出上下文函数：</p>
+  $$c_k = \textsc{Engineer}\big(\tau,\, s_k;\; c_{k-1}^{*},\, \mathcal{R}_k\big) \tag{5}$$
+  <p>工作区四件套：</p>
+  <ol>
+    <li><strong>技能文件夹</strong> $s_k$（<code>SKILL.md</code> 必读）；</li>
+    <li><strong>上轮最优上下文</strong> $c_{k-1}^{*}$——<strong>warm-start</strong>：base-agent 是"更新"而非"从零重建"已有知识；</li>
+    <li><strong>训练 rollouts</strong> $\mathcal{R}_k=\{(x_i, \hat y_i, \text{eval}_i)\}$：用 $c_{k-1}^{*}$ 在 $\mathcal{D}_{\text{train}}$ 上跑出来的逐样本结果（问题、模型答案、对错）；</li>
+    <li><strong>工具函数</strong>（附录 E）：<code>call_llm</code>（固定 DeepSeek V3.1，支持批量 + Pydantic 结构化输出，并发 50、单批上限 100 次调用）与 <code>compute_embedding_similarity</code>（text-embedding-3-small 余弦相似度矩阵）。</li>
+  </ol>
+
+  <h3>4.2 上下文 = 文件 + 代码，且必须暴露可调用接口</h3>
+  <ul>
+    <li>上下文函数落地为一个目录：静态组件 $\rho$（知识库、决策规则、示例）+ 动态算子 $F$（检索/过滤/组合逻辑代码）。<strong>代码+文件表示不施加任何结构约束</strong>，允许任意计算过程参与上下文生成。</li>
+    <li>为了 rollouts 与评估能被程序化调用，base-agent 必须实现<strong>预定义输入输出签名的可调用接口</strong>；论文主实验统一为一次性检索接口 <code>query → context</code>（<code>retrieve_context.py</code> 中的 <code>retrieval_function(question: str) -&gt; str</code>，要求用绝对路径读文件）。每次 base-agent 执行完毕后做接口校验。</li>
+  </ul>
+
+  <details class="deriv">
+    <summary>展开看：base-agent 系统提示词的质量标准（附录 B）</summary>
+    <div class="body">
+      <p>提示词给 base-agent 定了双重目标，写得很"训导师"：</p>
+      <ol>
+        <li><strong>修掉所有错误预测</strong>：对每个错误样本反问"如果模型当时检索到了正确的上下文，它还会答错吗？"——若会，则上下文不完整，继续补；</li>
+        <li><strong>泛化</strong>：必须提炼 pattern 和 principle 而不是背答案；训练样例只能作为一般规则的"插图"；检索逻辑必须能把新问题匹配到相关上下文。</li>
+      </ol>
+      <p>同时要求既分析错误也分析正确样本（"什么导致了成功？能否沉淀为可复用策略？"）——这一点后来在 USPTO 案例中演化成了显式的 SUCCESS_PATTERNS.md（见 §9.2）。</p>
+    </div>
+  </details>
+
+  <div class="note"><strong>与 ACE 的机制差异（base 层视角）：</strong>ACE 的 curator 每次只处理一个实例的反思、往 playbook 追加增量条目（局部视野）；MCE 的 base-agent <strong>一次性看到全部训练 rollouts + 完整既有上下文</strong>，可以重组、精简、重写整个知识结构，还能写代码把反思并行化。论文把 MCE 上下文质量更高归因于这两点：全局视野（可整体重构而非盲目追加）与批量级优化（聚合大量样本反馈后再动手）。</div>
+</section>
+
+<!-- ============ 5 ============ -->
+<section id="orch">
+  <h2 class="sec"><span class="num">5</span>算法编排：(1+1)-ES 与工程实现</h2>
+
+  <h3>5.1 Algorithm 1</h3>
+  <div class="card">
+    <p style="margin-top:0"><strong>输入：</strong>任务规范 $\tau$，数据 $\mathcal{D}=\mathcal{D}_{\text{train}}\cup\mathcal{D}_{\text{val}}$，迭代数 $K$。<strong>初始化：</strong>$\mathcal{H}_0\leftarrow\emptyset$，$c_0^*\leftarrow\emptyset$。</p>
+    <ol style="margin-bottom:0">
+      <li><strong>技能进化</strong>：$s_k \leftarrow \textsc{Crossover}(\tau, \mathcal{H}_{k-1})$</li>
+      <li><strong>上下文优化</strong>：$\mathcal{R}_k \leftarrow \textsc{Rollout}(c_{k-1}^{*};\, \mathcal{D}_{\text{train}})$；$\;c_k \leftarrow \textsc{Engineer}(\tau, s_k;\, c_{k-1}^{*}, \mathcal{R}_k)$</li>
+      <li><strong>评估</strong>：$J_k^{\text{train}} \leftarrow J(c_k;\mathcal{D}_{\text{train}})$，$J_k^{\text{val}} \leftarrow J(c_k;\mathcal{D}_{\text{val}})$；更新 $\mathcal{H}_k \leftarrow \mathcal{H}_{k-1}\cup\{(s_k,c_k,J_k^{\text{train}},J_k^{\text{val}})\}$；保留优者 $c_k^* \leftarrow \arg\max_{c\in\{c_{k-1}^{*},\,c_k\}} J^{\text{val}}(c)$</li>
+    </ol>
+    <p style="margin-bottom:0"><strong>返回：</strong>最优上下文函数 $c_K^*$ 及其对应技能。数据集大时可对 base-agent 做训练数据分批（batching）。</p>
+  </div>
+  <p>整体是一个<strong>历史信息引导的 (1+1) 进化策略</strong>：每轮 agentic crossover 可引用全部历史 $\mathcal{H}_{k-1}$；只产生一个后代 $c_k$，与当前最优 $c_{k-1}^{*}$ 二选一。论文明说这是为简单起见的选择，更强的搜索算法（种群、MAP-Elites 式多样性维持等）留作未来。</p>
+
+  <figure>
+    <svg viewBox="0 0 980 430" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="MCE bi-level architecture">
+      <defs>
+        <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#6ea8fe"/>
+        </marker>
+        <marker id="arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#7ee0c0"/>
+        </marker>
+      </defs>
+      <!-- Meta level -->
+      <rect x="40" y="30" width="900" height="150" rx="16" fill="#1e2440" stroke="#2a3150"/>
+      <text x="70" y="60" fill="#6ea8fe" font-size="15" font-weight="700">META 层 · Agentic Skill Evolution（meta-agent）</text>
+      <rect x="70" y="80" width="380" height="76" rx="10" fill="#171b2e" stroke="#6ea8fe"/>
+      <text x="90" y="110" fill="#e8ecf5" font-size="14" font-weight="600">Agentic Crossover：s_k = Crossover(τ, H_{k-1})</text>
+      <text x="90" y="134" fill="#9aa4c0" font-size="12.5">读历史 → 识别成败模式 → 过拟合/欠拟合体检 → 合成新技能</text>
+      <rect x="500" y="80" width="400" height="76" rx="10" fill="#171b2e" stroke="#2a3150"/>
+      <text x="520" y="108" fill="#e8ecf5" font-size="14" font-weight="600">技能数据库 H = {(s_i, c_i, J_train, J_val)}</text>
+      <text x="520" y="132" fill="#9aa4c0" font-size="12.5">全部迭代的技能 / 上下文 / 指标（evaluations.json + skills/）</text>
+      <!-- Base level -->
+      <rect x="40" y="230" width="900" height="150" rx="16" fill="#1e2440" stroke="#2a3150"/>
+      <text x="70" y="260" fill="#7ee0c0" font-size="15" font-weight="700">BASE 层 · Fully Agentic Context Optimization（base-agent）</text>
+      <rect x="70" y="280" width="270" height="76" rx="10" fill="#171b2e" stroke="#7ee0c0"/>
+      <text x="88" y="308" fill="#e8ecf5" font-size="14" font-weight="600">输入：s_k + c*_{k-1}</text>
+      <text x="88" y="330" fill="#9aa4c0" font-size="12.5">+ rollouts R_k + 工具函数</text>
+      <rect x="380" y="280" width="280" height="76" rx="10" fill="#171b2e" stroke="#7ee0c0"/>
+      <text x="398" y="308" fill="#e8ecf5" font-size="14" font-weight="600">执行技能 → 写文件+代码</text>
+      <text x="398" y="330" fill="#9aa4c0" font-size="12.5">context/ + retrieve_context.py（接口校验）</text>
+      <rect x="700" y="280" width="200" height="76" rx="10" fill="#171b2e" stroke="#7ee0c0"/>
+      <text x="718" y="308" fill="#e8ecf5" font-size="14" font-weight="600">评估 c_k</text>
+      <text x="718" y="330" fill="#9aa4c0" font-size="12.5">train / val 指标 → 择优保留</text>
+      <!-- arrows -->
+      <line x1="450" y1="118" x2="500" y2="118" stroke="#6ea8fe" stroke-width="2" marker-end="url(#arr)"/>
+      <line x1="260" y1="180" x2="260" y2="280" stroke="#6ea8fe" stroke-width="2" marker-end="url(#arr)"/>
+      <text x="272" y="236" fill="#6ea8fe" font-size="13">技能 s_k（SKILL.md 文件夹）</text>
+      <line x1="340" y1="318" x2="380" y2="318" stroke="#7ee0c0" stroke-width="2" marker-end="url(#arr2)"/>
+      <line x1="660" y1="318" x2="700" y2="318" stroke="#7ee0c0" stroke-width="2" marker-end="url(#arr2)"/>
+      <path d="M 800 280 C 830 200, 760 190, 720 156" fill="none" stroke="#7ee0c0" stroke-width="2" marker-end="url(#arr2)"/>
+      <text x="806" y="216" fill="#7ee0c0" font-size="13">J_k^train / J_k^val</text>
+      <path d="M 120 356 C 60 400, 940 420, 920 380 L 920 180" fill="none" stroke="#9aa4c0" stroke-width="1.6" stroke-dasharray="5 5" marker-end="url(#arr)"/>
+      <text x="470" y="420" fill="#9aa4c0" font-size="13">c*（warm-start 回到下一轮 base-agent）· 迭代 K 次 · (1+1)-ES</text>
+    </svg>
+    <figcaption>图：MCE 双层优化循环（根据论文 Fig. 2 与 Algorithm 1 重绘）。Meta 层只读写技能数据库与技能目录，base 层只读写自己当轮的工作区，权限严格隔离。</figcaption>
+  </figure>
+
+  <h3>5.2 工程实现要点</h3>
+  <ul>
+    <li><strong>工具集</strong>：两个 agent 都通过标准工具集 $\mathcal{T}=\{\texttt{Read, Write, Edit, Bash, Glob, Grep, TodoWrite}\}$ 与编程环境交互，产出物就是文件系统里的文件——和 Claude Code / OpenCode 这类 coding agent 完全一致。</li>
+    <li><strong>权限隔离</strong>：两个 agent 的读写权限按角色与当前迭代严格限定（meta-agent 不能碰上下文目录，base-agent 不能越出当轮迭代目录），防止信息泄漏造成"伪进化"。</li>
+    <li><strong>框架兼容</strong>：与 Claude Agent SDK、LangChain DeepAgents 直接兼容；论文实验用 Claude Agent SDK 实例化。</li>
+    <li><strong>默认模型配置</strong>：生成器（被优化上下文所服务的推理模型）= DeepSeek V3.1（Aegis2 用 Qwen3-8B）；MCE 的 agentic 模型（驱动 meta/base agent）= <strong>MiniMax M2.1</strong>；base-agent 内部可调用 DeepSeek V3.1 作为工具；全部经 OpenRouter 访问。</li>
+  </ul>
+</section>
+
+<!-- ============ 6 ============ -->
+<section id="exp">
+  <h2 class="sec"><span class="num">6</span>实验设置与主结果</h2>
+
+  <h3>6.1 设置</h3>
+  <table>
+    <tr><th>基准</th><th>领域</th><th>任务</th><th>指标</th><th>train/val/test</th></tr>
+    <tr><td>FiNER</td><td>金融</td><td>XBRL 财报实体 → 139 个 US GAAP 标签的语义分类（子集聚焦 12 个债务/信贷类标签）</td><td>pass@1 Acc</td><td>200/100/100</td></tr>
+    <tr><td>USPTO-50k</td><td>化学</td><td>单步逆合成：给产物 SMILES 预测反应物（分层覆盖 10 类反应）</td><td>exact-match Acc</td><td>50/30/100</td></tr>
+    <tr><td>Symptom2Disease</td><td>医疗</td><td>症状描述 → 22 类疾病诊断</td><td>pass@1 Acc</td><td>200/50/212</td></tr>
+    <tr><td>LawBench</td><td>法律</td><td>中文刑事案件事实 → 罪名预测（可多罪名）</td><td>micro-F1</td><td>200/50/100</td></tr>
+    <tr><td>Aegis2.0</td><td>AI 安全</td><td>用户 prompt 安全/不安全二分类（选取 LLaMA-3-SafeGuard 最差的 4 个风险子类）</td><td>F1</td><td>400/128/140</td></tr>
+  </table>
+  <ul>
+    <li><strong>基线</strong>：Base Model（zero-shot）、ICL（塞进尽量多训练样本）、MIPROv2（DSPy，auto="heavy"）、GEPA（DSPy，auto="heavy"，对齐 MCE 的 rollout 预算）、Dynamic Cheatsheet（DC-CU 累积模式，仅 online）、<strong>ACE（官方实现，offline 训 5 epochs）</strong>。公平性措施：沿用 ACE 论文建议实现、相同初始上下文/模板、基线训练预算不少于 MCE。</li>
+    <li><strong>两种评估设定</strong>（沿用 ACE）：<strong>Offline</strong>——CE 方法在训练集上迭代多轮后在 held-out 测试集评估；<strong>Online</strong>——顺序处理测试集、只计每条样本首次推理的成绩（MCE 的 base-agent 把已处理样本累积进文件系统持续学习；online 下测两个变体：固定技能 / 无技能自主）。</li>
+  </ul>
+
+  <h3>6.2 主结果（论文 Table 1）</h3>
+  <table>
+    <tr><th>方法</th><th>FiNER<br>Acc%↑</th><th>USPTO50k<br>Acc%↑</th><th>Symptom2Disease<br>Acc%↑</th><th>LawBench<br>micro-F1↑</th><th>Aegis2.0<br>F1↑</th><th>Avg. Rel.<br>Gain%↑</th></tr>
+    <tr><td>Base Model</td><td>58.0</td><td>6.0</td><td>63.7</td><td>0.36</td><td>0.54</td><td>–</td></tr>
+    <tr><td colspan="7" style="background:var(--panel2); color:var(--muted)"><strong>Offline 设定</strong></td></tr>
+    <tr><td>ICL</td><td>64.0 (+6.0)</td><td>9.0 (+3.0)</td><td>84.4 (+20.7)</td><td>0.57 (+.21)</td><td>0.59 (+.05)</td><td>32.1</td></tr>
+    <tr><td>MIPROv2</td><td>69.0 (+11.0)</td><td>14.0 (+8.0)</td><td>73.1 (+9.4)</td><td>0.60 (+.24)</td><td>0.59 (+.05)</td><td>48.6</td></tr>
+    <tr><td>GEPA</td><td>66.0 (+8.0)</td><td>15.0 (+9.0)</td><td>70.8 (+7.1)</td><td>0.69 (+.33)</td><td>0.76 (+.22)</td><td>61.5</td></tr>
+    <tr><td>ACE</td><td>71.0 (+13.0)</td><td>18.0 (+12.0)</td><td>79.2 (+15.5)</td><td>0.65 (+.29)</td><td>0.68 (+.14)</td><td>70.7</td></tr>
+    <tr class="best"><td><strong>MCE</strong></td><td><strong>75.0 (+17.0)</strong></td><td><strong>20.0 (+14.0)</strong></td><td><strong>89.2 (+25.5)</strong></td><td><strong>0.70 (+.34)</strong></td><td><strong>0.80 (+.26)</strong></td><td><strong>89.1</strong></td></tr>
+    <tr><td colspan="7" style="background:var(--panel2); color:var(--muted)"><strong>Online 设定</strong></td></tr>
+    <tr><td>DC</td><td>61.0 (+3.0)</td><td>14.0 (+8.0)</td><td>73.1 (+9.4)</td><td>0.46 (+.10)</td><td>0.53 (-.01)</td><td>35.8</td></tr>
+    <tr><td>ACE</td><td>64.0 (+6.0)</td><td>13.0 (+7.0)</td><td>62.3 (<span style="color:var(--pink)">-1.4</span>)</td><td>0.63 (+.27)</td><td>0.57 (+.03)</td><td>41.1</td></tr>
+    <tr><td>MCE（无技能）</td><td>67.0 (+9.0)</td><td>18.0 (+12.0)</td><td>76.9 (+13.2)</td><td>0.70 (+.34)</td><td>0.68 (+.14)</td><td>71.3</td></tr>
+    <tr class="best"><td><strong>MCE（固定技能）</strong></td><td><strong>68.0 (+10.0)</strong></td><td><strong>20.0 (+14.0)</strong></td><td><strong>76.4 (+12.7)</strong></td><td><strong>0.66 (+.30)</strong></td><td><strong>0.63 (+.09)</strong></td><td><strong>74.1</strong></td></tr>
+  </table>
+
+  <p>论文的九个观察（Obs.❶–❾）可归并为五组：</p>
+  <ol>
+    <li><strong>领域适配有效（Obs.❶）</strong>：offline 平均相对提升 89.1%；小模型收益更大（Gemma3-4B 达 172.6%）。</li>
+    <li><strong>全面且稳定地领先（Obs.❷❸）</strong>：offline 五个基准全部第一（89.1 vs ACE 70.7），online 同样领先（74.1 vs 41.1）。更值得注意的是<strong>基线排名随任务剧烈波动</strong>——FiNER 需要深度反思所以 ACE 强、ICL 弱；Symptom2Disease 训练/测试分布几乎一致所以 many-shot ICL 最强、ACE 反而不如 ICL；Aegis2 用小模型所以 GEPA 的简洁偏置占优。<strong>每个固定 harness 都有它的"主场"，而 MCE 没有客场</strong>。</li>
+    <li><strong>胜过垂直模型（Obs.❹）</strong>：LawBench 上最好的法律专精模型 0.56 F1 vs MCE 0.70；Aegis2 上 Qwen3-8B+MCE 0.80 F1 vs 专职安全模型 Llama Guard 3 8B 的 0.72。说明<strong>学习到的上下文可以替代昂贵的领域微调</strong>。</li>
+    <li><strong>上下文适应性/效率/迁移性（Obs.❺–❼）</strong>：见第 7 节。</li>
+    <li><strong>训练效率（Obs.❽❾）</strong>：13.6× 加速、4.8× rollout 节省，见第 7 节。</li>
+  </ol>
+  <p class="lead">汇总口径：offline/online 对 DeepSeek-V3.1 base 的平均相对提升分别为 89.1% / 74.1%，超出此前 SOTA（ACE）18.4 / 33.0 个百分点；对各设定下最强 CE 基线的逐任务相对提升介于 5.6%–53.8%，均值 16.9%（如 FiNER offline 75.0/71.0=+5.6%，USPTO online 20.0/13.0=+53.8%）。</p>
+</section>
+
+<!-- ============ 7 ============ -->
+<section id="eff">
+  <h2 class="sec"><span class="num">7</span>适应性 · 效率 · 迁移性</h2>
+
+  <h3>7.1 上下文长度自适应：既无简短偏置也无膨胀偏置（Obs.❺）</h3>
+  <ul>
+    <li>GEPA 典型产出 1–2K tokens（永远简短）；ACE 在 200 个训练样本、5 epochs 后膨胀到约 <strong>80K</strong> tokens；</li>
+    <li>MCE 按任务自主学习合适长度：FiNER 上两个最有效上下文分别是 <strong>1.5K</strong> 和 <strong>20K</strong> tokens；LawBench 44K；USPTO50k 86K。<strong>同一个框架，既能产出 GEPA 式的精炼，也能产出超出 ACE 的庞大知识库</strong>——长度本身成了被学习的策略变量。</li>
+  </ul>
+
+  <h3>7.2 上下文效率：同样的 tokens，更高的准确率（Obs.❻）</h3>
+  <p>FiNER 上（论文 Fig. 3）：</p>
+  <ul>
+    <li>约 1.5K tokens 时：<strong>MCE-S 73%</strong> vs ACE（epoch1 step20）65%；</li>
+    <li><strong>MCE-L 75% 仅用 20K tokens</strong>，优于 ACE 5 epochs 后的 70% @ 79K tokens——<strong>1/4 的上下文，多 5 个点</strong>。</li>
+  </ul>
+  <div class="note"><strong>原因（论文归因）：</strong>① base-agent 对累积上下文保有全局视野，能重构与精炼而非盲目追加；② 批量级处理训练 rollouts，聚合大量样本反馈后再更新。两者共同产出连贯、无冗余的上下文，规避了 ACE 加法式整理的冗余与退化。</div>
+
+  <h3>7.3 强→弱模型迁移（Obs.❼，论文 Table 2）</h3>
+  <p>用 DeepSeek-V3.1 作生成器训出上下文，直接迁移给小模型（Aegis2 与 USPTO50k 因设置原因不参与）：</p>
+  <table>
+    <tr><th>迁移到</th><th>方法</th><th>FiNER Acc%</th><th>Symptom2Disease Acc%</th><th>LawBench F1</th><th>Avg. Rel. Gain%↑</th><th>Avg. Rel. Drop%↓</th></tr>
+    <tr><td rowspan="2">Llama3.3-70B</td><td>ACE</td><td>71.0 (+15.0)</td><td>68.4 (+3.3)</td><td>0.19 (<span style="color:var(--pink)">-.05</span>)</td><td>3.7</td><td>28.1</td></tr>
+    <tr class="best"><td>MCE</td><td><strong>74.0 (+18.0)</strong></td><td><strong>82.1 (+17.0)</strong></td><td><strong>0.27 (+.03)</strong></td><td><strong>23.6</strong></td><td><strong>23.6</strong></td></tr>
+    <tr><td rowspan="2">Qwen3-8B</td><td>ACE</td><td>63.0 (+4.0)</td><td>72.2 (+6.6)</td><td>0.32 (+.05)</td><td>11.8</td><td>23.6</td></tr>
+    <tr class="best"><td>MCE</td><td><strong>71.0 (+12.0)</strong></td><td><strong>80.2 (+14.6)</strong></td><td><strong>0.45 (+.18)</strong></td><td><strong>36.4</strong></td><td><strong>17.1</strong></td></tr>
+    <tr><td rowspan="2">Gemma3-4B</td><td>ACE</td><td>64.0 (+47.0)</td><td>51.4 (-0.5)</td><td>0.00 (-.01)</td><td>58.5</td><td>48.3</td></tr>
+    <tr class="best"><td>MCE</td><td><strong>65.0 (+48.0)</strong></td><td><strong>70.3 (+18.4)</strong></td><td><strong>0.03 (+.02)</strong></td><td><strong>172.6</strong></td><td><strong>43.4</strong></td></tr>
+  </table>
+  <ul>
+    <li>MCE 的迁移掉点比 ACE 少约 <strong>4–7 个百分点</strong>（28.1→23.6，23.6→17.1，48.3→43.4）；</li>
+    <li>ACE 的迁移上下文偶尔会把性能打到 base 模型<strong>以下</strong>（Llama3.3-70B LawBench：0.24→0.19）——ACE 的 rollout 特异性整理会过拟合到训练模型的错误模式；</li>
+    <li>论文归因：MCE 的上下文更紧凑（小模型长上下文处理弱）+ 批量级全 agentic 优化产出的结构化上下文与训练模型耦合更低。这构成一种实用的"<strong>知识蒸馏</strong>"路径：用强模型学上下文、给小模型用。</li>
+  </ul>
+
+  <h3>7.4 训练效率（Obs.❽❾，论文 Fig. 4，FiNER）</h3>
+  <div class="grid2">
+    <div class="card" style="margin:0">
+      <h4 style="margin-top:0">13.6× 时间加速</h4>
+      <p style="margin-bottom:0">MCE 训 5 epochs 用时 <strong>1.9 小时</strong> vs ACE <strong>25.8 小时</strong>。来源：批量级优化——技能要么直接让 agent 读错误预测、找模式、改文件（无重型 LLM 脚手架），要么写代码把反思/整理并行化；对比 ACE 的逐实例处理。</p>
+    </div>
+    <div class="card" style="margin:0">
+      <h4 style="margin-top:0">4.8× rollout 节省</h4>
+      <p style="margin-bottom:0">MCE 仅需 <strong>450 次 rollout</strong> 即达 95% 训练准确率；ACE 在 2169 次 rollout 后峰值 94%（且 MCE 的统计还包含训练+验证推理）。全局视野 + 批量优化同时带来了更快的收敛。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 8 ============ -->
+<section id="ablation">
+  <h2 class="sec"><span class="num">8</span>消融与混淆排除</h2>
+
+  <h3>8.1 消融双层设计（FiNER，Table 3）</h3>
+  <table>
+    <tr><th>变体</th><th>Offline</th><th>Online</th><th>读法</th></tr>
+    <tr><td>Base Model</td><td>58.0</td><td>58.0</td><td>–</td></tr>
+    <tr><td>ACE</td><td>71.0 (+13.0)</td><td>64.0 (+6.0)</td><td>对照</td></tr>
+    <tr><td>MCE（无技能）</td><td>73.0 (+15.0)</td><td>67.0 (+9.0)</td><td>光凭"全 agentic 的 base 层"就已超过 ACE → 手工脚手架不是必需的</td></tr>
+    <tr><td>MCE（固定技能）</td><td>71.0 (+13.0)</td><td>68.0 (+10.0)</td><td>只看任务规范拍脑袋生成的技能，方差大（offline 甚至不如无技能）</td></tr>
+    <tr class="best"><td><strong>MCE（完整，进化技能）</strong></td><td><strong>75.0 (+17.0)</strong></td><td>–</td><td>技能进化再 +2 点；online 单遍处理无法迭代进化，故不适用</td></tr>
+  </table>
+  <div class="key"><strong>三点结论：</strong>① meta 层技能进化带来稳定增益（73→75）；② 即使没有技能引导，base-agent 全 agentic 工作已优于 ACE（73/67 vs 71/64）——"文件+代码的上下文表示 + 全局批量优化"本身就是收益来源；③ 固定技能质量不稳定，说明<em>从验证性能反馈中迭代进化</em>（而非一次性生成）才是关键。</div>
+
+  <h3>8.2 排除模型混淆（Table 4）——一个很诚实的对照</h3>
+  <p>MCE 用 MiniMax M2.1 驱动 agent，质疑：收益会不会只是来自 M2.1 比 DeepSeek V3.1 更强的知识/能力（知识转移）？作者把 ACE 的 reflector/curator 换成 M2.1 做对照：</p>
+  <table>
+    <tr><th rowspan="2">检查点</th><th colspan="2">ACE + DeepSeek V3.1</th><th colspan="2">ACE + MiniMax M2.1</th></tr>
+    <tr><th>tokens</th><th>Acc%</th><th>tokens</th><th>Acc%</th></tr>
+    <tr><td>Epoch 1</td><td>12K</td><td>71</td><td>38K</td><td>69</td></tr>
+    <tr><td>Epoch 2</td><td>23K</td><td>69</td><td>90K</td><td>69</td></tr>
+    <tr><td>最终</td><td>79K</td><td><strong>70</strong></td><td>114K</td><td><strong>67</strong></td></tr>
+  </table>
+  <p>M2.1 让 ACE 产出更啰嗦的 playbook（114K vs 79K tokens），准确率反而更低（67 vs 70），且因 playbook 超出上下文窗口提前终止（epoch 3 step 73）。<strong>结论：MCE 的收益来自方法论设计，而非 agentic 模型的知识泄漏</strong>；但论文也坦承——MCE 需要一个"能与编程环境交互、产出合法文件与代码"的 agentic 模型，这是硬前提。</p>
+</section>
+
+<!-- ============ 9 ============ -->
+<section id="case">
+  <h2 class="sec"><span class="num">9</span>五个任务的 Skill 演化史（案例研究，附录 D 精华）</h2>
+  <p class="lead">这是全文最有信息量的部分：每个任务上，meta-agent 都从"通用方法论"起步，经由验证集反馈把技能推向一个<strong>人类设计者多半想不到的方向</strong>。五个任务正好展示了五种截然不同的演化终态——这就是"超越人类直觉设计空间"的具体含义。</p>
+
+  <h3>9.1 FiNER：从"模式抽取"到"错误驱动的泛化"</h3>
+  <ul>
+    <li><strong>任务特性</strong>：139 个名字高度相似的长尾标签（如 <code>InterestExpense</code> vs <code>InterestExpenseDebt</code>），胜负手是规则覆盖度与消歧逻辑；需要超出训练实例的深度反思，故 ICL/MIPROv2/GEPA 都不行，ACE 靠反复反思积累 playbook 而占优。</li>
+    <li><strong>技能演化</strong>：初始技能是按部就班的"阶段式上下文整理"（分析标签语义→逐标签提取决策规则）。几轮后 meta-agent 从指标里读到"<em>上一轮捕获了 29 条具体模式，但 4.5% 的 train/val gap 说明在过拟合</em>"，于是最优技能把核心哲学改写为<strong>错误驱动泛化</strong>：
+      <ol>
+        <li>抽象原则优先于具体示例；</li>
+        <li>语义推理链（教模型<em>怎么思考</em>分类，而不只是<em>答什么</em>）；</li>
+        <li>跨示例模式（从多个错误里归纳共同主题）。</li>
+      </ol>
+    </li>
+    <li><strong>学到的上下文</strong>：三个文件 <code>tag-reference.md</code>（逐标签决策规则+正反指示词）、<code>semantic-guidance.md</code>（关键区分+决策树）、<code>common-patterns.md</code>（30+ 条 WRONG→RIGHT 错误模式）。亮点是"<strong>反模式（anti-patterns）</strong>"文档和五层决策链，例如：</li>
+  </ul>
+  <div class="card">
+    <p style="margin:0"><strong>反模式示例：</strong>看到 "\$X facility" 就选 <code>MaximumBorrowingCapacity</code>。<br>
+    ❌ "\$16.0 million Tranche A loan facility" → MaximumBorrowingCapacity<br>
+    ✅ "\$16.0 million Tranche A loan facility" → <code>DebtInstrumentFaceAmount</code><br>
+    <strong>理由</strong>："Tranche A loan" 是具体债务工具而非循环额度——<em>设施名称本身是判别器</em>。检索策略：整库返回（full retrieval）对该任务最有效。</p>
+  </div>
+
+  <h3>9.2 USPTO-50k：差异化学习 + 工作流优先</h3>
+  <ul>
+    <li><strong>任务特性</strong>：逻辑推理 + 深度领域知识检索，角落案例决定成败；GEPA 的简短偏置系统性丢失稀有反应规则，ACE 的增量积累相对最有效。</li>
+    <li><strong>技能演化</strong>：从"按反应类型做百科全书式覆盖"转向<strong>差异化学习（differential learning）</strong>——既做失败模式挖掘，也做<em>成功模式挖掘</em>（对正确预测反思"哪个化学模式识别对了？"，提取 2-3 条可迁移 pattern）；并显式要求压缩：只留 top-20 高频错误模式，删掉孤例。</li>
+    <li><strong>学到的上下文</strong>：<code>workflow.md</code>（带内联验证检查点的决策流程）、<code>QUICK_REFERENCE.md</code>、<code>SUCCESS_PATTERNS.md</code>（训练上 100% 正确的已验证模式，如 Hantzsch 噻唑合成）、按反应类型分文件的指南。一个标志性设计是<em>工作流内嵌验证检查点</em>：</li>
+  </ul>
+  <div class="card">
+    <p style="margin:0"><strong>内联检查点示例：</strong>杂环形成 → "你检查环里有没有氧了吗？有 'oc' 模式 → 1,3,4-oxadiazole；没有 → 'nnn' 模式 → 1,2,4-triazole（常见错误：混淆两者）"；酰胺形成逆合成 → "前体应是酯 C(=O)OC 而<strong>不是</strong>酸 C(=O)O！" 技能原则：<em>行动优先、成功 &gt; 错误、无情简化、工作流优先</em>。检索同样是整库返回最有效。</p>
+  </div>
+
+  <h3>9.3 Symptom2Disease：技能学会了"何时停止"</h3>
+  <ul>
+    <li><strong>任务特性</strong>：训练/测试分布几乎无漂移，分类靠模式匹配而非推理 → many-shot ICL 是最强基线（每类 8-10 例就够最近邻匹配）；GEPA 把症状措辞差异抽象没了（"context collapse"），ACE 的抽象启发式盖过模型预训练医学知识、online 下早期错误还会固化传播（online ACE 甚至 -1.4 低于 base）。</li>
+    <li><strong>技能演化</strong>：最戏剧性的哲学转变——最优技能明确写道"<em>先前迭代的 88% val、1% gap 已近最优，不要破坏它</em>"，转向<strong>保守精炼</strong>：新模式须过 5 道验证门、要求 3+ 次出现（此前 2+）、泛化风险低、新案例置信度 ≥0.9；并引入<strong>显式停止准则</strong>：</li>
+  </ul>
+  <div class="card">
+    <p style="margin:0"><strong>停止准则（任一满足即保持现状）：</strong>① 已验证模式 &lt; 3 个；② 训练准确率 &gt; 90%（已过拟合）；③ 预估 train-val gap &gt; 1.5%（gap 在扩大）；④ 歧义+边缘+新异错误 &gt; 40%（剩余错误不可约）。论文称之为 meta-learning 洞察：<em>技能从历史中学到"知道何时停止与知道加什么同样重要"</em>。</p>
+  </div>
+  <ul>
+    <li><strong>学到的上下文</strong>：以"决定性判别器"（surgical discriminators）为核心——如"痛性水疱+非全身=脓疱疮；痒性水疱+全身=水痘"；以及症状"语义精 essence"（哮喘=呼吸困难为主诉、肺炎=发热+有色痰，"有色痰=肺炎"是决定性的）。</li>
+    <li><strong>检索函数演化成 1,440 行规则路由系统</strong>：30+ 条优先级规则（9 条关键规则 → 4 条外科手术式修复 → 语义精匹配 → 26+ 条错误模式匹配 → 兜底返回完整指南）。例如"流鼻涕+打喷嚏+喉咙痛+无发热 → 只返回 ALLERGY 相关小节"。<strong>核心洞察：系统学的不是堆积上下文，而是"何时应用哪个判别器"——检索函数本身就是一棵决策树，防止上下文互相干扰。</strong></li>
+  </ul>
+
+  <h3>9.4 LawBench：结构优于模式，88KB → 30KB</h3>
+  <ul>
+    <li><strong>任务特性</strong>：长上下文细节敏感 + 严格法律逻辑（盗窃 vs 抢劫取决于是否用暴力/胁迫）+ 封闭标签集高精度分类。这里<strong>基线层级再次反转</strong>：ACE 的 playbook 积累变成负债——检出的历史条目造成<strong>上下文干扰</strong>（判"走私普通货物"时被"走私武器/文物"的策略稀释注意力）；GEPA 的简短全局指令反而最优，因为它引导模型专注当下案情做系统推理。</li>
+    <li><strong>技能演化</strong>：meta-agent 观察到"基于模式的学习导致过拟合——即使简化规则如'秘密窃取→盗窃'也是在匹配表面模式"，且"88KB 上下文与 14% train-val gap 相关"、"负向学习（教不该做什么）有极限"。最优技能转向<strong>结构化案件分解</strong>：</li>
+  </ul>
+  <div class="card">
+    <p style="margin-top:0"><strong>READ → DECOMPOSE → MATCH → VALIDATE：</strong>① 通读全案（who/what/when/where/how/why）；② 行为抽取——编号小节（一）（二）、时间标记（"随后""另"）、不同受害人/对象、"另案处理""另查明" ⇒ 独立行为；③ 逐行为匹配罪名（定性→列候选→核验构成要件→选最具体罪名）。<strong>多罪名靠结构标记检测，不靠模式</strong>。</p>
+    <p style="margin-bottom:0">另一个元学习洞察：错误按<strong>处理阶段</strong>分类（事实理解错误 / 行为抽取错误 / 行为独立性错误 / 罪名选择错误 / 罪名名称错误 / 多罪名检测错误），而非按罪名分类——<em>"错误如何发生"比"哪些罪名易混"更重要</em>。</p>
+  </div>
+  <ul>
+    <li><strong>学到的上下文</strong>：11 个专门文件共约 <strong>30KB</strong>（从 88KB 压缩而来），含结构反模式（"编号事实合并""忽略另案处理""关键词定罪名"）；检索函数仅 177 行，采用触发式增强（检测到 "(一)""另案处理" 等标记就附加多罪名提醒）。与症状诊断的 1,440 行路由形成鲜明对照——<strong>上下文形态精确匹配了任务结构</strong>。</li>
+  </ul>
+
+  <h3>9.5 Aegis2.0：给小模型的"精确度闸门"</h3>
+  <ul>
+    <li><strong>任务特性</strong>：生成器是 Qwen3-8B 小模型（护栏场景要求轻量部署），多步推理弱、对 prompt 措辞敏感；GEPA 的简短偏置因此占优。</li>
+    <li><strong>技能演化</strong>：meta-agent 发现小模型尤其容易<strong>过度分类</strong>（把良性 prompt 误判为 unsafe），转向"外科手术式修复 + 显式 precision/recall 权衡"：过分类为主→加 safe 排除模式；欠分类为主→补触发模式；保持 precision/recall 平衡分 &gt; 0.7。并提炼小模型难处理的关键区分："CREATE 新内容=SAFE vs EXTRACT/改写=查抄袭意图"、"良性 roleplay=SAFE vs 带 override+有害内容=UNSAFE"、"仅搭人设的 jailbreak+确认请求=SAFE vs 带行动请求=UNSAFE"。</li>
+    <li><strong>学到的上下文</strong>：12 个文件（safe 基线 + 4 类违规模式 + 3 个防过分类文件），规则优先于示例（小模型学规则优于学示例）。检索函数 995 行，实现<strong>精确度优先级联</strong>：先做"早期安全返回"（良性内容创作、SEO 写作、&lt;10 词的非正式提问 → 直接返回 safe 上下文），再依次检测模板 jailbreak、职业 roleplay、各类别模式。<strong>检索函数充当 precision gate：明显良性时干脆不给模型看违规相关内容</strong>，从源头减少误判。</li>
+  </ul>
+
+  <div class="key">
+    <strong>五个案例合起来看（本节最重要的一眼）：</strong>FiNER 演化出"反模式+推理链"，USPTO 演化出"工作流+成功/失败双文档"，Symptom2Disease 演化出"停止准则+1440 行路由"，LawBench 演化出"结构分解+30KB 精简上下文"，Aegis2 演化出"精确度闸门+早期安全返回"。<strong>没有任何两个任务的终态策略相同，且都不是论文作者预先设计的</strong>——这就是把 CE 从"手工 harness"解放为"可学习技能"后释放出的设计空间。
+  </div>
+</section>
+
+<!-- ============ 10 ============ -->
+<section id="vs">
+  <h2 class="sec"><span class="num">10</span>MCE vs ACE 深度对比</h2>
+  <p>既然你已学过 ACE，这张表是最快的对齐方式：</p>
+  <table>
+    <tr><th>维度</th><th>ACE（Zhang et al., ICLR 2026）</th><th>MCE（本论文）</th></tr>
+    <tr><td>优化对象</td><td>上下文本身（itemized playbook，条目列表）</td><td>上下文函数 $c=(\rho,F)$（文件+代码）<strong>以及产生它的技能 $s$</strong></td></tr>
+    <tr><td>"怎么学"的流程</td><td><strong>手工固定</strong>：Generator→Reflector→Curator 循环</td><td><strong>可学习</strong>：技能由 meta-agent 进化；ACE 流程只是技能空间的一个点（提示词中的 Example Skill B）</td></tr>
+    <tr><td>更新粒度</td><td>逐实例（instance-level）：每条样本反思后增量追加条目</td><td>批量级（batch-level）：base-agent 通览全部 rollouts 后整体重构</td></tr>
+    <tr><td>全局视野</td><td>curator 只看局部（反思+现有条目摘要）→ 噪声更新</td><td>base-agent 直接读写完整上下文目录 → 可精简、重组、删除</td></tr>
+    <tr><td>上下文形态</td><td>单一日志式 playbook，只增难减 → bloat（FiNER 5 epochs 后 ~80K tokens）</td><td>任意文件结构+检索代码，长度 1.5K–86K 自适应；可演化成路由系统/决策树</td></tr>
+    <tr><td>防过拟合机制</td><td>条目去重等启发式</td><td>外层目标直接是 $J_{\text{val}}$；meta-agent 显式做 overfit/underfit 体检；技能可学成"保守精炼+停止准则"</td></tr>
+    <tr><td>训练开销（FiNER）</td><td>25.8 小时 / 2169 rollouts（峰值 94%）</td><td><strong>1.9 小时 / 450 rollouts（达 95%）</strong>；13.6× / 4.8×</td></tr>
+    <tr><td>性能（FiNER offline）</td><td>71.0</td><td><strong>75.0</strong>（+5.6% 相对）</td></tr>
+    <tr><td>平均相对增益（offline / online）</td><td>70.7 / 41.1</td><td><strong>89.1 / 74.1</strong></td></tr>
+    <tr><td>强→弱迁移掉点</td><td>28.1 / 23.6 / 48.3（70B/8B/4B）</td><td><strong>23.6 / 17.1 / 43.4</strong>，且不会像 ACE 偶尔掉到 base 之下</td></tr>
+    <tr><td>额外依赖</td><td>仅需生成器 + reflector（LLM API）</td><td>还需一个能操作文件系统/写代码的 agentic 模型（实验用 MiniMax M2.1，经 Claude Agent SDK）</td></tr>
+    <tr><td>失败模式</td><td>context bloat、滚动过拟合训练模型的错误模式、online 下错误固化</td><td>依赖 agentic 模型能力；长轨迹任务的细粒度 credit assignment 弱（见 §12）</td></tr>
+  </table>
+
+  <div class="note"><strong>一句话定位：</strong>ACE 回答了"上下文能不能像权重一样被持续学习？"（能，用固定流水线）；MCE 回答的是"学习上下文的<em>方法本身</em>能不能也被学习？"（能，用技能进化）。前者是 CE 的 SOTA 实例，后者是包含前者为特例的元框架。</div>
+</section>
+
+<!-- ============ 11 ============ -->
+<section id="evo">
+  <h2 class="sec"><span class="num">11</span>在 LLM×进化计算谱系中的位置</h2>
+  <p>论文 §2.2 把 LLM 驱动的进化优化按抽象层级整理成谱系，MCE 自述为新增的一层：</p>
+  <table>
+    <tr><th>进化对象的抽象层级</th><th>代表工作</th><th>进化的是什么</th></tr>
+    <tr><td>解（solution）级</td><td>EvoPrompt（Guo et al. 2024）、文本解、数值参数进化</td><td>prompt / 答案 / 参数</td></tr>
+    <tr><td>函数（function）级</td><td>FunSearch（Romera-Paredes et al. 2024）、EoH（Ye et al. 2024）、Eureka 式奖励函数进化</td><td>启发式函数、奖励函数</td></tr>
+    <tr><td>程序（program）级</td><td>AlphaEvolve（Novikov et al. 2025）、NAS、agent workflow 进化</td><td>搜索算法、网络结构、工作流</td></tr>
+    <tr class="best"><td><strong>技能（skill）级（本文）</strong></td><td>MCE</td><td>指令+脚本+资源+验证协议+动态算子的完整文件夹——<strong>天然支持跨层共同进化</strong>（方法论文本与代码一起变异）</td></tr>
+  </table>
+  <ul>
+    <li>与 AlphaEvolve/FunSearch 的关键差异：它们进化的是<em>问题的解或算子</em>，MCE 进化的是<em>"如何学习"的规范</em>，且遗传算子本身是 agentic 的（自由翻查祖先目录、按组件选择性重组），而非固定的重组规则。</li>
+    <li>论文自称这是"首批动态进化 agent skills 的工作之一"，桥接了"手工技能工程"（Anthropic skills 仓库那种人工编写）与"自主自我改进"。</li>
+  </ul>
+</section>
+
+<!-- ============ 12 ============ -->
+<section id="limits">
+  <h2 class="sec"><span class="num">12</span>局限、未来方向与批判性思考</h2>
+
+  <h3>12.1 论文自述的局限</h3>
+  <ol>
+    <li><strong>推理密集型任务上无优势</strong>：MCE 擅长领域知识获取与模式匹配类任务；对推理密集型任务，现有的人工 harness（迭代试错、纠错、系统反思）已经很适配，MCE 未必更好。</li>
+    <li><strong>长且复杂的 rollout 轨迹</strong>：此类场景需要细粒度 credit assignment 与逐轨迹分析，批量级全 agentic CE 可能做不好。论文指出这源于底层 agent 模型的能力而非框架本身，随 agentic 模型变强会缓解。</li>
+  </ol>
+
+  <h3>12.2 论文给出的三个未来方向</h3>
+  <ol>
+    <li><strong>技能进化超越 CE</strong>：以往进化方法针对解、启发式或搜索算法；MCE 进化的是更高阶的整合抽象。该范式可推广到其他 agent 能力与任务域。</li>
+    <li><strong>共同进化"上下文利用技能"</strong>：目前生成器为与基线公平对比只用一次性推理；既然上下文存为文件，让生成器以 agentic 方式直接与上下文制品交互（边用边学），把"learning skills"与"utilization skills"共同进化。</li>
+    <li><strong>技能的渐进式披露（progressive disclosure）与组合</strong>：agent 只在相关时加载技能细节，因此技能可跨域组合、低开销扩展；技能跨任务迁移与技能组合的涌现行为是开放问题。</li>
+  </ol>
+
+  <h3>12.3 批判性思考（笔者评注，非论文内容）</h3>
+  <div class="cmt">
+    <b class="tagline">① 评估规模与统计功效：</b>五个基准的 test 集为 100–212 条，训练集最小仅 50 条（USPTO50k）。MCE 与 ACE 在 FiNER 上的差距是 75.0 vs 71.0（100 条测试 = 4 条样本之差）。论文用"5 任务 × 2 设定 × 一致性排名"来论证稳健性，方向可信，但<strong>单任务点估计的置信区间很宽</strong>，且未报告多种子方差——agentic 系统本身方差不小。引用具体数字时建议保留这个心眼。
+  </div>
+  <div class="cmt">
+    <b class="tagline">② 成本核算的不对称：</b>13.6× 加速统计的是端到端训练时长，rollout 数也把训练+验证推理都计入，口径公平。但 MCE 额外消耗了 <strong>meta-agent 与 base-agent 两个 coding agent 的完整 agent loop token</strong>（读文件夹、写代码、跑 Bash），这部分 agentic 推理开销与 ACE 的 reflector/curator 开销未做 token 级对比。在 API 计价场景下，"更快"未必等于"更便宜"，尽管 4.8× 的 rollout 节省大概率能覆盖。
+  </div>
+  <div class="cmt">
+    <b class="tagline">③ (1+1)-ES 是有意的"地板配置"：</b>单后代、无种群、无多样性维持，作者明说是求简单。这意味着论文报告的数字大概率是 MCE 框架的<strong>下界</strong>——换成 MAP-Elites 或带岛屿模型的搜索，技能空间的探索会充分得多。反过来说，(1+1)-ES 对 warm-start 的依赖也让演化路径更接近"贪心爬山"，Symptom2Disease 案例中"学会保守"可能部分源自该策略的惰性。
+  </div>
+  <div class="cmt">
+    <b class="tagline">④ 与我们正在用的工具链的关系：</b>MCE 的 base-agent 工作方式（SKILL.md + Read/Write/Edit/Bash + 文件系统工作区 + 接口校验）就是一个标准的 Claude Code / OpenCode 会话。这意味着<strong>复现 MCE 不需要专门框架</strong>：你完全可以手工扮演 meta-agent——让 coding agent 读历史评估、写下一版"学习技能"SKILL.md、再开子会话执行——这正是论文想要的"基础设施零改造"卖点。它与本仓库里 skill 的使用方式（progressive disclosure）也是同构的。
+  </div>
+  <div class="cmt">
+    <b class="tagline">⑤ 与训练侧方法的边界：</b>MCE 把生成器 LLM 视为冻结黑盒（API 即可），这是它部署友好的根源，也是天花板——检索函数再精巧，1,440 行规则路由本质上是把"分类器"写在了上下文里。对于权重可更新的场景，MCE 学到的技能/上下文或许更适合作为<strong>数据合成与课程设计的先导</strong>（先让 MCE 探明任务结构，再决定微调/RL 怎么做），而不是终态方案。
+  </div>
+</section>
+
+<!-- ============ 13 ============ -->
+<section id="repro">
+  <h2 class="sec"><span class="num">13</span>复现指南</h2>
+  <ul>
+    <li><strong>主仓库</strong>：<a href="https://github.com/metaevo-ai/meta-context-engineering">github.com/metaevo-ai/meta-context-engineering</a>（ICML 2026 版）；实验产物（学到的技能、上下文、检索函数）在 <a href="https://github.com/metaevo-ai/mce-artifact">github.com/metaevo-ai/mce-artifact</a>。论文为 arXiv:2601.21557（v2, 2026-02-11）。</li>
+    <li><strong>环境</strong>：Python 3.11+，<code>uv</code> 管理；模型经 OpenRouter 访问（需 <code>OPENROUTER_API_KEY</code>）；agent 层基于 Claude Agent SDK。</li>
+  </ul>
+  <pre><code>meta-context-engineering/
+├── env/                        # 任务环境
+│   ├── base.py                 #   InterfaceSignature, TaskEnvironment
+│   ├── registry.py             #   环境注册表
+│   ├── TUTORIAL.md             #   如何添加新环境
+│   └── symptom_diagnosis*/     # 示例环境
+├── mce/                        # 核心框架
+│   ├── main.py                 #   训练编排（Algorithm 1）
+│   ├── meta_agent.py           #   Meta 层：技能进化
+│   ├── base_agent.py           #   Base 层：上下文优化
+│   └── validation.py           #   接口校验
+├── scripts/                    # 训练 & 评估脚本
+└── assets/                     # 论文与图</code></pre>
+  <pre><code># 最小运行示例
+uv run python -m mce.main \
+    --workspace "workspace/my_task"        # 输出目录
+    --env "my_task"                        # 环境名
+    --train-data "path/to/train.jsonl"     # 训练数据
+    --val-data "path/to/val.jsonl"         # 验证数据
+    --model "deepseek/deepseek-chat-v3.1"  # 生成器 LLM
+    --iterations 3                         # meta 迭代数
+    --train-limit 50 --val-limit 20
+
+# 论文自带的三种接口形态示例（症状诊断任务）
+bash scripts/train_symptom_diagnosis.sh           # 一次性推理的上下文
+bash scripts/train_symptom_diagnosis_twostep.sh   # 两步工作流的上下文
+bash scripts/train_symptom_diagnosis_agent.sh     # 给 agent 用的上下文</code></pre>
+  <div class="note"><strong>复现时的注意点：</strong>① 上下文接口可任务自定义（一次性检索 / 两步工作流 / agent 工具），不限于论文主实验的 <code>query→context</code>；② base-agent 的沙箱内 LLM 工具默认固定为 DeepSeek V3.1、embedding 为 text-embedding-3-small；③ 想快速感受方法而不烧 API：直接读 mce-artifact 里五个任务演化出的技能与上下文文件，是性价比最高的学习路径（本报告第 9 节即由此整理）。</div>
+</section>
+
+<!-- ============ 14 ============ -->
+<section id="refs">
+  <h2 class="sec"><span class="num">14</span>参考文献</h2>
+  <ol>
+    <li><strong>本报告主角</strong>：Ye, H., He, X., Arak, V., Dong, H., Song, G. <em>Meta Context Engineering via Agentic Skill Evolution</em>. arXiv:2601.21557v2, ICML 2026.</li>
+    <li><strong>直接前作（你已学）</strong>：Zhang, Q. et al. <em>Agentic Context Engineering: Evolving Contexts for Self-Improving Language Models</em>. ICLR 2026.（arXiv:2510.04618；代码 github.com/ace-agent/ace）</li>
+    <li>Agrawal, L.A. et al. <em>GEPA: Reflective Prompt Evolution Can Outperform Reinforcement Learning</em>. arXiv:2507.19457, 2025.</li>
+    <li>Suzgun, M. et al. <em>Dynamic Cheatsheet: Test-Time Learning with Adaptive Memory</em>. arXiv:2504.07952, 2025.</li>
+    <li>Opsahl-Ong, K. et al. <em>MIPROv2 / DSPy</em>, 2024.</li>
+    <li>Hua, Q. et al. <em>Context Engineering 2.0: The Context of Context Engineering</em>. arXiv:2510.26493, 2025.</li>
+    <li>Romera-Paredes, B. et al. <em>Mathematical Discoveries from Program Search with Large Language Models</em>（FunSearch）. Nature, 2024.</li>
+    <li>Novikov, A. et al. <em>AlphaEvolve: A Coding Agent for Scientific and Algorithmic Discovery</em>. 2025.</li>
+    <li>Ye, H. et al. <em>Evolution of Heuristics (EoH)</em>. ICML 2024.</li>
+    <li>Guo, Q. et al. <em>EvoPrompt: Connecting LLMs with Evolutionary Algorithms</em>. 2024.</li>
+    <li>Anthropic. <em>Equipping Agents for the Real World with Agent Skills</em>. Anthropic Engineering Blog, 2025-10；以及 Claude Agent SDK 文档。</li>
+    <li>基准：FiNER（Loukas et al. 2022）、USPTO-50k（Schneider et al. 2016）、Symptom2Disease（Gretel AI 2023）、LawBench（Fei et al. 2024）、Aegis2（Ghosh et al. 2025）。</li>
+    <li>模型：DeepSeek V3.1、Qwen3-8B、Gemma3-4B、Llama3.3-70B、Llama Guard 3 8B、MiniMax M2.1；统一经 OpenRouter 访问。</li>
+  </ol>
+
+  <div class="foot">
+    <p><strong>报告信息</strong>：首次生成日期 2026-08-15 ｜ 最后更新日期 2026-08-15 ｜ 模型：Kimi K3（opencode/kimi-k3）｜ 模式：OpenCode 默认模式。</p>
+    <p>公式使用 MathJax 渲染，需联网加载。本报告基于 arXiv:2601.21557v2 全文（含附录 A–E）精读整理；除 §12.3 明确标注为"笔者评注"外，所有数字与论断均可溯源至论文原文。与 ACE 的对比部分默认读者已熟悉 ACE 的 Generator–Reflector–Curator 框架。</p>
+  </div>
+</section>
+
+</main>
+</div>
+</body>
+</html>

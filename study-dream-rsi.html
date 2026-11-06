@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dream-RSI 论文调研报告</title>
+<script>
+  window.MathJax = {
+    tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']] },
+    svg: { fontCache: 'global' }
+  };
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg.js"></script>
+<style>
+  :root {
+    --bg: #0f1117; --panel: #171a23; --panel2: #1e222d; --border: #2a2f3d;
+    --text: #d7dbe4; --muted: #9aa3b5; --accent: #6ea8fe; --accent2: #7bd88f;
+    --warn: #ffcc66; --bad: #ff7b7b; --code-bg: #11141c;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    line-height: 1.75; font-size: 16px; }
+  .layout { display: flex; max-width: 1240px; margin: 0 auto; }
+  nav.toc { position: sticky; top: 0; align-self: flex-start; width: 260px; height: 100vh; overflow-y: auto;
+    padding: 28px 18px; border-right: 1px solid var(--border); font-size: 14px; }
+  nav.toc h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin: 0 0 14px; }
+  nav.toc a { display: block; color: var(--muted); text-decoration: none; padding: 4px 8px; border-radius: 6px; margin-bottom: 2px; }
+  nav.toc a:hover { color: var(--text); background: var(--panel2); }
+  nav.toc a.sub { padding-left: 20px; font-size: 13px; }
+  main { flex: 1; min-width: 0; padding: 40px 48px 120px; }
+  header.hero { padding: 28px 32px; background: linear-gradient(135deg, #1b2740, #14181f);
+    border: 1px solid var(--border); border-radius: 16px; margin-bottom: 36px; }
+  header.hero h1 { margin: 0 0 10px; font-size: 30px; line-height: 1.3; }
+  header.hero p { margin: 6px 0; color: var(--muted); font-size: 15px; }
+  .tag { display: inline-block; font-size: 12px; padding: 3px 10px; border-radius: 999px; background: var(--panel2);
+    border: 1px solid var(--border); color: var(--accent); margin: 4px 8px 0 0; }
+  .meta { margin-top: 14px; font-size: 13px; color: var(--muted); border-top: 1px dashed var(--border); padding-top: 10px; }
+  .meta b { color: var(--text); font-weight: 600; }
+  h2.section { font-size: 24px; margin: 48px 0 16px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 19px; margin: 32px 0 12px; color: #eef1f7; }
+  h4 { font-size: 16px; margin: 22px 0 8px; color: var(--accent2); }
+  p { margin: 12px 0; }
+  ul, ol { padding-left: 24px; }
+  li { margin: 6px 0; }
+  code { background: var(--code-bg); padding: 2px 6px; border-radius: 5px; font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 13.5px; color: #e5b8ff; }
+  pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px; overflow-x: auto; font-size: 13.5px; line-height: 1.6; }
+  pre code { background: none; padding: 0; color: #c7d0e0; }
+  .callout { border-left: 4px solid var(--accent); background: var(--panel); padding: 14px 18px; border-radius: 0 10px 10px 0; margin: 18px 0; }
+  .callout.key { border-left-color: var(--accent2); }
+  .callout.warn { border-left-color: var(--warn); }
+  .callout .label { font-weight: 700; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--accent); }
+  .callout.key .label { color: var(--accent2); }
+  .callout.warn .label { color: var(--warn); }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 20px 24px; margin: 18px 0; }
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; margin: 18px 0; font-size: 14.5px; }
+  th, td { border: 1px solid var(--border); padding: 9px 13px; text-align: left; vertical-align: top; }
+  th { background: var(--panel2); color: #eef1f7; }
+  tr:nth-child(even) td { background: rgba(255,255,255,0.015); }
+  tr.hl td { background: rgba(123,216,143,0.08); }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .mathblock { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 6px 20px; margin: 18px 0; overflow-x: auto; }
+  .ref { font-size: 14px; } .ref li { margin: 10px 0; }
+  a.link { color: var(--accent); }
+  .footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--border); color: var(--muted); font-size: 13px; }
+  .badge-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 14px; margin: 18px 0; }
+  .badge { background: var(--panel2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+  .badge .t { font-size: 12px; color: var(--muted); letter-spacing: 0.5px; }
+  .badge .v { font-size: 20px; margin-top: 4px; color: #eef1f7; font-weight: 600; }
+  .badge .s { font-size: 12.5px; color: var(--muted); }
+  .fig { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin: 18px 0; overflow-x: auto; }
+  .fig svg { display: block; margin: 0 auto; max-width: 100%; height: auto; }
+  .fig .cap { font-size: 13px; color: var(--muted); text-align: center; margin-top: 8px; }
+  .bars { display: grid; grid-template-columns: 44px 1fr 64px 60px; gap: 6px 10px; align-items: center; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+  .bars .bar { height: 14px; background: var(--accent); border-radius: 4px; }
+  .bars .bar.att { background: var(--warn); opacity: .75; }
+  .bars .h { color: var(--muted); font-size: 12px; }
+  @media (max-width: 900px) { nav.toc { display: none; } main { padding: 24px 16px 80px; } }
+</style>
+</head>
+<body>
+<div class="layout">
+<nav class="toc">
+  <h2>目录</h2>
+  <a href="#s0">0. 一句话全貌</a>
+  <a href="#s1">1. 论文信息</a>
+  <a href="#s2">2. 动机：探索策略是瓶颈</a>
+  <a href="#s3">3. 问题形式化</a>
+  <a class="sub" href="#s3-1">3.1 发现树</a>
+  <a class="sub" href="#s3-2">3.2 探索策略 π</a>
+  <a href="#s4">4. 方法：Dream-RSI</a>
+  <a class="sub" href="#s4-1">4.1 在线 rollout</a>
+  <a class="sub" href="#s4-2">4.2 离线回放模拟器</a>
+  <a class="sub" href="#s4-3">4.3 回放目标函数</a>
+  <a class="sub" href="#s4-4">4.4 策略改进循环</a>
+  <a class="sub" href="#s4-5">4.5 伪代码</a>
+  <a class="sub" href="#s4-6">4.6 手把手玩具例子</a>
+  <a href="#s5">5. 实验</a>
+  <a class="sub" href="#s5-1">5.1 Lasso 正则化路径</a>
+  <a class="sub" href="#s5-2">5.2 数学优化</a>
+  <a class="sub" href="#s5-3">5.3 GPU Kernel</a>
+  <a href="#s6">6. 分析与消融</a>
+  <a href="#s7">7. 相关工作定位</a>
+  <a href="#s8">8. 批判性评价</a>
+  <a href="#s9">9. 学习要点 & 延伸问题</a>
+  <a href="#s10">10. 代码与复现</a>
+  <a href="#ref">参考资料</a>
+</nav>
+
+<main>
+<header class="hero">
+  <h1>Dream-RSI<br><span style="font-size:20px;color:var(--muted);font-weight:500">Recursive Self-Improvement through Evolving Worlds —— 把"发现历史"当作做梦用的模拟器，离线进化探索策略</span></h1>
+  <p>本报告精读 <em>Dream-RSI: Recursive Self-Improvement through Evolving Worlds</em>（arXiv:2609.14858v1，cs.CL，2026 年 9 月）。作者来自 University of Maryland、Google DeepMind、University of Virginia 等。注：论文标题中是 <b>Self-Improvement</b>（自我改进），不是 Self-Implement。</p>
+  <p>预备知识：AlphaEvolve / OpenEvolve 类"LLM 提案 → 评测 → 精炼"的代码进化发现系统；离线强化学习 / off-policy 评估的基本直觉；回放（replay）与模拟器的概念。</p>
+  <div>
+    <span class="tag">Recursive Self-Improvement</span><span class="tag">Coding Agent</span><span class="tag">AI for Discovery</span>
+    <span class="tag">Exploration Policy</span><span class="tag">Off-policy Replay</span><span class="tag">AlphaEvolve 系</span><span class="tag">Gemini CLI</span>
+  </div>
+  <div class="meta">
+    首次生成：<b>2026-11-06</b> &nbsp;·&nbsp; 最后更新：<b>2026-11-06</b> &nbsp;·&nbsp; 模型与模式：<b>Claude Opus 5.5 (claude-opus-5-5)，Cowork 模式</b>
+  </div>
+</header>
+
+<!-- 0 -->
+<h2 class="section" id="s0">0. 一句话全貌</h2>
+<div class="callout key">
+  <div class="label">核心思想</div>
+  <p>在 AlphaEvolve 式的代码发现系统里，"<b>下一步扩展哪些候选、并行开几个、何时停</b>"这套<b>探索策略</b>通常是人手写死的。Dream-RSI 把探索策略写成<b>可执行的 Python 代码</b>，并发现：<b>已经跑完的发现树本身就是一个免费的模拟器</b>——在它上面"回放"任何新策略，只需按记录揭示结果，不需要再调用一次 coding agent。于是可以每轮在线跑一次真实发现 → 把树存入历史 → 让一个"策略开发 agent"在所有历史树上离线改写、评估策略 M 次 → 选回放得分最高的版本上线。这就是"在梦里（replay）自我改进，醒来（online）再部署"的递归循环。</p>
+</div>
+<div class="badge-grid">
+  <div class="badge"><div class="t">Lasso 路径求解（Pro）</div><div class="v">2931 ms</div><div class="s">vs 固定策略 3587 ms；调用 317 vs 550</div></div>
+  <div class="badge"><div class="t">对比 SimpleTES</div><div class="v">≈162× 更省</div><div class="s">317 次调用 vs 51,200 次生成</div></div>
+  <div class="badge"><div class="t">Sum–Diff（↑）</div><div class="v">1.145427</div><div class="s">新 SOTA，<1000 次生成</div></div>
+  <div class="badge"><div class="t">KernelBench ConvDiv</div><div class="v">2.09×</div><div class="s">相近预算下性能提升</div></div>
+</div>
+
+<!-- 1 -->
+<h2 class="section" id="s1">1. 论文信息</h2>
+<div class="table-wrap"><table>
+  <tr><th>项目</th><th>内容</th></tr>
+  <tr><td>标题</td><td>Dream-RSI: Recursive Self-Improvement through Evolving Worlds</td></tr>
+  <tr><td>arXiv</td><td>2609.14858v1（cs.CL）</td></tr>
+  <tr><td>作者</td><td>Tong Zheng, Xidong Wu, Zheng Zhang, Zhankui He, Chaoyi Zhang, Benjamin Coleman, Ruoqiao Wei, Di Bai, Haolin Liu, Rui Liu, Xue Wang, Yue Zhuan, Wang-Cheng Kang, Renkai Xiang, Heng Huang, Xinwu Cheng, Yunsong Guo</td></tr>
+  <tr><td>机构</td><td>University of Maryland, College Park；Google DeepMind；University of Virginia（部分作者机构在抽取文本中缺失）</td></tr>
+  <tr><td>Backbone</td><td>Gemini-3.1 Pro、Gemini-3.7-Flash（通过 Gemini CLI 作为 coding agent）</td></tr>
+  <tr><td>任务</td><td>算法工程（Lasso 正则化路径）、数学优化（Sum–Diff、自相关不等式、圆填充）、GPU Kernel 工程（KernelBench）</td></tr>
+</table></div>
+
+<!-- 2 -->
+<h2 class="section" id="s2">2. 动机：探索策略是瓶颈</h2>
+<p>AlphaEvolve、OpenEvolve、ShinkaEvolve 一类系统由 LLM 不断<b>提出 → 评测 → 精炼</b>候选程序，大规模时动辄成千上万次"提案–评测"循环。论文认为，随着底层 coding agent 越来越强，真正决定成本与效果的是<b>探索策略</b>：</p>
+<ul>
+  <li>精炼哪个候选？是继续深挖一条分支（exploit），还是开新根（explore）？</li>
+  <li>一批并行开几个 worker？</li>
+  <li>什么时候判定一条分支没救了、什么时候整体停止？</li>
+</ul>
+<p>以往这些都是<b>人工设计且在发现过程中固定</b>的，不能从自身历史中学习，于是会持续把算力浪费在无效方向上。而直接<b>在线</b>优化探索策略有两个难点：</p>
+<div class="card">
+  <ol>
+    <li><b>反馈延迟且昂贵</b>：一个策略好不好，要看它在很多轮提案–评测后的效果，单次评估就是一次完整的发现 rollout。</li>
+    <li><b>元搜索空间巨大</b>：可能需要尝试大量候选策略，每个都要跑一次长 rollout，成本不可承受。</li>
+  </ol>
+</div>
+<div class="callout">
+  <div class="label">关键洞察</div>
+  <p>"Completed discovery histories already provide such a simulator."——一棵跑完的发现树记录了每个节点被扩展后得到了什么分数。只要新策略选择的节点"在记录里"，就可以直接读出结果，而不必真的调用 LLM。这就把<b>昂贵的在线策略评估</b>变成了<b>廉价的离线回放</b>，类似 RL 里的 off-policy evaluation / 世界模型里的"在梦中训练"（Dream 一词即来源于此）。</p>
+</div>
+
+<!-- 3 -->
+<h2 class="section" id="s3">3. 问题形式化</h2>
+<h3 id="s3-1">3.1 发现树（Discovery Tree）</h3>
+<ul>
+  <li>根节点 $r$：初始工作区（workspace）。</li>
+  <li>每个非根节点 $v$ 是一次"生成–评测"尝试，有唯一父节点（尝试从父节点的工作区出发，继承其工作区）。</li>
+  <li>节点 $v$ 存储：结果工作区快照、产物（artifact）、诊断信息、分数 $s_v$（越高越好）。</li>
+</ul>
+<p>当前观测到的树记为 $\mathcal{T}$，<b>可选节点集</b>为根加所有叶子：</p>
+<div class="mathblock">$$A(\mathcal{T}) = \{r\} \cup \operatorname{leaves}(\mathcal{T})$$</div>
+<p>选根 = 开一条新分支；选叶 = 在该候选上继续精炼。设有 $W$ 个并行 worker，可行动作是一个批次 $C \subseteq A(\mathcal{T}),\ |C| \le W$。</p>
+
+<h3 id="s3-2">3.2 探索策略 π</h3>
+<p>策略 $\pi$ 是<b>可执行代码</b>（附录 prompt 中是一个 Python 类 <code>OptimalPolicy</code>，含 <code>solve(question, budget)</code> 与 <code>plan_grid</code> 方法）。每个决策轮，它观察当前树，输出一个批次；<b>返回空批次即终止</b>。同一次 rollout 内策略代码固定不变。</p>
+<p>这一"编排层（orchestration layer）"让探索变得显式、可编程，控制以下四件事，而底层 coding agent、评测器、执行接口完全不变：</p>
+<div class="table-wrap"><table>
+  <tr><th>控制维度</th><th>含义</th></tr>
+  <tr><td>节点选择</td><td>扩展哪些叶子、是否开新根</td></tr>
+  <tr><td>分支</td><td>开新分支 vs 继续已有分支</td></tr>
+  <tr><td>批大小 / 并行度</td><td>本轮同时跑多少个尝试（≤ W）</td></tr>
+  <tr><td>停止</td><td>返回空批次</td></tr>
+</table></div>
+
+<!-- 4 -->
+<h2 class="section" id="s4">4. 方法：Dream-RSI</h2>
+<div class="fig">
+<svg viewBox="0 0 820 330" width="820" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, PingFang SC, sans-serif">
+  <defs>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#9aa3b5"/></marker>
+  </defs>
+  <!-- online -->
+  <rect x="20" y="20" width="360" height="290" rx="14" fill="#1b2740" stroke="#2a2f3d"/>
+  <text x="200" y="48" fill="#6ea8fe" font-size="16" font-weight="700" text-anchor="middle">在线阶段（醒着，真实执行）</text>
+  <rect x="50" y="70" width="300" height="50" rx="10" fill="#1e222d" stroke="#6ea8fe"/>
+  <text x="200" y="92" fill="#d7dbe4" font-size="14" text-anchor="middle">部署策略 π_t，≤ K₁ 轮</text>
+  <text x="200" y="110" fill="#9aa3b5" font-size="12" text-anchor="middle">每轮选批次 C ⊆ A(T)，|C| ≤ W</text>
+  <rect x="50" y="140" width="300" height="50" rx="10" fill="#1e222d" stroke="#6ea8fe"/>
+  <text x="200" y="162" fill="#d7dbe4" font-size="14" text-anchor="middle">Coding agent 并行生成 + 评测</text>
+  <text x="200" y="180" fill="#9aa3b5" font-size="12" text-anchor="middle">随机转移：同一工作区结果可不同</text>
+  <rect x="50" y="210" width="300" height="50" rx="10" fill="#1e222d" stroke="#7bd88f"/>
+  <text x="200" y="232" fill="#d7dbe4" font-size="14" text-anchor="middle">新发现树 T_t</text>
+  <text x="200" y="250" fill="#9aa3b5" font-size="12" text-anchor="middle">H_t = H_{t−1} ∪ {T_t}</text>
+  <line x1="200" y1="120" x2="200" y2="138" stroke="#9aa3b5" stroke-width="1.5" marker-end="url(#ar)"/>
+  <line x1="200" y1="190" x2="200" y2="208" stroke="#9aa3b5" stroke-width="1.5" marker-end="url(#ar)"/>
+  <!-- offline -->
+  <rect x="440" y="20" width="360" height="290" rx="14" fill="#1f1b2e" stroke="#2a2f3d"/>
+  <text x="620" y="48" fill="#e5b8ff" font-size="16" font-weight="700" text-anchor="middle">离线阶段（做梦，零 agent 调用）</text>
+  <rect x="470" y="70" width="300" height="50" rx="10" fill="#1e222d" stroke="#e5b8ff"/>
+  <text x="620" y="92" fill="#d7dbe4" font-size="14" text-anchor="middle">在全部历史树上回放 π_t^m</text>
+  <text x="620" y="110" fill="#9aa3b5" font-size="12" text-anchor="middle">≤ K₂ 轮，确定性揭示记录结果</text>
+  <rect x="470" y="140" width="300" height="50" rx="10" fill="#1e222d" stroke="#e5b8ff"/>
+  <text x="620" y="162" fill="#d7dbe4" font-size="14" text-anchor="middle">策略开发 agent 改写代码</text>
+  <text x="620" y="180" fill="#9aa3b5" font-size="12" text-anchor="middle">π_t^m → π_t^{m+1}，共 M 次</text>
+  <rect x="470" y="210" width="300" height="50" rx="10" fill="#1e222d" stroke="#7bd88f"/>
+  <text x="620" y="232" fill="#d7dbe4" font-size="14" text-anchor="middle">选 argmax_m V̄^m 作为 π_{t+1}</text>
+  <text x="620" y="250" fill="#9aa3b5" font-size="12" text-anchor="middle">候选含 π_t^0 ⇒ 回放分不降</text>
+  <line x1="620" y1="120" x2="620" y2="138" stroke="#9aa3b5" stroke-width="1.5" marker-end="url(#ar)"/>
+  <path d="M770,165 C800,165 800,95 772,95" fill="none" stroke="#9aa3b5" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#ar)"/>
+  <line x1="620" y1="190" x2="620" y2="208" stroke="#9aa3b5" stroke-width="1.5" marker-end="url(#ar)"/>
+  <!-- cross arrows -->
+  <path d="M350,235 C400,235 420,95 468,95" fill="none" stroke="#7bd88f" stroke-width="2" marker-end="url(#ar)"/>
+  <path d="M470,285 C420,300 380,300 330,285 C200,250 90,140 48,95" fill="none" stroke="#ffcc66" stroke-width="2" marker-end="url(#ar)"/>
+  <text x="400" y="300" fill="#ffcc66" font-size="12" text-anchor="middle">部署 π_{t+1}，t ← t+1</text>
+  <text x="408" y="150" fill="#7bd88f" font-size="12" text-anchor="middle">历史扩充</text>
+</svg>
+<div class="cap">图 1（本报告绘制）：Dream-RSI 的外层递归——每轮一次真实在线发现 + 一次纯离线的策略进化。"Evolving Worlds" 指回放世界（历史树集合）随轮数不断增长。</div>
+</div>
+
+<h3 id="s4-1">4.1 在线 rollout</h3>
+<p>第 $t$ 轮，策略 $\pi_t$ 可以读历史 $\mathcal{H}_{t-1}$（仅作上下文，与新树隔离），从 $\mathcal{T}_t^0 = \{r\}$ 出发，最多跑 $K_1$ 轮：</p>
+<ul>
+  <li>每轮选批次 $C_t^k \in A(\mathcal{T}_t^k, W)$，每个被选节点并行执行一次生成–评测，各产生一个子节点；</li>
+  <li>转移是<b>随机的</b>：同一工作区出发，coding agent 可能给出不同结果；</li>
+  <li>结束后 $\mathcal{H}_t = \mathcal{H}_{t-1} \cup \{\mathcal{T}_t\}$。</li>
+</ul>
+
+<h3 id="s4-2">4.2 离线回放模拟器（"做梦"）</h3>
+<p>把每棵历史树 $\mathcal{T}_i$ 当作一个固定的"世界"。对策略–树对 $(m, i)$，从 $\{r\}$ 开始回放：</p>
+<div class="card">
+  <ul>
+    <li><b>选非根节点 $v$</b>：揭示 $v$ 在记录中的<b>唯一子节点</b>（若存在）。</li>
+    <li><b>选根 $r$</b>：揭示 $r$ 的<b>最早创建、尚未揭示</b>的子节点 → 相当于开新分支。</li>
+    <li><b>没有记录的后继</b>：返回空，不产生新节点（模拟器无法"想象"未发生的事）。</li>
+    <li>策略只能从<b>已揭示</b>的合法集合 $A(\mathcal{T}_i^{m,k})$ 中选，看不到未揭示节点的分数。</li>
+    <li><b>终止</b>：策略返回空批次 / 达到 $K_2$ 轮 / 所有记录节点都已揭示。记完成轮数为 $k^\star$。</li>
+  </ul>
+</div>
+<div class="callout warn">
+  <div class="label">理解要点</div>
+  <p>这里的设计很巧妙：在线树里每个非根节点恰好"被精炼一次"，所以每个节点至多一个子节点（链式精炼），根下面有多个子节点（多条分支）。回放时策略做的决策本质是<b>"在这些已记录的链上，按什么顺序、走多深、开几条、何时停"</b>——这正是探索策略要学的东西，而结果都可以从记录里查到。代价是：策略<b>无法被评估在记录之外的行为</b>（例如对同一节点精炼两次），这就是该模拟器的覆盖偏差。</p>
+</div>
+
+<h3 id="s4-3">4.3 回放目标函数</h3>
+<p>令 $N_i^m = |\mathcal{T}_i^{m,k^\star}| - 1$ 为揭示的非根节点数（即消耗的尝试数）：</p>
+<div class="mathblock">$$V_i^m \;=\; \underbrace{\max_{v \in \mathcal{T}_i^{m,k^\star}} s_v}_{\text{发现质量}} \;-\; \underbrace{\beta_1 N_i^m}_{\text{执行成本}} \;+\; \underbrace{\beta_2 \frac{N_i^m}{\max\{1, k^\star\}}}_{\text{并行奖励}}$$</div>
+<ul>
+  <li><b>质量</b>：回放过程中揭示到的最好分数；</li>
+  <li><b>成本</b>：每次尝试罚 $\beta_1$ —— 鼓励"够了就停"；</li>
+  <li><b>并行</b>：平均每轮尝试数乘 $\beta_2$ —— 鼓励批处理而非串行（同样的尝试数，轮数越少墙钟时间越短）。</li>
+</ul>
+<p>策略的总体评分是在所有历史树上的平均：$\bar V^m = \frac{1}{t}\sum_{i=1}^{t} V_i^m$。</p>
+<div class="callout warn">
+  <div class="label">注意</div>
+  <p>正文未给出 $\beta_1, \beta_2$ 的具体数值。附录 B.2 的策略开发 prompt 中实际优化的是 <code>pareto.reward = pareto.auc − λ · parallel_penalty</code>（扫描 β 后的 AUC 形式），与公式 (1) 思想一致但并不完全等同。代码中 β 网格默认为 {0, 0.25, 0.5, 0.75, 1}，λ = 0.05，详见第 10 节。</p>
+</div>
+
+<h3 id="s4-4">4.4 策略改进循环</h3>
+<ol>
+  <li>$\pi_t^0 = \pi_t$；</li>
+  <li>对 $m = 0,\dots,M-1$：在全部 $t$ 棵历史树上回放 $\pi_t^m$，得到 $\bar V^m$；</li>
+  <li>一个固定的 LLM <b>策略开发 agent</b> 阅读回放轨迹、得分和以往修改反馈，改写代码得到 $\pi_t^{m+1}$；</li>
+  <li>选 $\pi_{t+1} = \pi_t^{m^\star}$，$m^\star \in \arg\max_m \bar V^m$。</li>
+</ol>
+<div class="callout key">
+  <div class="label">弱单调性</div>
+  <p>因为候选集合包含当前策略 $\pi_t^0$，必有 $\bar V^{m^\star} \ge \bar V^0$：<b>在固定的历史上，选出的策略不会比当前策略差</b>。但这只是"历史上的选择性质"，<b>不是在线改进的保证</b>——论文没有给出形式化定理，也没有量化回放分与在线表现的相关性。</p>
+</div>
+
+<h3 id="s4-5">4.5 伪代码（据正文重构）</h3>
+<pre><code>Input: 初始策略 π_1（人工 "parallel refining"），H_0 = ∅，K1, K2, M
+for t = 1, 2, ...:
+    # ---- 在线：真实调用 coding agent ----
+    T_t = Rollout(π_t, context=H_{t-1}, max_rounds=K1)   # 随机转移
+    H_t = H_{t-1} ∪ {T_t}
+
+    # ---- 离线：仅回放，零 agent 调用 ----
+    π^0 = π_t
+    for m = 0 .. M-1:
+        V[m] = mean_{i=1..t} Replay(π^m, T_i, max_rounds=K2)
+        π^{m+1} = PolicyDevAgent.revise(π^m, traces, V[0..m])
+    π_{t+1} = π^{argmax_m V[m]}</code></pre>
+<p>附录 B.2 对策略开发 agent 的约束值得注意：只能编辑一个策略文件；必须 <b>prefix-only</b>（只用已揭示信息）；禁止使用未揭示分数或硬编码 cell ID；trace 数据只能在轮与轮之间读，<b>不能在 <code>solve()</code> 内部读</b>——这些都是在防止策略"偷看答案"从而在回放中作弊。</p>
+
+<h3 id="s4-6">4.6 手把手玩具例子：一轮"在线 → 做梦 → 选策略"</h3>
+<div class="callout">
+  <div class="label">类比</div>
+  <p>Dream-RSI 的离线阶段本质上就是<b>量化交易的回测</b>：不会每想出一个交易策略就拿真钱去试，而是先在历史行情上回放，看它当时能赚多少。这里的"历史行情"就是之前真实跑过的发现树。下面例子中的数字都是编的，只为说明机制。</p>
+</div>
+
+<h4>先认识三个概念</h4>
+<div class="table-wrap"><table>
+  <tr><th>概念</th><th>含义</th></tr>
+  <tr><td><b>精炼（refine）</b></td><td>选中一个已有节点，把它的工作区（代码、分数、报错）交给 coding agent，让它分析原因并改出更好的版本，评测后成为该节点的<b>子节点</b>。树上每条"父 → 子"的边都是一次精炼，花一次 agent 调用。选叶子 = 在现有思路上<b>深挖</b>（exploit）；选根 r = 从初始程序重新起步、<b>开新分支</b>（explore）。论文中每轮 "10 条分支 × 11 次" 即 <code>BRANCHES=10</code>、<code>REFINE=10</code>：每条分支 1 次从根出发 + 最多 10 次精炼。</td></tr>
+  <tr><td><b>N</b></td><td>回放中揭示出的非根节点数 = 策略用掉的尝试次数 = <b>成本</b>（根是初始程序，不算尝试）。</td></tr>
+  <tr><td><b>k*</b></td><td>回放结束时完成的回合数（每回合并行跑一批，全部跑完才进入下一回合）≈ <b>墙钟时间</b>。小写 k 是回合编号；大写 K₁、K₂ 是在线 / 回放的回合上限。</td></tr>
+  <tr><td><b>N / k*</b></td><td>平均每回合跑几个 = <b>并行度</b>。同样 6 次尝试，3 回合跑完（并行度 2）比 6 回合跑完（并行度 1）快一倍。所以目标函数里 −β₁·N 逼策略省钱，+β₂·N/k* 逼策略把 worker 塞满；分母写成 max{1, k*} 只是防止除以零。</td></tr>
+</table></div>
+
+<h4>设定</h4>
+<p>任务：让 agent 写一个程序，分数越高越好。最多 W = 2 个 agent 并行。起点策略 π₁ 是人写的"parallel refining"：开 2 条分支，每条精炼到深度 3。策略本身就是一段 Python 代码：</p>
+<pre><code># π₁ 原策略：开 2 条分支，每条精炼到深度 3
+def select(tree):
+    batch = []
+    if num_branches(tree) &lt; 2:
+        batch.append(ROOT)                          # 开新分支
+    batch += [l for l in leaves(tree) if depth(l) &lt; 3]   # 继续精炼
+    return batch[:W]                                # 返回空列表 = 停止</code></pre>
+
+<h4>第 1 步：在线跑一轮（真花钱）</h4>
+<p>π₁ 指挥 agent 真实运行，花了 6 次调用，得到发现树 T₁，存入历史 $\mathcal{H}_1=\{\mathcal{T}_1\}$：</p>
+<div class="fig">
+<svg viewBox="0 0 640 190" width="640" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, PingFang SC, sans-serif">
+  <g stroke="#9aa3b5" stroke-width="1.5">
+    <line x1="70" y1="95" x2="160" y2="50"/><line x1="70" y1="95" x2="160" y2="140"/>
+    <line x1="210" y1="50" x2="290" y2="50"/><line x1="340" y1="50" x2="420" y2="50"/>
+    <line x1="210" y1="140" x2="290" y2="140"/><line x1="340" y1="140" x2="420" y2="140"/>
+  </g>
+  <circle cx="50" cy="95" r="22" fill="#1e222d" stroke="#6ea8fe" stroke-width="2"/><text x="50" y="100" fill="#d7dbe4" font-size="15" text-anchor="middle">r</text>
+  <g font-size="13" text-anchor="middle">
+    <rect x="160" y="32" width="50" height="36" rx="8" fill="#1e222d" stroke="#ffcc66"/><text x="185" y="48" fill="#d7dbe4">A1</text><text x="185" y="63" fill="#ffcc66" font-size="11">0.40</text>
+    <rect x="290" y="32" width="50" height="36" rx="8" fill="#1e222d" stroke="#ffcc66"/><text x="315" y="48" fill="#d7dbe4">A2</text><text x="315" y="63" fill="#ffcc66" font-size="11">0.42</text>
+    <rect x="420" y="32" width="50" height="36" rx="8" fill="#1e222d" stroke="#ffcc66"/><text x="445" y="48" fill="#d7dbe4">A3</text><text x="445" y="63" fill="#ffcc66" font-size="11">0.43</text>
+    <rect x="160" y="122" width="50" height="36" rx="8" fill="#1e222d" stroke="#7bd88f"/><text x="185" y="138" fill="#d7dbe4">B1</text><text x="185" y="153" fill="#7bd88f" font-size="11">0.30</text>
+    <rect x="290" y="122" width="50" height="36" rx="8" fill="#1e222d" stroke="#7bd88f"/><text x="315" y="138" fill="#d7dbe4">B2</text><text x="315" y="153" fill="#7bd88f" font-size="11">0.55</text>
+    <rect x="420" y="122" width="50" height="36" rx="8" fill="#1e222d" stroke="#7bd88f"/><text x="445" y="138" fill="#d7dbe4">B3</text><text x="445" y="153" fill="#7bd88f" font-size="11">0.80</text>
+  </g>
+  <text x="490" y="55" fill="#ffcc66" font-size="12">A 分支早早卡住</text>
+  <text x="490" y="145" fill="#7bd88f" font-size="12">B 分支一路变好</text>
+</svg>
+<div class="cap">图 2（本报告绘制）：第 1 轮在线运行得到的发现树 T₁。每条边是一次精炼 / 一次 agent 调用。</div>
+</div>
+
+<h4>第 2 步：内层循环——LLM 连续改写策略代码，每版都在 T₁ 上回放</h4>
+<p>回放规则：选非根节点 → 揭示它在记录中的子节点和分数；选根 r → 揭示一条尚未揭示分支的第一个节点；记录里没有的 → 什么也得不到；策略<b>只看得到已揭示的分数</b>。每个版本的评估都只是查表，<b>不调用 coding agent</b>。论文中每次学习评估 M = 4 个版本（当前策略 + 连续改写 3 次）；每次改写都能看到之前所有版本的回放结果，所以是<b>一条链，不是一次并列提多个</b>。</p>
+
+<p><b>版本 0 = 原策略 π₁</b> 的回放：</p>
+<div class="table-wrap"><table>
+  <tr><th>回合</th><th>可选节点</th><th>选择</th><th>揭示</th></tr>
+  <tr><td>1</td><td>r</td><td>{r}</td><td>A1 = 0.40</td></tr>
+  <tr><td>2</td><td>r, A1</td><td>{r, A1}</td><td>B1 = 0.30，A2 = 0.42</td></tr>
+  <tr><td>3</td><td>A2, B1</td><td>{A2, B1}</td><td>A3 = 0.43，B2 = 0.55</td></tr>
+  <tr><td>4</td><td>A3, B2</td><td>{B2}（A3 已到深度 3）</td><td>B3 = 0.80</td></tr>
+  <tr><td>5</td><td>A3, B3</td><td>都到深度 3 → 返回空批次，结束</td><td>–</td></tr>
+</table></div>
+<p>结果：最高 0.80，N = 6，k* = 4。</p>
+
+<p><b>版本 1</b>：LLM 读了回放轨迹，发现 A 分支 0.40 → 0.42 → 0.43 几乎不涨还多花了调用，于是加入剪枝：</p>
+<pre><code># 版本 1：某一步涨幅不足 0.05 的分支不再精炼
+alive = [l for l in leaves(tree) if depth(l) &lt; 3 and gain(l) &gt;= 0.05]</code></pre>
+<div class="table-wrap"><table>
+  <tr><th>回合</th><th>可选节点</th><th>选择</th><th>揭示</th></tr>
+  <tr><td>1</td><td>r</td><td>{r}</td><td>A1 = 0.40</td></tr>
+  <tr><td>2</td><td>r, A1</td><td>{r, A1}</td><td>B1 = 0.30，A2 = 0.42</td></tr>
+  <tr><td>3</td><td>A2, B1</td><td>A 只涨 0.02 → 剪掉；选 {B1}</td><td>B2 = 0.55</td></tr>
+  <tr><td>4</td><td>B2</td><td>{B2}</td><td>B3 = 0.80</td></tr>
+  <tr><td>5</td><td>B3</td><td>深度 3 → 返回空批次，结束</td><td>–</td></tr>
+</table></div>
+<p>结果：最高 0.80，N = 5，k* = 4。A3 从未被揭示，相当于省下一次调用。注意第 3 回合剪掉 A 时，策略并不知道 B 以后能到 0.80，它只看得到 B1 = 0.30——这就是 prefix-only、"不准偷看"的约束。</p>
+
+<p><b>版本 2</b>：LLM 看到"剪枝有效"，就剪得更狠——只保留当前分数最高的那条分支。回放：前两回合同上；第 3 回合 A2 = 0.42 &gt; B1 = 0.30，于是剪掉还没起势的 B，只选 {A2} 得到 A3 = 0.43；第 4 回合 A 也到深度 3，结束。最高 0.43，N = 4（A1、A2、A3、B1），k* = 3。</p>
+
+<p><b>版本 3</b>：LLM 看到"版本 2 剪过头了"，改回版本 1 的涨幅阈值，并加一条"剪掉一条分支后，用空出的 worker 开新分支"。但 T₁ 中根下只记录了 A、B 两条分支，开新分支揭示不出任何东西，所以在 T₁ 上的回放结果与版本 1 相同。这也体现了回放的局限：它<b>无法给记录之外的行为加分</b>。</p>
+
+<h4>第 3 步：按目标函数打分并选择</h4>
+<p>$V = \max s - \beta_1 N + \beta_2 \cdot N/k^\star$，取 $\beta_1 = 0.02,\ \beta_2 = 0.01$：</p>
+<div class="table-wrap"><table>
+  <tr><th>版本</th><th class="num">最高分</th><th class="num">N</th><th class="num">k*</th><th class="num">−β₁N</th><th class="num">+β₂N/k*</th><th class="num">V</th></tr>
+  <tr><td>0（原策略）</td><td class="num">0.80</td><td class="num">6</td><td class="num">4</td><td class="num">−0.12</td><td class="num">+0.015</td><td class="num">0.695</td></tr>
+  <tr class="hl"><td>1（涨幅剪枝）</td><td class="num">0.80</td><td class="num">5</td><td class="num">4</td><td class="num">−0.10</td><td class="num">+0.0125</td><td class="num"><b>0.7125</b></td></tr>
+  <tr><td>2（只留最好分支）</td><td class="num">0.43</td><td class="num">4</td><td class="num">3</td><td class="num">−0.08</td><td class="num">+0.0133</td><td class="num">0.363</td></tr>
+  <tr class="hl"><td>3（剪枝 + 补开新分支）</td><td class="num">0.80</td><td class="num">5</td><td class="num">4</td><td class="num">−0.10</td><td class="num">+0.0125</td><td class="num"><b>0.7125</b></td></tr>
+</table></div>
+<p>从<b>所有版本</b>里选回放分最高的（不是直接用最后一版），所以改坏的版本 2 不会被部署；又因为版本 0 也在候选中，最差也就是保持原样。版本 1 与 3 并列，假设选中版本 1 作为 π₂。</p>
+
+<h4>第 4 步：外层循环——部署、产生新世界、再做梦</h4>
+<ol>
+  <li><b>第 2 轮在线</b>：π₂ 真实运行，产生全新的树 T₂。agent 有随机性，T₂ 与 T₁ 不同；剪枝省下的调用让好分支挖得更深。$\mathcal{H}_2=\{\mathcal{T}_1,\mathcal{T}_2\}$。</li>
+  <li><b>第 2 次做梦</b>：以 π₂ 为版本 0 再连续改写 3 次，每个版本要在 T₁ 和 T₂ 上<b>都回放并取平均分</b>。只在 T₁ 上好、在 T₂ 上差的版本会被平均分淘汰——这就是 "Evolving Worlds"：用来做梦的世界越积越多，评估越可靠、越不容易过拟合单棵树。</li>
+  <li>部署 π₃ → 产生 T₃ → 在 T₁、T₂、T₃ 上做梦……循环到设定轮数（如 Lasso 为 5 轮）。</li>
+</ol>
+
+<div class="table-wrap"><table>
+  <tr><th></th><th>外层循环（t）</th><th>内层循环（m）</th></tr>
+  <tr><td>做什么</td><td>真实跑一轮，攒一棵新树</td><td>LLM 改写策略代码</td></tr>
+  <tr><td>花 agent 调用吗</td><td>花（论文中每轮最多 110 次）</td><td>不花，只回放查表（改写代码的 LLM 本身另有开销）</td></tr>
+  <tr><td>每次产出</td><td>新历史树 $\mathcal{T}_t$</td><td>新策略版本 $\pi_t^m$</td></tr>
+  <tr><td>如何推进</td><td>部署内层选出的最佳版本</td><td>每次改写参考之前所有版本的回放分</td></tr>
+</table></div>
+<div class="callout key">
+  <div class="label">一句话</div>
+  <p>内层 = 让 LLM 当程序员，用<b>回测分数</b>做反馈，不断改一个调度算法；外层 = 定期用真实运行扩充回测用的历史。把这个例子放大到每轮 110 次调用、5–10 轮、复杂得多的策略代码，就是论文的实验；图 6 中 ConvDiv 每轮尝试数从 110 降到 50、平台期又回升到 92，正是这种学到的"该省就省、卡住就加码"的行为。</p>
+</div>
+
+<!-- 5 -->
+<h2 class="section" id="s5">5. 实验</h2>
+<p><b>对照基线 Recursive Fixed Exploration</b>：与 Dream-RSI 完全相同的 agent、评测器、初始化和预算，起点都是人工设计的 "parallel refining" 策略（多个独立工作区并行，各自精炼自己的候选）。第 1 轮两者完全一致；之后基线策略固定，Dream-RSI 通过回放修订策略。这是一个干净的控制变量设计。</p>
+<p><b>成本口径</b>：累计 discovery-agent 调用次数。每轮预算上限：Gemini-3.1 Pro 为 10 工作区 × 最多 11 步 = <b>110</b> 次；Gemini-3.7-Flash 为 32 × 20 = <b>640</b> 次。</p>
+
+<h3 id="s5-1">5.1 算法工程：Lasso 正则化路径</h3>
+<p>目标：写出更快的 Lasso 全路径求解器，在 6 个留出数据集上的平均运行时间（ms，越低越好）。</p>
+<div class="table-wrap"><table>
+  <tr><th>方法</th><th>模型</th><th class="num">调用次数</th><th class="num">平均运行时 (ms) ↓</th></tr>
+  <tr><td>sklearn</td><td>–</td><td class="num">–</td><td class="num">44180.3</td></tr>
+  <tr><td>glmnet</td><td>–</td><td class="num">–</td><td class="num">13767.5</td></tr>
+  <tr><td>SimpleTES</td><td>gpt-oss-120b</td><td class="num">51,200</td><td class="num">3804.8</td></tr>
+  <tr><td>SimpleTES †</td><td>gpt-oss-120b</td><td class="num">51,200</td><td class="num">8318.4</td></tr>
+  <tr><td>Recursive Fixed Exploration</td><td>Gemini-3.1-Pro</td><td class="num">550</td><td class="num">3587.1</td></tr>
+  <tr class="hl"><td><b>Dream-RSI</b></td><td>Gemini-3.1-Pro</td><td class="num">317</td><td class="num">2931.0</td></tr>
+  <tr><td>Recursive Fixed Exploration</td><td>Gemini-3.7-Flash</td><td class="num">3200</td><td class="num">2516.7</td></tr>
+  <tr class="hl"><td><b>Dream-RSI</b></td><td>Gemini-3.7-Flash</td><td class="num">1879</td><td class="num"><b>2350.6</b></td></tr>
+</table></div>
+<div class="table-wrap"><table>
+  <tr><th>Dream-RSI 分数据集 (ms)</th><th class="num">Gisette</th><th class="num">RCV1</th><th class="num">DNA</th><th class="num">Leukemia</th><th class="num">Colon</th><th class="num">Duke Breast</th></tr>
+  <tr><td>Gemini-3.1-Pro</td><td class="num">2841.0</td><td class="num">14616.0</td><td class="num">49.9</td><td class="num">30.2</td><td class="num">16.4</td><td class="num">32.5</td></tr>
+  <tr><td>Gemini-3.7-Flash</td><td class="num">1091.9</td><td class="num">12923.4</td><td class="num">31.4</td><td class="num">21.0</td><td class="num">12.2</td><td class="num">23.6</td></tr>
+</table></div>
+<ul>
+  <li>相比固定策略：Pro 下运行时 −18%，调用 550→317（≈1.7× 更省）；Flash 下 3200→1879。</li>
+  <li>相比 SimpleTES：调用量少约两个数量级（最多 162×），且运行时更快（不过 backbone 不同，见第 8 节）。</li>
+  <li>成本曲线：两者第 1 轮重合，之后 Dream-RSI 以更低累计调用达到更低运行时。</li>
+</ul>
+<h4>发现出的求解器长什么样</h4>
+<p>SimpleTES 的解法按维度在 LARS 与坐标下降之间切换；Dream-RSI 找到的是在<b>活跃集优化内部自适应</b>的 C++ 实现（Eigen + OpenMP）：</p>
+<ul>
+  <li><b>Strong rule 筛选</b>；</li>
+  <li><b>基于 Cauchy–Schwarz 的 KKT 剪枝</b>：用上界证明特征可以保持非活跃，只有上界无法证明时才重算精确梯度（仅在 $p\ge500, n\ge150$ 时启用）；剪枝失效时整体刷新梯度；</li>
+  <li>不相交分区的活跃集簿记（O(1) swap-delete）、惰性 Gram 矩阵构造、64 字节对齐缓冲区、无分支软阈值函数等硬件感知实现。</li>
+</ul>
+
+<h3 id="s5-2">5.2 数学优化</h3>
+<p>Gemini-3.1 Pro，10 轮，总生成 &lt; 1000 次。</p>
+<div class="table-wrap"><table>
+  <tr><th>方法</th><th class="num">Sum Diff ↑</th><th class="num">Auto Correlation ↓</th><th class="num">Circle Packing ↑</th></tr>
+  <tr><td>AlphaEvolve</td><td class="num">–</td><td class="num">1.455700</td><td class="num">2.635862</td></tr>
+  <tr><td>AlphaEvolveV2</td><td class="num">1.121936</td><td class="num">–</td><td class="num">2.635983</td></tr>
+  <tr><td>OpenEvolve</td><td class="num">–</td><td class="num">1.460000</td><td class="num">–</td></tr>
+  <tr><td>CodeEvolve</td><td class="num">–</td><td class="num">–</td><td class="num">2.635980</td></tr>
+  <tr><td>ShinkaEvolve</td><td class="num">–</td><td class="num">1.457800</td><td class="num">2.635982</td></tr>
+  <tr><td>TTS-Discovery</td><td class="num">–</td><td class="num">–</td><td class="num">2.635983</td></tr>
+  <tr><td>ThetaEvolve</td><td class="num">–</td><td class="num">1.493000</td><td class="num">2.635983</td></tr>
+  <tr><td>EvoX</td><td class="num">–</td><td class="num">1.458900</td><td class="num">2.635900</td></tr>
+  <tr><td>SimpleTES (51,200 次)</td><td class="num">1.143975</td><td class="num"><b>1.453675</b></td><td class="num">2.635983</td></tr>
+  <tr><td>Recursive Fixed Exploration</td><td class="num">1.144047</td><td class="num">1.456001</td><td class="num">2.635983</td></tr>
+  <tr class="hl"><td><b>Dream-RSI</b></td><td class="num"><b>1.145427</b></td><td class="num">1.456375</td><td class="num">2.635983</td></tr>
+</table></div>
+<p>解读：Sum–Diff 刷新最好结果；圆填充已饱和（大家都到 2.635983）；自相关上 SimpleTES 最好，Dream-RSI 甚至略逊于自己的固定策略基线——说明<b>"省算力"是更稳健的结论，"质量更好"并非处处成立</b>。</p>
+
+<h3 id="s5-3">5.3 GPU Kernel 工程（KernelBench）</h3>
+<p>Gemini-3.1 Pro，性能指标 1/ms（越高越好），对比 Recursive Fixed Exploration：</p>
+<div class="table-wrap"><table>
+  <tr><th>任务</th><th>Dream-RSI 结论</th><th>类型</th></tr>
+  <tr><td>VGG16</td><td>性能相当，生成次数少 <b>2.43×</b></td><td>省成本</td></tr>
+  <tr><td>LayerNorm</td><td>性能相当，生成次数少 <b>1.79×</b></td><td>省成本</td></tr>
+  <tr><td>ConvDiv</td><td>相近预算下性能高 <b>2.09×</b></td><td>提质量</td></tr>
+  <tr><td>ConvMax</td><td>相近预算下性能高 <b>1.44×</b></td><td>提质量</td></tr>
+</table></div>
+<p>有意思的模式：在"容易饱和"的任务上，学到的策略学会了<b>早停省钱</b>；在"还有空间"的任务上，学会了<b>把预算花在刀刃上</b>。</p>
+
+<!-- 6 -->
+<h2 class="section" id="s6">6. 分析与消融</h2>
+<h3>6.1 历史当"模拟器" vs 当"提示"</h3>
+<p>在 ConvDiv 上，把历史以<b>提示词级语义指导</b>（告诉 agent 未来该往哪个方向搜）的方式喂进去，在同预算下，无论 Fixed 还是 Dream-RSI 都<b>不如不加指导</b>。作者解释：强语义方向偏置会在多线程并行搜索时<b>过度约束</b>搜索、降低多样性。这正是论文核心主张的反证——历史更适合用来<b>评估策略</b>，而不是直接<b>告诉 agent 做什么</b>。（正文仅给图，无具体数值。）</p>
+
+<h3>6.2 探索策略如何随轮次演化（ConvDiv）</h3>
+<div class="card">
+  <div class="bars">
+    <div class="h">轮次</div><div class="h">轮内最佳性能 (1/ms, 蓝) / 评估尝试数 (黄, 满格=110)</div><div class="h">性能</div><div class="h">尝试</div>
+    <div>E0</div><div><div class="bar" style="width:22.5%"></div><div class="bar att" style="width:100%;margin-top:3px"></div></div><div>0.427</div><div>110</div>
+    <div>E1</div><div><div class="bar" style="width:32.9%"></div><div class="bar att" style="width:100%;margin-top:3px"></div></div><div>0.625</div><div>110</div>
+    <div>E2</div><div><div class="bar" style="width:45.0%"></div><div class="bar att" style="width:79.1%;margin-top:3px"></div></div><div>0.855</div><div>87</div>
+    <div>E3</div><div><div class="bar" style="width:73.9%"></div><div class="bar att" style="width:72.7%;margin-top:3px"></div></div><div>1.403</div><div>80</div>
+    <div>E4</div><div><div class="bar" style="width:78.4%"></div><div class="bar att" style="width:45.5%;margin-top:3px"></div></div><div>1.488</div><div>50</div>
+    <div>E5</div><div><div class="bar" style="width:79.0%"></div><div class="bar att" style="width:83.6%;margin-top:3px"></div></div><div>1.499</div><div>92</div>
+    <div>E6</div><div><div class="bar" style="width:93.3%"></div><div class="bar att" style="width:72.7%;margin-top:3px"></div></div><div>1.770</div><div>80</div>
+    <div>E7</div><div><div class="bar" style="width:99.1%"></div><div class="bar att" style="width:82.7%;margin-top:3px"></div></div><div>1.880</div><div>91</div>
+    <div>E8</div><div><div class="bar" style="width:100%"></div><div class="bar att" style="width:78.2%;margin-top:3px"></div></div><div>1.898</div><div>86</div>
+  </div>
+  <p style="font-size:13px;color:var(--muted);margin-bottom:0">数据取自论文图 6 的文字标签；尝试数与轮次的对应关系为按图标签顺序读取，可能有偏差。</p>
+</div>
+<p>行为呈现明显的<b>自适应</b>：性能提升期策略先<b>节流</b>（110 → 50 次），到 E4–E5 出现平台期时又<b>加大投入</b>（50 → 92），随后性能继续上升到 1.898（相对 E0 提升约 4.4×）。这类"该省就省、卡住就加码"的元行为恰是人工固定策略难以写出的。</p>
+
+<h3>6.3 进化出的策略的行为特征</h3>
+<p>论文没有单独的 case study 节，以下来自附录 B.2 的 replay-policy prompt 与图 6：</p>
+<ul>
+  <li><b>组合式批次</b>：每轮构造一个最多 <code>max_parallelism</code> 个独立候选的"投资组合"，混合 exploit、explore（新根或欠探索分支）和至多一个 recovery 动作；同一批次不能同时包含父与子。</li>
+  <li><b>谨慎剪枝</b>：只有累积证据显示"不可恢复"或"反复无望"才关闭分支，单次浅层低分不足以剪枝。</li>
+  <li><b>可修复错误不判死刑</b>：形状、mask、内存布局等实现错误保留资格，不当作算法失败。</li>
+  <li><b>β 作为每回合标量</b>：控制宽度、耐心、剪枝强度，在轮间选定，不在 <code>solve()</code> 内调。</li>
+  <li><b><code>plan_grid</code></b>：每个在线轮前，仅用前缀安全的历史决定分支数与精炼步数。</li>
+</ul>
+
+<!-- 7 -->
+<h2 class="section" id="s7">7. 相关工作定位</h2>
+<div class="table-wrap"><table>
+  <tr><th>方向</th><th>代表工作</th><th>Dream-RSI 的区别</th></tr>
+  <tr><td>AI 驱动的发现</td><td>AlphaEvolve, OpenEvolve, CodeEvolve, ShinkaEvolve, PACEvolve, DeltaEvolve, MLEvolve</td><td>它们的探索策略多为人工设计并固定</td></tr>
+  <tr><td>元层探索优化</td><td>SkyDiscover, SwarmResearch, EvoX</td><td>同样把探索当元优化问题，但依赖昂贵延迟的在线反馈；Dream-RSI 改为离线回放、off-policy</td></tr>
+  <tr><td>自进化 agent</td><td>进化权重 / harness / 上下文 / 技能 / 测试时学习 / rubric / 环境（如 ACE、MCE 等）</td><td>多在对象层；Dream-RSI 让<b>元层</b>机制递归、离线地改进</td></tr>
+  <tr><td>记忆与经验复用</td><td>历史作为上下文、记忆、技能、训练信号</td><td>历史被组织成<b>可交互的回放模拟器</b>，用来廉价评估大量控制器</td></tr>
+</table></div>
+<div class="callout">
+  <div class="label">和你之前学过的内容的联系</div>
+  <p>与 <b>MCE</b>（study-mce.html）同属"把元层流程本身变成可进化对象"的思路：MCE 进化的是 context engineering 技能，Dream-RSI 进化的是探索策略代码。与 <b>World Models</b>（study-world-models/）的联系在名字里——"Dream" 致敬 Ha &amp; Schmidhuber 的"在梦中训练"，只是这里的"世界模型"不是学出来的神经网络，而是<b>非参数的、由真实记录构成的回放世界</b>，因此零模型误差但覆盖有限。</p>
+</div>
+
+<!-- 8 -->
+<h2 class="section" id="s8">8. 批判性评价</h2>
+<h3>优点</h3>
+<ul>
+  <li><b>想法简洁而通用</b>：只加一层编排，不改 agent、评测器；任何树状提案–评测系统都能套用。</li>
+  <li><b>控制变量干净</b>：Recursive Fixed Exploration 与 Dream-RSI 只差"是否离线改策略"，第 1 轮完全重合。</li>
+  <li><b>成本收益显著</b>：一致地以更少调用达到相当或更好效果，跨三类任务成立。</li>
+  <li><b>防作弊意识</b>：prefix-only、不读未揭示分数等约束，对回放评估的可信度很关键。</li>
+</ul>
+<h3>局限 / 疑问</h3>
+<ul>
+  <li><b>回放保真度未量化</b>：模拟器只能揭示记录过的子节点，策略在记录之外的行为（同一节点多次采样、更深的链）完全无法评估；回放分与在线表现的相关性没有报告。这是 off-policy 评估的经典覆盖偏差问题。</li>
+  <li><b>单调性很弱</b>：$\bar V^{m^\star}\ge\bar V^0$ 只在固定历史上成立，且多次 argmax 选择存在对历史过拟合（winner's curse）风险。</li>
+  <li><b>与外部基线的比较不对等</b>：SimpleTES、AlphaEvolve 等数字多取自原文，backbone 不同（gpt-oss-120b vs Gemini），"162× 更省"应理解为系统级对比而非纯方法对比。</li>
+  <li><b>无方差 / 多种子结果</b>：发现过程高度随机，单次运行的差异（如 Sum–Diff 1.145427 vs 1.144047）是否显著不得而知。</li>
+  <li><b>关键超参正文未披露</b>：正文没写 $\beta_1,\beta_2,K_1,K_2,M$，需要去代码里查（M=4、β 网格、λ=0.05 等见第 10 节）；式 1 与实际优化的 Pareto-AUC 目标也不完全一致。</li>
+  <li><b>离线阶段成本未计入</b>：成本只统计 discovery-agent 调用，策略开发 agent 的 M 次改写及回放的 token / 时间开销没有被纳入"省 162×"的口径。</li>
+  <li>没有专门的局限性章节；任务集与轮数有限。</li>
+</ul>
+
+<!-- 9 -->
+<h2 class="section" id="s9">9. 学习要点 &amp; 延伸问题</h2>
+<div class="callout key">
+  <div class="label">三句话带走</div>
+  <ol>
+    <li>代码进化发现系统的瓶颈正从"生成能力"转向"<b>探索策略</b>"——选谁、开多少、何时停。</li>
+    <li>跑完的发现树是一个<b>零成本、零模型误差</b>的回放模拟器，可在上面 off-policy 评估任意新策略。</li>
+    <li>"在线采集 → 离线改写策略 → 选最优部署"的递归循环，让探索策略随世界（历史）一起进化，主要收益是<b>大幅省算力</b>。</li>
+  </ol>
+</div>
+<h4>值得自己思考 / 动手的问题</h4>
+<ol>
+  <li>能否给回放模拟器加一个<b>学出来的转移模型</b>（预测未记录节点的分数分布），把 Dream-RSI 从"非参数回放"推广到"Dyna 式"混合模拟？代价与收益如何？</li>
+  <li>如何<b>度量回放保真度</b>？例如：在同一棵树上，用留出的一部分分支检验回放排序与在线排序的 Kendall τ。</li>
+  <li>多次 argmax 选择的过拟合：能否借用 off-policy RL 的<b>保守估计</b>（如下置信界、bootstrapped 历史）来选策略？</li>
+  <li>把成本项 $\beta_1$ 换成真实的墙钟 / 美元成本，并计入策略开发 agent 的开销，结论还成立吗？</li>
+  <li>迁移性：在 Lasso 任务上进化出的探索策略，直接用在 KernelBench 上是否仍优于人工策略？（论文未做跨任务迁移实验。）</li>
+</ol>
+
+<h2 class="section" id="s10">10. 代码与复现</h2>
+<p>代码已在 <a class="link" href="https://github.com/google-research/dream-rsi" target="_blank" rel="noopener">google-research/dream-rsi</a> 开源（Apache-2.0；README 注明 "not an officially supported Google product"，为配合论文发布的研究代码）。论文摘要里链接的 <code>zhengkid/Dream-RSI</code> 目前只放了论文 PDF 和 README（写着 "Code is being prepared for release"）。npm/pi.dev 上的 <code>pi-dream-rsi</code> 是第三方社区包，页面上看不出与论文作者有关联。</p>
+
+<h3>10.1 仓库结构与论文概念的对应</h3>
+<div class="table-wrap"><table>
+  <tr><th>路径</th><th>对应论文概念</th></tr>
+  <tr><td><code>dream_rsi/orchestrate.py</code></td><td>外层循环：explore → learn → promote</td></tr>
+  <tr><td><code>dream_rsi/policy/baseline.py</code></td><td>人工起点策略 "parallel refining"（Recursive Fixed Exploration 一直用它）</td></tr>
+  <tr><td><code>dream_rsi/policy/discovered/method.template.py</code></td><td>被策略开发 agent 改写的探索策略 π</td></tr>
+  <tr><td><code>dream_rsi/env/</code></td><td><code>TraceEnv</code>：在线 rollout 与离线回放<b>共用</b>的决策接口（同一份策略代码两边都能跑）</td></tr>
+  <tr><td><code>dream_rsi/exploration/</code></td><td>在线 rollout：在选中节点上运行 agent 并评测</td></tr>
+  <tr><td><code>dream_rsi/learning/trace_pool.py</code></td><td>回放世界（历史树集合 $\mathcal{H}_t$）</td></tr>
+  <tr><td><code>dream_rsi/learning/discover.py</code></td><td>策略改写（policy-development agent）</td></tr>
+  <tr><td><code>dream_rsi/learning/heuristic_search/eval.py</code></td><td>回放目标（式 1）</td></tr>
+  <tr><td><code>dream_rsi/learning/directions/</code></td><td>Guidance 消融用的方向摘要</td></tr>
+  <tr><td><code>dream_rsi/prompts/explore.txt</code>、<code>heuristic_proposer.txt</code></td><td>论文 Listing 1、2（附录 B 的两个 prompt）</td></tr>
+  <tr><td><code>dream_rsi/agents/</code></td><td>Gemini CLI（论文所用）、Claude Agent SDK、Codex CLI</td></tr>
+</table></div>
+
+<h3>10.2 论文正文没写、代码里给出的超参</h3>
+<div class="table-wrap"><table>
+  <tr><th>超参</th><th>代码默认值</th><th>含义</th></tr>
+  <tr><td>$M$</td><td>4（当前策略 + <code>DISCOVER_ROUNDS=3</code> 次改写）</td><td>每个学习步评估的策略版本数</td></tr>
+  <tr><td>预算偏好 ρ（即 prompt 中的 β）</td><td><code>DRSI_REPLAY_BETA_GRID=0,0.25,0.5,0.75,1</code></td><td>每个版本在每个 ρ 下各回放一次，得到 Pareto-AUC</td></tr>
+  <tr><td>λ（并行惩罚）</td><td><code>DRSI_REPLAY_PARALLELISM_PENALTY=0.05</code></td><td><code>reward = auc − λ · parallel_penalty</code></td></tr>
+  <tr><td>BRANCHES × (REFINE+1)</td><td>10 × 11 = 110；<code>MAX_WORKERS=10</code></td><td>每轮网格预算 B 与并行度 W（Flash 版 Lasso 为 W=32、B=640）</td></tr>
+  <tr><td>单次回放超时</td><td>3600 s</td><td><code>DISCOVER_EVAL_TIMEOUT</code></td></tr>
+  <tr><td>默认模型</td><td><code>gemini-3.1-pro-preview</code></td><td>Gemini CLI；探索阶段默认只给文件工具，学习阶段有 shell</td></tr>
+</table></div>
+<div class="table-wrap"><table>
+  <tr><th>任务</th><th><code>TASK</code></th><th class="num">在线轮数 T</th><th class="num">评测超时 (s)</th></tr>
+  <tr><td>Sum–Difference</td><td><code>sums_diffs</code></td><td class="num">10</td><td class="num">240</td></tr>
+  <tr><td>Autocorrelation</td><td><code>autocorrelation_third</code></td><td class="num">10</td><td class="num">120</td></tr>
+  <tr><td>Circle Packing</td><td><code>circle_packing_26</code></td><td class="num">10</td><td class="num">600</td></tr>
+  <tr><td>Lasso path</td><td><code>lasso_path</code></td><td class="num">5</td><td class="num">600</td></tr>
+  <tr><td>VGG16 / LayerNorm / ConvDiv / ConvMax</td><td><code>kb_l3_11_vgg16</code> 等</td><td class="num">9</td><td class="num">3600</td></tr>
+</table></div>
+<p>论文硬件：数学与 Lasso 任务在 8 vCPU / 32 GB 虚拟机上跑，kernel 任务在 NVIDIA L40S 上跑。</p>
+
+<h3>10.3 上手步骤</h3>
+<pre><code>pip install -e ".[tasks]"          # Python ≥ 3.10；另需 npm 安装 Gemini CLI
+cp .env.example .env               # 填 API key（支持 GEMINI_API_KEYS 轮换）
+bash scripts/fetch_tasks.sh        # 下载数学 / Lasso 任务（来自 SimpleTES，AGPL-3.0，不随仓库分发）
+bash tasks/lasso_path/setup.sh     # Lasso 评测器需要 Eigen + g++
+
+DRY_RUN=1 bash scripts/run_dream_rsi.sh circle_packing_26   # 只做检查、打印命令
+bash scripts/run_e0.sh circle_packing_26                     # 共享的第 1 轮 E0
+E0_WORKSPACE=workspace/.../circle_packing_26 \
+  bash scripts/run_dream_rsi.sh circle_packing_26            # Dream-RSI 循环
+bash scripts/run_baseline.sh circle_packing_26               # Recursive Fixed Exploration
+GUIDANCE=1 bash scripts/run_dream_rsi.sh ...                 # Guidance 消融</code></pre>
+<p>输出目录 <code>workspace/dream_rsi/&lt;task&gt;/</code> 下：<code>history/iterXXX/raw_scores.json</code> 记录每次尝试的分数（节点名 <code>b&lt;分支&gt;_a&lt;尝试&gt;</code>，失败记 0 分），<code>trace_pool/</code> 是冻结的回放世界，<code>policy/method.py</code> 是最新上线策略，<code>pipeline_summary.json</code> 记录每轮探索 / 学习 / 晋升。仓库没有附带跑好的日志或发现出的程序，kernel 任务需要 GPU 评测服务器。</p>
+<div class="callout">
+  <div class="label">建议的阅读顺序</div>
+  <p><code>env/</code>（TraceEnv，理解"回放"到底怎么揭示节点）→ <code>policy/baseline.py</code>（起点策略长什么样）→ <code>learning/heuristic_search/eval.py</code>（目标函数的真实实现，对照式 1 与 Pareto-AUC 的差别）→ <code>prompts/heuristic_proposer.txt</code> → <code>orchestrate.py</code>。最便宜的上手实验：用 <code>circle_packing_26</code> 或 <code>sums_diffs</code>，不需要 GPU。</p>
+</div>
+
+<h2 class="section" id="ref">参考资料</h2>
+<ol class="ref">
+  <li><a class="link" href="https://arxiv.org/pdf/2609.14858" target="_blank" rel="noopener">arXiv:2609.14858 — Dream-RSI: Recursive Self-Improvement through Evolving Worlds (PDF)</a></li>
+  <li><a class="link" href="https://huggingface.co/papers/2609.14858" target="_blank" rel="noopener">Hugging Face Papers 页面</a>（本报告正文内容依据其 Markdown 全文版本阅读）</li>
+  <li><a class="link" href="https://www.emergentmind.com/papers/2609.14858" target="_blank" rel="noopener">Emergent Mind 论文页</a></li>
+  <li><a class="link" href="https://github.com/google-research/dream-rsi" target="_blank" rel="noopener">代码仓库 github.com/google-research/dream-rsi</a>（Apache-2.0，含完整框架与复现脚本）</li>
+  <li><a class="link" href="https://github.com/zhengkid/Dream-RSI" target="_blank" rel="noopener">论文摘要中的仓库 github.com/zhengkid/Dream-RSI</a> · 项目页 dream-rsi.com（目前仅论文与 README）</li>
+</ol>
+
+<div class="callout warn">
+  <div class="label">阅读说明</div>
+  <p>本报告基于论文 v1 全文文本整理。附录 C 的 Lasso 求解器源码在抽取文本中被截断；图 4、图 5 只有坐标轴与少量标签可读，KernelBench 与 guidance 消融的绝对数值以原文图表为准。</p>
+</div>
+
+<div class="footer">
+  Dream-RSI 论文调研报告 · 首次生成 2026-11-06 · 最后更新 2026-11-06 · 生成模型：Claude Opus 5.5 (claude-opus-5-5)，Cowork 模式
+</div>
+</main>
+</div>
+</body>
+</html>

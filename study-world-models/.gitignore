@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+# 训练产物
+worldmodel_min/*.pt
+worldmodel_min/*.npy
+worldmodel_min/*.npz
+worldmodel_min/*.json
