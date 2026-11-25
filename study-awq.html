@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="AWQ（Activation-aware Weight Quantization）中文学习笔记：核心观察、逐通道缩放、官方代码细节、可复现小实验、与 GPTQ 的效果/应用/开销对比，以及 W4A16 与 FP4 的硬件加速现状。">
+  <title>AWQ 学习笔记：激活感知权重量化</title>
+  <style>
+    :root {
+      --bg: #f4f7f6;
+      --paper: #ffffff;
+      --ink: #172a2a;
+      --muted: #5d6f6d;
+      --line: #dce6e3;
+      --brand: #087f6a;
+      --brand-dark: #075d50;
+      --brand-soft: #e4f4ef;
+      --accent: #e88b3a;
+      --accent-soft: #fff3e6;
+      --code-bg: #102d2b;
+      --code-ink: #e8f5f0;
+      --shadow: 0 12px 32px rgba(23, 57, 52, 0.07);
+      --radius: 18px;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; scroll-padding-top: 24px; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--bg);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      font-size: 16px;
+      line-height: 1.78;
+    }
+    a { color: var(--brand-dark); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+    a:hover { color: var(--brand); }
+    code, .formula, .code-block {
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    }
+    code {
+      padding: 0.12em 0.38em;
+      border-radius: 5px;
+      color: #135e51;
+      background: #eaf3f0;
+      font-size: 0.9em;
+    }
+    .container { width: min(1160px, calc(100% - 40px)); margin: 0 auto; }
+
+    .hero {
+      position: relative;
+      overflow: hidden;
+      color: #f5fffb;
+      background: linear-gradient(125deg, #092f2d 0%, #075d50 58%, #128672 100%);
+      padding: 62px 0 48px;
+    }
+    .hero::after {
+      content: "";
+      position: absolute;
+      width: 480px;
+      height: 480px;
+      right: -130px;
+      top: -230px;
+      border: 1px solid rgba(255,255,255,.15);
+      border-radius: 50%;
+      box-shadow: 0 0 0 70px rgba(255,255,255,.035), 0 0 0 140px rgba(255,255,255,.025);
+    }
+    .eyebrow {
+      margin: 0 0 12px;
+      color: #8ee2ce;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+    }
+    h1 { margin: 0; font-size: clamp(34px, 5vw, 56px); line-height: 1.16; letter-spacing: -.035em; }
+    .hero-subtitle { max-width: 790px; margin: 20px 0 26px; color: #d3eee7; font-size: 18px; }
+    .hero-subtitle strong { color: #fff; }
+    .tags { display: flex; flex-wrap: wrap; gap: 9px; }
+    .tag {
+      padding: 5px 12px;
+      border: 1px solid rgba(255,255,255,.22);
+      border-radius: 999px;
+      color: #e9f9f4;
+      background: rgba(255,255,255,.08);
+      font-size: 13px;
+    }
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 24px;
+      margin-top: 30px;
+      padding-top: 20px;
+      border-top: 1px solid rgba(255,255,255,.16);
+      color: #bcded6;
+      font-size: 12px;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 218px minmax(0, 1fr);
+      gap: 34px;
+      align-items: start;
+      padding: 38px 0 70px;
+    }
+    .toc {
+      position: sticky;
+      top: 24px;
+      max-height: calc(100vh - 48px);
+      overflow-y: auto;
+      padding: 20px 18px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: rgba(255,255,255,.76);
+    }
+    .toc-title { margin: 0 0 10px; color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: .12em; }
+    .toc a { display: block; padding: 5px 0; color: var(--muted); text-decoration: none; font-size: 13px; line-height: 1.45; }
+    .toc a:hover { color: var(--brand); }
+    .toc .new { color: var(--accent); font-size: 11px; font-weight: 700; margin-left: 4px; }
+    .mobile-toc { display: none; }
+    main { min-width: 0; }
+    section {
+      margin-bottom: 24px;
+      padding: 30px 34px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--paper);
+      box-shadow: var(--shadow);
+    }
+    h2 { margin: 0 0 20px; font-size: 26px; line-height: 1.35; letter-spacing: -.02em; }
+    h3 { margin: 28px 0 12px; font-size: 19px; line-height: 1.45; }
+    h2 .num { margin-right: 9px; color: var(--brand); font-size: 14px; vertical-align: middle; }
+    p { margin: 10px 0; }
+    ul, ol { padding-left: 1.35em; }
+    li + li { margin-top: 7px; }
+    .lead { color: #294441; font-size: 17px; }
+    .muted { color: var(--muted); }
+    .small { font-size: 13px; }
+    .cite { font-size: 11px; font-weight: 700; text-decoration: none; vertical-align: super; }
+
+    .takeaway {
+      padding: 20px 22px;
+      border-left: 4px solid var(--brand);
+      border-radius: 0 12px 12px 0;
+      background: var(--brand-soft);
+    }
+    .takeaway strong { color: var(--brand-dark); }
+    .warning {
+      padding: 17px 20px;
+      border: 1px solid #f1d2ae;
+      border-radius: 12px;
+      background: var(--accent-soft);
+    }
+    .warning-title { color: #985015; font-weight: 750; }
+    .grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 14px; }
+    .mini-card { padding: 18px; border: 1px solid var(--line); border-radius: 12px; background: #fbfdfc; }
+    .mini-card h3 { margin: 0 0 8px; font-size: 16px; }
+    .mini-card p { margin: 0; color: var(--muted); font-size: 14px; }
+    .kpi { color: var(--brand); font-size: 25px; font-weight: 800; line-height: 1.2; }
+
+    .formula {
+      overflow-x: auto;
+      margin: 16px 0;
+      padding: 17px 20px;
+      border: 1px solid #cfe1dc;
+      border-radius: 12px;
+      color: #123f38;
+      background: #f1f8f5;
+      text-align: center;
+      font-size: 16px;
+      line-height: 1.8;
+      white-space: nowrap;
+    }
+    .formula .label { display: block; margin-bottom: 5px; color: var(--muted); font-family: inherit; font-size: 12px; }
+    sub, sup { line-height: 0; }
+
+    .flow { display: grid; grid-template-columns: 1fr 24px 1fr 24px 1fr; gap: 8px; align-items: stretch; margin: 20px 0; }
+    .flow-step { padding: 16px 12px; border: 1px solid #cde1db; border-radius: 12px; background: #f6fbf9; text-align: center; }
+    .flow-step b { display: block; margin-bottom: 5px; color: var(--brand-dark); }
+    .flow-step span { color: var(--muted); font-size: 13px; line-height: 1.5; }
+    .arrow { align-self: center; color: var(--brand); text-align: center; font-size: 22px; }
+
+    .steps { list-style: none; padding: 0; counter-reset: step; }
+    .steps li { position: relative; min-height: 48px; padding: 0 0 22px 50px; counter-increment: step; }
+    .steps li::before {
+      content: counter(step);
+      position: absolute;
+      left: 0;
+      top: 0;
+      display: grid;
+      place-items: center;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      color: #fff;
+      background: var(--brand);
+      font-size: 14px;
+      font-weight: 700;
+    }
+    .steps li:not(:last-child)::after { content: ""; position: absolute; left: 15px; top: 36px; bottom: 4px; width: 2px; background: var(--line); }
+    .steps b { display: block; margin-bottom: 3px; }
+    .steps p { margin: 0; color: var(--muted); }
+
+    .table-wrap { overflow-x: auto; margin: 16px 0; border: 1px solid var(--line); border-radius: 12px; }
+    table { width: 100%; border-collapse: collapse; min-width: 690px; font-size: 14px; }
+    th, td { padding: 13px 15px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { color: #294b45; background: #edf5f2; font-weight: 700; }
+    tr:last-child td { border-bottom: 0; }
+    tbody tr:nth-child(even) { background: #fbfdfc; }
+    td.hl { color: var(--brand-dark); font-weight: 700; }
+
+    .code-block { overflow-x: auto; margin: 14px 0; padding: 20px; border-radius: 12px; color: var(--code-ink); background: var(--code-bg); font-size: 13px; line-height: 1.65; white-space: pre; }
+    .code-comment { color: #8fbcb1; }
+    details.fold { margin: 14px 0; padding: 12px 16px; border: 1px solid var(--line); border-radius: 12px; background: #fbfdfc; }
+    details.fold summary { cursor: pointer; color: var(--brand-dark); font-weight: 700; }
+    .checklist { list-style: none; padding: 0; }
+    .checklist li { position: relative; padding-left: 28px; }
+    .checklist li::before { content: "✓"; position: absolute; left: 0; color: var(--brand); font-weight: 800; }
+    .mistake { margin: 12px 0; padding: 15px 18px; border-radius: 10px; background: #f6f8f7; }
+    .mistake b { color: var(--brand-dark); }
+
+    .bars { margin: 18px 0; }
+    .bar-row { display: grid; grid-template-columns: 170px minmax(0, 1fr) 64px; gap: 10px; align-items: center; margin: 6px 0; font-size: 13px; }
+    .bar-row .lbl { color: var(--muted); text-align: right; }
+    .bar-track { height: 16px; border-radius: 8px; background: #eef4f2; overflow: hidden; }
+    .bar { height: 100%; border-radius: 8px; background: linear-gradient(90deg, #12a083, #087f6a); }
+    .bar.base { background: #b9c9c5; }
+    .bar.fp16 { background: linear-gradient(90deg, #f3b277, #e88b3a); }
+    .bar.best { background: linear-gradient(90deg, #0b6d5b, #054c40); }
+    .bar-row .val { font-variant-numeric: tabular-nums; }
+
+    .sources { font-size: 14px; }
+    .sources li { margin-bottom: 12px; word-break: break-word; }
+    footer { padding: 0 0 40px; color: var(--muted); text-align: center; font-size: 12px; line-height: 1.8; }
+
+    @media (max-width: 900px) {
+      .layout { grid-template-columns: 1fr; padding-top: 22px; }
+      .toc { display: none; }
+      .mobile-toc { display: block; margin-bottom: 20px; padding: 14px 18px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); }
+      .mobile-toc a { display: inline-block; margin: 4px 12px 4px 0; font-size: 13px; }
+      section { padding: 25px; }
+    }
+    @media (max-width: 640px) {
+      .container { width: min(100% - 22px, 1160px); }
+      .hero { padding: 42px 0 34px; }
+      .hero-subtitle { font-size: 16px; }
+      .layout { gap: 18px; }
+      section { padding: 22px 18px; border-radius: 14px; }
+      h2 { font-size: 23px; }
+      .grid-2 { grid-template-columns: 1fr; }
+      .flow { grid-template-columns: 1fr; }
+      .arrow { transform: rotate(90deg); height: 22px; }
+      .formula { padding: 14px; font-size: 14px; text-align: left; }
+      .meta { gap: 5px 14px; }
+      .bar-row { grid-template-columns: 110px minmax(0, 1fr) 56px; }
+    }
+    @media print {
+      body { background: #fff; font-size: 12px; }
+      .hero { padding: 25px 0; color: #000; background: #fff; border-bottom: 2px solid #222; }
+      .hero-subtitle, .meta, .eyebrow, .tag { color: #333; }
+      .hero::after, .toc, .mobile-toc { display: none; }
+      .layout { display: block; padding: 15px 0; }
+      section { box-shadow: none; break-inside: avoid; padding: 18px; }
+      a { color: #000; }
+    }
+  </style>
+</head>
+<body>
+  <header class="hero">
+    <div class="container">
+      <p class="eyebrow">LLM Quantization · Study Notes</p>
+      <h1>AWQ：激活感知权重量化</h1>
+      <p class="hero-subtitle">Activation-aware Weight Quantization。核心不是“把 1% 权重留成 FP16”，而是<strong>根据激活统计搜索逐输入通道缩放，让统一低比特权重量化把误差花在更值得的地方</strong>。</p>
+      <div class="tags" aria-label="主题标签">
+        <span class="tag">训练后量化 PTQ</span>
+        <span class="tag">Weight-only</span>
+        <span class="tag">典型 W4A16</span>
+        <span class="tag">Per-channel scaling</span>
+        <span class="tag">MLSys 2024 Best Paper</span>
+      </div>
+      <div class="meta">
+        <span>首次生成：2026-11-17</span>
+        <span>最后更新：2026-11-17</span>
+        <span>使用模型与模式：首版 Kimi Code（默认模式）；本次更新 Claude Opus 5.5（opencode/claude-opus-5-5，OpenCode 默认模式）</span>
+        <span>主要依据：原论文、官方代码、独立评测论文、硬件 ISA / 框架文档</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="container">
+    <div class="layout">
+      <nav class="toc" aria-label="目录">
+        <p class="toc-title">目录</p>
+        <a href="#summary">01 · 一句话理解</a>
+        <a href="#baseline">02 · 从朴素量化出发</a>
+        <a href="#insight">03 · 两个关键观察</a>
+        <a href="#scaling">04 · 等价缩放为何有效</a>
+        <a href="#algorithm">05 · 算法与官方代码细节</a>
+        <a href="#example">06 · 可复现的小实验<span class="new">新</span></a>
+        <a href="#obs-view">07 · 从 OBS / GPTQ 视角看<span class="new">新</span></a>
+        <a href="#versus">08 · AWQ vs GPTQ：效果、应用、开销<span class="new">新</span></a>
+        <a href="#outliers">09 · 量化后还有 outlier 吗</a>
+        <a href="#speedup">10 · 为什么 W4A16 能加速<span class="new">新</span></a>
+        <a href="#hardware">11 · 硬件：FP4 × FP16 有原生加速吗<span class="new">新</span></a>
+        <a href="#ecosystem">12 · 2026 年工具链现状<span class="new">新</span></a>
+        <a href="#practice">13 · 实践与部署</a>
+        <a href="#limits">14 · 局限与常见误区</a>
+        <a href="#sources">参考资料</a>
+      </nav>
+
+      <main>
+        <details class="mobile-toc">
+          <summary><strong>展开目录</strong></summary>
+          <a href="#summary">一句话理解</a><a href="#baseline">量化基础</a><a href="#insight">关键观察</a><a href="#scaling">等价缩放</a><a href="#algorithm">算法与代码</a><a href="#example">小实验</a><a href="#obs-view">OBS 视角</a><a href="#versus">AWQ vs GPTQ</a><a href="#outliers">Outlier</a><a href="#speedup">加速原理</a><a href="#hardware">硬件支持</a><a href="#ecosystem">工具链</a><a href="#practice">实践部署</a><a href="#limits">局限误区</a><a href="#sources">参考资料</a>
+        </details>
+
+        <section id="summary">
+          <h2><span class="num">01</span>一句话理解 AWQ</h2>
+          <div class="takeaway">
+            <strong>先测量哪些输入通道的激活通常较大，再放大这些通道对应的权重列、同时把输入缩小相同倍数；搜索让模块输出误差最小的缩放强度，最后统一做低比特分组量化。</strong>
+          </div>
+          <p class="lead">AWQ 是 <strong>Activation-aware Weight Quantization</strong> 的缩写，中文通常译为“激活感知权重量化”，来自 MIT Han Lab，获 MLSys 2024 最佳论文。它是一种面向 LLM 的低比特、训练后、仅权重量化方法，常见配置是 INT4 权重与 FP16/BF16 激活，即 <strong>W4A16</strong>。<a class="cite" href="#ref-1">[1]</a></p>
+          <div class="grid-2">
+            <div class="mini-card">
+              <div class="kpi">看什么？</div>
+              <p>看激活分布，而不是只看权重绝对值。权重造成的影响还取决于它乘上的输入激活。</p>
+            </div>
+            <div class="mini-card">
+              <div class="kpi">保护谁？</div>
+              <p>保护高激活输入通道对应的权重列；最终对所有通道采用连续缩放，而非只保存一个二值的“重要权重名单”。</p>
+            </div>
+            <div class="mini-card">
+              <div class="kpi">怎么保护？</div>
+              <p>通过数学上等价的逐通道缩放重新分配量化分辨率，不引入不规则的 INT4 / FP16 混合权重存储。</p>
+            </div>
+            <div class="mini-card">
+              <div class="kpi">不做什么？</div>
+              <p>不反向传播、不重新训练，也不做 GPTQ 式的逐列量化与剩余权重误差补偿。</p>
+            </div>
+          </div>
+        </section>
+
+        <section id="baseline">
+          <h2><span class="num">02</span>从朴素权重量化出发</h2>
+          <p>对一个线性层 <code>y = Wx</code>，Round-to-Nearest（RTN）把每个权重映射到最近的量化网格点。以 <em>b</em> bit 非对称量化为例：</p>
+          <div class="formula">
+            q = clip(round(w / Δ) + z, 0, 2<sup>b</sup> − 1)<br>
+            ŵ = Δ · (q − z)
+          </div>
+          <p>其中 <code>Δ</code> 是量化步长，<code>z</code> 是零点。4 bit 只有 <strong>16 个整数级别</strong>。实际 AWQ 通常采用 group-wise 量化：每个输出通道内再按固定数量的输入通道分组，各组拥有自己的 scale 和 zero point。论文与官方示例都用 <code>group_size = 128</code>。<a class="cite" href="#ref-1">[1]</a><a class="cite" href="#ref-3">[3]</a></p>
+          <h3>“Weight-only”到底量化的是什么？</h3>
+          <ul>
+            <li><strong>存储与搬运：</strong>权重以 INT4 等低比特形式保存，配套保存高精度量化参数。</li>
+            <li><strong>计算：</strong>推理内核把权重即时反量化到 FP16/BF16，再与高精度激活计算；不是整个矩阵乘法都在 INT4 上完成（原因见第 11 节：硬件没有 INT4 × FP16 的乘法指令）。</li>
+            <li><strong>主要收益：</strong>降低权重显存占用与显存带宽压力。对自回归 decode 这类受权重读取带宽限制的场景尤其有价值。</li>
+          </ul>
+          <div class="warning">
+            <div class="warning-title">4 bit 不等于总显存恰好缩小 4 倍</div>
+            仅看理想权重 payload，7B 参数从 FP16 到 INT4 约由 14 GB 降到 3.5 GB（按十进制 GB）。实际还要加上 scale / zero point、未量化层、KV cache、激活与运行时缓冲区，因此总显存不会严格缩小 4 倍。
+          </div>
+        </section>
+
+        <section id="insight">
+          <h2><span class="num">03</span>两个关键观察</h2>
+          <h3>观察一：权重并不同等重要</h3>
+          <p>论文的消融实验发现，在 INT3、group size 128 的设置下，仅把约 <strong>0.1%–1%</strong> 的显著权重通道保留为 FP16，就能相对朴素 RTN 明显改善量化质量。<a class="cite" href="#ref-1">[1]</a></p>
+          <h3>观察二：应根据激活，而不是权重大小选重要通道</h3>
+          <p>同一个实验里，<strong>按什么标准挑</strong>这 1% 通道，结果天差地别（OPT-6.7B，INT3-g128，WikiText-2 困惑度，越低越好）：</p>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>保留为 FP16 的比例</th><th>按激活幅度挑</th><th>按权重 L2 范数挑</th><th>随机挑</th></tr></thead>
+              <tbody>
+                <tr><td>0%（即 RTN）</td><td colspan="3">23.54（FP16 原模型为 10.86）</td></tr>
+                <tr><td>0.1%</td><td class="hl">11.58</td><td>23.41</td><td>23.54</td></tr>
+                <tr><td>1%</td><td class="hl">11.39</td><td>22.37</td><td>24.23</td></tr>
+                <tr><td>3%</td><td class="hl">11.36</td><td>22.45</td><td>24.22</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="small muted">数据来自论文 Table 1。按权重大小挑和随机挑几乎没用；按激活挑，0.1% 就把困惑度从 23.54 拉回 11.58。</p>
+          <p>原因很直接：设第 <code>j</code> 个输入通道上的权重量化误差为 <code>δw<sub>ij</sub></code>，则输出误差为</p>
+          <div class="formula">δy<sub>i</sub> = Σ<sub>j</sub> δw<sub>ij</sub> · x<sub>j</sub></div>
+          <p>同样大小的权重误差，乘上更大的激活就造成更大的输出误差。因此，<strong>输入通道的典型激活幅度</strong>是权重误差敏感度的有用代理。</p>
+          <div class="warning">
+            <div class="warning-title">“保留 1% FP16”是动机实验，不是 AWQ 最终的存储方式</div>
+            混合精度格式对硬件不友好（不规则访存、需要专门内核）。AWQ 最终改用逐通道缩放来“保护”这些通道，目标模型仍可统一打包为低比特权重。
+          </div>
+        </section>
+
+        <section id="scaling">
+          <h2><span class="num">04</span>核心操作：等价逐通道缩放</h2>
+          <h3>4.1 不改变原始线性变换</h3>
+          <p>令每个输入通道 <code>j</code> 有一个正缩放系数 <code>s<sub>j</sub></code>，组成对角矩阵 <code>S</code>。把权重第 <code>j</code> 列乘以 <code>s<sub>j</sub></code>，同时把输入第 <code>j</code> 维除以 <code>s<sub>j</sub></code>：</p>
+          <div class="formula">
+            <span class="label">未量化时，数学输出完全相同</span>
+            y = Wx = (WS)(S<sup>−1</sup>x)
+          </div>
+          <p>AWQ 真正量化的是变换后的权重 <code>WS</code>，因此实际计算近似为：</p>
+          <div class="formula">ŷ = Q(WS) · S<sup>−1</sup>x</div>
+          <p>注意 <code>s</code> 是<strong>按输入通道</strong>定义的，同一列的所有输出行共用一个 <code>s<sub>j</sub></code>；它和每个量化 group 内部的步长 <code>Δ</code> 是两回事。</p>
+
+          <h3>4.2 为什么放大显著权重能降低有效误差？</h3>
+          <p>只看一个显著权重。原量化步长为 <code>Δ</code>；把它乘以 <code>s &gt; 1</code> 后量化，再除以 <code>s</code> 回到原坐标系，新步长记为 <code>Δ′</code>。舍入误差的期望大致不变（约 0.25 个步长），所以：</p>
+          <div class="formula">新误差 / 原误差 ≈ (Δ′ / Δ) · (1 / s)</div>
+          <p>只放大一个元素，通常不会改变整组的最大值，即 <code>Δ′ ≈ Δ</code>，于是这个权重的有效误差约缩小到 <code>1/s</code>。但 <code>s</code> 太大时，它会变成组内最大值、撑大 <code>Δ′</code>，组内其他普通权重的误差随之放大。论文实测（OPT-6.7B，INT3-g128，只放大 1% 显著通道）：<a class="cite" href="#ref-1">[1]</a></p>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>s</th><th>1（RTN）</th><th>1.25</th><th>1.5</th><th>2</th><th>4</th></tr></thead>
+              <tbody>
+                <tr><td>Δ 发生变化的 group 比例</td><td>0%</td><td>2.8%</td><td>4.4%</td><td>8.2%</td><td>21.2%</td></tr>
+                <tr><td>显著通道平均误差比 (Δ′/Δ)·(1/s)</td><td>1</td><td>0.804</td><td>0.676</td><td>0.519</td><td>0.303</td></tr>
+                <tr><td>WikiText-2 PPL</td><td>23.54</td><td>12.87</td><td>12.48</td><td class="hl">11.92</td><td>12.36</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="takeaway"><strong>所以 AWQ 不是“缩放越大越好”，而是在显著通道和其他通道之间重新分配有限的量化分辨率。</strong>这就是需要搜索缩放强度的原因。论文中完整 AWQ 在该设置下 PPL 为 11.39，与“1% 保留 FP16”的 11.39 持平，但不需要混合精度存储。</div>
+
+          <h3>4.3 反向缩放到哪里去了？</h3>
+          <p><code>S<sup>−1</sup></code> 被吸收进前一个算子，推理时零额外开销。官方实现有三种吸收方式：<a class="cite" href="#ref-4">[4]</a></p>
+          <ul>
+            <li><strong>Norm → Linear：</strong>LayerNorm / RMSNorm 的 weight（及 bias）除以 <code>s</code>，后续 Linear 的对应输入列乘以 <code>s</code>（<code>scale_ln_fcs</code>）。</li>
+            <li><strong>Linear → Linear：</strong>前一个 Linear 的对应<strong>输出行</strong>除以 <code>s</code>，后一个 Linear 的输入列乘以 <code>s</code>（<code>scale_fc_fc</code>）。例如 <code>v_proj → o_proj</code>（注意力输出对 V 是逐通道线性的）、<code>up_proj → down_proj</code>（SwiGLU 输出对 up 是逐元素线性的）。</li>
+            <li><strong>激活函数 → Linear：</strong>GELU 等非线性不能直接穿过，官方用 <code>ScaledActivation</code> 包一层显式的逐通道除法。</li>
+          </ul>
+        </section>
+
+        <section id="algorithm">
+          <h2><span class="num">05</span>完整算法与官方代码细节</h2>
+          <div class="flow" aria-label="AWQ 三阶段流程">
+            <div class="flow-step"><b>逐 block 校准前向</b><span>缓存每个 Linear 的输入，统计逐通道 mean|x|</span></div>
+            <div class="arrow">→</div>
+            <div class="flow-step"><b>搜索缩放 + 裁剪</b><span>20 档 α 网格搜索；再搜 10 档权重裁剪</span></div>
+            <div class="arrow">→</div>
+            <div class="flow-step"><b>统一量化</b><span>生成 INT3 / INT4 权重及 group 量化参数</span></div>
+          </div>
+
+          <h3>5.1 缩放搜索（<code>auto_scale.py</code>）</h3>
+          <p>缩放系数被参数化为 <code>s = s<sub>X</sub><sup>α</sup></code>，其中 <code>s<sub>X</sub></code> 是逐通道平均激活幅度，只需搜索一个标量 <code>α</code>。以下伪代码按官方代码整理：<a class="cite" href="#ref-4">[4]</a></p>
+          <div class="code-block"><span class="code-comment"># x: 缓存的该组 Linear 的输入 [n_tokens, c_in]</span>
+x_mean = x.abs().mean(dim=0)                 <span class="code-comment"># get_act_scale：每个输入通道一个数</span>
+for i in range(20):                          <span class="code-comment"># n_grid = 20</span>
+    alpha = i / 20                           <span class="code-comment"># 0, 0.05, ..., 0.95（不含 1.0）</span>
+    s = x_mean.pow(alpha).clamp(min=1e-4)
+    s = s / sqrt(s.max() * s.min())          <span class="code-comment"># 归一化，让缩放围绕 1 分布</span>
+    for fc in linears2scale:                 <span class="code-comment"># 共享同一输入的多个 Linear 用同一个 s</span>
+        fc.weight = Q(fc.weight * s) / s     <span class="code-comment"># 伪量化后再除回去</span>
+    loss = mean((block(x) - block_fp16(x)) ** 2)   <span class="code-comment"># 看整个被检查模块的输出</span>
+    记录最小 loss 对应的 s；恢复原权重
+<span class="code-comment"># 最后把 1/s 融进前一个算子，把 s 乘进这些 Linear 的列</span></div>
+          <p>对 Llama / Qwen2 结构，每个 Transformer block 搜索 4 组缩放：</p>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>前一个算子（吸收 1/s）</th><th>被放大的 Linear</th><th>搜索时比较谁的输出</th></tr></thead>
+              <tbody>
+                <tr><td><code>input_layernorm</code></td><td><code>q_proj, k_proj, v_proj</code></td><td>整个 <code>self_attn</code></td></tr>
+                <tr><td><code>v_proj</code></td><td><code>o_proj</code></td><td><code>o_proj</code>（仅当二者权重形状相同时才做，GQA 模型会跳过）</td></tr>
+                <tr><td><code>post_attention_layernorm</code></td><td><code>gate_proj, up_proj</code></td><td>整个 <code>mlp</code></td></tr>
+                <tr><td><code>up_proj</code></td><td><code>down_proj</code></td><td><code>down_proj</code></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="small muted">细节：代码里定义了同时使用权重统计的 <code>get_weight_scale</code>，但默认搜索只用激活统计。后来 NVIDIA ModelOpt 的 <code>awq_lite</code> 和 llm-compressor 的 <code>duo_scaling</code> 都加入了“激活<sup>α</sup> / 权重<sup>1−α</sup>”的变体（见第 12 节）。</p>
+
+          <h3>5.2 权重裁剪搜索（<code>auto_clip.py</code>）</h3>
+          <ul>
+            <li>在缩放之后进行，使用已经除以 <code>s</code> 的输入特征。</li>
+            <li>对每个“输出通道 × group”，把截断阈值设为原最大值的 100%、95%、…、55%（10 档），对称截断后伪量化。</li>
+            <li>从校准 token 中均匀抽 512 个，计算该 group 局部输出的 MSE，取最小者。</li>
+            <li>名字含 <code>q_</code>、<code>k_</code>、<code>query</code>、<code>key</code>、<code>Wqkv</code> 的层<strong>跳过</strong>裁剪（代码注释：QK 相乘后难以精确裁剪）。<a class="cite" href="#ref-7">[7]</a></li>
+          </ul>
+
+          <h3>5.3 整体流程（<code>pre_quant.py</code>）</h3>
+          <ol class="steps">
+            <li>
+              <b>准备校准集</b>
+              <p>默认取 pile-val 数据，<code>n_samples=512</code>、<code>seqlen=512</code>；不需要标签、损失反传或参数训练。<a class="cite" href="#ref-6">[6]</a></p>
+            </li>
+            <li>
+              <b>逐 block 处理</b>
+              <p>对第 i 个 block：挂 hook 缓存所有 Linear 的输入，同时算出该 block 的 FP16 输出作为下一个 block 的输入。</p>
+            </li>
+            <li>
+              <b>缩放搜索并应用</b>
+              <p>按 5.1 搜索 4 组缩放，应用到权重，并把缓存的输入同步除以 <code>s</code>。</p>
+            </li>
+            <li>
+              <b>裁剪搜索并应用</b>
+              <p>按 5.2 搜索并截断权重。</p>
+            </li>
+            <li>
+              <b>最后统一量化</b>
+              <p>真正的 INT 量化与打包在这些变换都完成之后进行（<code>--q_backend real</code>）。</p>
+            </li>
+          </ol>
+          <div class="warning">
+            <div class="warning-title">一个和 GPTQ 不同的细节</div>
+            官方 AWQ 在<strong>应用缩放和裁剪之前</strong>就已算出下一个 block 的输入，所以后续 block 看到的是 FP16 模型的激活，前面 block 的量化误差<strong>不会传递</strong>下去。GPTQ 则用“已量化 block 的真实输出”作为下一层输入，让后面的层能看到并补偿前面的误差。
+          </div>
+        </section>
+
+        <section id="example">
+          <h2><span class="num">06</span>一个可复现的小实验</h2>
+          <p>先看最直观的版本：两个输入通道平均激活为 <code>a = [8, 1]</code>，取 <code>α = 0.5</code>，则 <code>s ∝ [√8, 1] ≈ [2.83, 1]</code>。第一列权重获得约 2.83 倍的相对放大，推理时第一维输入做对应缩小。</p>
+          <p>下面用一个更接近真实的玩具层，看看 α 的选择如何影响误差。设定：</p>
+          <ul>
+            <li>一个 Linear：256 个输出 × 512 个输入通道，权重服从拉普拉斯分布。</li>
+            <li>输入通道相互独立；其中 5 个通道（约 1%）激活标准差为 20，其余为 1。</li>
+            <li>INT3 对称量化，group size 128，用期望输出误差 <code>E‖(W − Ŵ)x‖²</code> 衡量（通道独立时可精确计算）。</li>
+            <li>α 网格与官方实现一致：0, 0.05, …, 0.95。</li>
+          </ul>
+          <div class="bars" aria-label="不同方案的输出误差（相对 RTN）">
+            <div class="bar-row"><span class="lbl">RTN（α = 0）</span><div class="bar-track"><div class="bar base" style="width:100%"></div></div><span class="val">100%</span></div>
+            <div class="bar-row"><span class="lbl">1% 通道保留 FP16</span><div class="bar-track"><div class="bar fp16" style="width:20.1%"></div></div><span class="val">20.1%</span></div>
+            <div class="bar-row"><span class="lbl">只放大显著通道 ×2</span><div class="bar-track"><div class="bar" style="width:43.6%"></div></div><span class="val">43.6%</span></div>
+            <div class="bar-row"><span class="lbl">只放大显著通道 ×4</span><div class="bar-track"><div class="bar" style="width:37.3%"></div></div><span class="val">37.3%</span></div>
+            <div class="bar-row"><span class="lbl">α = 0.10</span><div class="bar-track"><div class="bar" style="width:66.0%"></div></div><span class="val">66.0%</span></div>
+            <div class="bar-row"><span class="lbl">α = 0.20</span><div class="bar-track"><div class="bar" style="width:47.7%"></div></div><span class="val">47.7%</span></div>
+            <div class="bar-row"><span class="lbl">α = 0.30</span><div class="bar-track"><div class="bar" style="width:37.6%"></div></div><span class="val">37.6%</span></div>
+            <div class="bar-row"><span class="lbl"><b>α = 0.40（最佳）</b></span><div class="bar-track"><div class="bar best" style="width:35.9%"></div></div><span class="val"><b>35.9%</b></span></div>
+            <div class="bar-row"><span class="lbl">α = 0.50</span><div class="bar-track"><div class="bar" style="width:39.2%"></div></div><span class="val">39.2%</span></div>
+            <div class="bar-row"><span class="lbl">α = 0.60</span><div class="bar-track"><div class="bar" style="width:46.3%"></div></div><span class="val">46.3%</span></div>
+            <div class="bar-row"><span class="lbl">α = 0.80</span><div class="bar-track"><div class="bar" style="width:68.4%"></div></div><span class="val">68.4%</span></div>
+            <div class="bar-row"><span class="lbl">α = 0.95</span><div class="bar-track"><div class="bar" style="width:85.8%"></div></div><span class="val">85.8%</span></div>
+          </div>
+          <div class="grid-2">
+            <div class="mini-card">
+              <h3>RTN 时误差集中在哪</h3>
+              <p>RTN 下，这 1% 的显著通道贡献了全部输出误差的 <b>79.9%</b>。这就是“保护少数通道收益巨大”的原因。</p>
+            </div>
+            <div class="mini-card">
+              <h3>为什么是 U 形曲线</h3>
+              <p>α 增大时，显著通道的误差占比一路下降（α=0.4 时 26%，α=0.95 时 5%），但它们撑大了所在 group 的步长，其他通道误差上升。两者平衡在 α≈0.4。</p>
+            </div>
+          </div>
+          <p class="small muted">这个玩具例子里 AWQ 没有追上“保留 1% FP16”（35.9% vs 20.1%），而论文在真实模型上两者持平（第 4 节）。差距取决于权重和激活的真实分布，玩具结果只用于说明机制，不代表真实模型的数值。</p>
+          <details class="fold">
+            <summary>展开实验脚本（纯 Python，无依赖）</summary>
+<div class="code-block">import math, random
+random.seed(42)
+R, C, G, BITS = 256, 512, 128, 3            # 256 个输出、512 个输入通道、group=128、INT3
+salient = [37, 201, 388, 450, 99]           # 约 1% 的输入通道激活很大
+sigma = [20.0 if j in salient else 1.0 for j in range(C)]
+a = [s * math.sqrt(2 / math.pi) for s in sigma]   # a_j = E|x_j|（高斯分布）
+
+def laplace(b=0.02):
+    u = random.random() - 0.5
+    return -math.copysign(1, u) * math.log(1 - 2 * abs(u)) * b
+W = [[laplace() for _ in range(C)] for _ in range(R)]
+QMAX = 2 ** (BITS - 1) - 1
+
+def quant_row(row, keep=()):
+    out = row[:]
+    for g in range(0, C, G):
+        idx = [j for j in range(g, g + G) if j not in keep]
+        d = max(abs(row[j]) for j in idx) / QMAX
+        for j in idx:
+            out[j] = d * max(-QMAX, min(QMAX, round(row[j] / d)))
+    return out
+
+def out_mse(Wq):   # E||(W - Wq) x||^2，输入通道独立 => Σ δw² σ²
+    return sum((W[r][j] - Wq[r][j]) ** 2 * sigma[j] ** 2
+               for r in range(R) for j in range(C)) / R
+
+def scaled_quant(s):
+    return [[v / s[j] for j, v in enumerate(quant_row([W[r][j] * s[j] for j in range(C)]))]
+            for r in range(R)]
+
+base = out_mse([quant_row(r) for r in W])
+print(f"keep 1% FP16: {out_mse([quant_row(r, set(salient)) for r in W]) / base:.1%}")
+for k in (2, 4):
+    print(f"salient x{k}: {out_mse(scaled_quant([k if j in salient else 1 for j in range(C)])) / base:.1%}")
+for i in range(20):                          # 与官方实现相同的 α 网格
+    alpha = i / 20
+    s = [t ** alpha for t in a]
+    n = math.sqrt(max(s) * min(s))
+    s = [t / n for t in s]
+    print(f"alpha={alpha:.2f}: {out_mse(scaled_quant(s)) / base:.1%}")</div>
+          </details>
+        </section>
+
+        <section id="obs-view">
+          <h2><span class="num">07</span>从 OBS / GPTQ 视角看 AWQ</h2>
+          <p>AWQ 和 GPTQ 优化的是<strong>同一个逐层目标</strong>：</p>
+          <div class="formula">min ‖WX − ŴX‖²，其 Hessian 为 H = 2XX<sup>T</sup></div>
+          <p>把一行权重的误差记为 <code>δw</code>，输出误差就是 <code>δw<sup>T</sup>(XX<sup>T</sup>)δw</code>。如果各输入通道近似不相关，它约等于</p>
+          <div class="formula">Σ<sub>j</sub> δw<sub>j</sub><sup>2</sup> · Σ<sub>t</sub> x<sub>jt</sub><sup>2</sup> = Σ<sub>j</sub> δw<sub>j</sub><sup>2</sup> · H<sub>jj</sub> / 2</div>
+          <p><strong>可以这样理解（这是我的解读，不是论文原话）：</strong>AWQ 的激活统计 <code>mean|x<sub>j</sub>|</code> 相当于用一阶矩代替二阶矩，廉价地近似了 <code>diag(H)</code>。放大第 j 列，就是把更多量化分辨率分给 <code>H<sub>jj</sub></code> 大的通道。</p>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th></th><th>AWQ</th><th>GPTQ</th></tr></thead>
+              <tbody>
+                <tr><td>用到的二阶信息</td><td>只用“对角”式的逐通道激活统计</td><td>完整 H（含通道间相关性），通过 Cholesky 分解使用</td></tr>
+                <tr><td>改变的是什么</td><td><strong>量化网格</strong>如何分配（通过缩放 + 裁剪），取整仍是 RTN</td><td><strong>取整决策</strong>：逐列量化，并更新剩余权重来补偿</td></tr>
+                <tr><td>自由度</td><td>每组只搜一个标量 α（20 档）</td><td>每个权重的取整都依赖之前的误差</td></tr>
+                <tr><td>过拟合校准集的风险</td><td>低：只统计平均幅度</td><td>较高：直接拟合校准数据的协方差</td></tr>
+                <tr><td>是否传递前层误差</td><td>否（下一层输入来自 FP16 模型）</td><td>是（下一层输入来自已量化模型）</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="takeaway"><strong>两者是正交的：AWQ 先把网格“摆对”，GPTQ 再把取整“做对”，可以叠加使用。</strong>论文 Table 9 中 INT2-g64：OPT-6.7B 的 GPTQ PPL 16.65，AWQ+GPTQ 降到 15.71；OPT-13B 从 16.74 降到 13.25。<a class="cite" href="#ref-1">[1]</a></div>
+          <h3>与 RTN、GPTQ、SmoothQuant 的总体区别</h3>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>方法</th><th>主要量化对象</th><th>核心思路</th><th>校准 / 训练</th><th>与 AWQ 的关键差别</th></tr>
+              </thead>
+              <tbody>
+                <tr><td><strong>RTN</strong></td><td>通常为权重</td><td>直接舍入到最近网格点</td><td>不需要校准</td><td>最简单，没有利用激活敏感度。</td></tr>
+                <tr><td><strong>AWQ</strong></td><td>权重，典型 W4A16</td><td>激活统计 + 逐通道等价缩放 + 分组量化</td><td>少量校准前向；无反传</td><td>重点是保护显著输入通道。</td></tr>
+                <tr><td><strong>GPTQ</strong><a class="cite" href="#ref-8">[8]</a></td><td>经典方法为仅权重</td><td>用输入 Hessian 逐列量化，并更新未量化权重来补偿误差</td><td>需要校准数据；顺序更新</td><td>二阶误差最小化与权重间补偿。</td></tr>
+                <tr><td><strong>SmoothQuant</strong><a class="cite" href="#ref-9">[9]</a></td><td>权重和激活，典型 W8A8</td><td>同样是等价逐通道缩放，但目的是把激活的量化难度迁移给权重</td><td>需要校准统计</td><td>目标是让激活也能低比特；AWQ 保持激活高精度。</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="versus">
+          <h2><span class="num">08</span>AWQ vs GPTQ：效果、应用与量化开销</h2>
+          <div class="takeaway"><strong>一句话：4-bit、group 128 时两者基本打平，谁赢取决于实现细节和评测方式；GPTQ 在更低比特、不分组时更稳，AWQ 对校准数据更鲁棒；量化开销在同一量级，但资源消耗的结构不同。</strong></div>
+
+          <h3>8.1 效果：各方证据</h3>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>来源</th><th>设置</th><th>结果</th></tr></thead>
+              <tbody>
+                <tr><td>AWQ 原论文<a class="cite" href="#ref-1">[1]</a></td><td>Llama-2-7B，WikiText-2 PPL</td><td>INT4-g128：FP16 5.47 / RTN 5.73 / GPTQ 5.69 / GPTQ-R 5.63 / <b>AWQ 5.60</b><br>INT3-g128：RTN 6.66 / GPTQ 6.43 / <b>AWQ 6.24</b></td></tr>
+                <tr><td>LLMC 基准（EMNLP 2024 Industry）<a class="cite" href="#ref-10">[10]</a></td><td>Llama-2-7B，统一校准设置复现</td><td>w4g128：GPTQ 5.62 / AWQ 5.60<br>w3g128：GPTQ 6.32 / AWQ 6.24<br>w2g64：<b>GPTQ 14.97</b> / AWQ 2.16×10<sup>5</sup>（AWQ 崩溃）</td></tr>
+                <tr><td>LLMC</td><td>Llama-3-8B，w3a16g128，多任务平均（AWQ 未开裁剪）</td><td>GPTQ：PPL 10.67 / 准确率 71.96<br>AWQ：10.98 / 70.72<br><b>AWQ+GPTQ：10.55 / 72.72</b></td></tr>
+                <tr><td>OmniQuant 论文<a class="cite" href="#ref-11">[11]</a></td><td>Llama-2-7B，W3A16 <b>不分组</b></td><td><b>GPTQ 8.37</b> / AWQ 24.00：AWQ 很依赖分组量化</td></tr>
+                <tr><td>Huang et al. 2024<a class="cite" href="#ref-12">[12]</a></td><td>指令模型（最大到 405B），多任务</td><td>原文结论：“weight-only 方法中，AWQ 通常比 GPTQ 掉点更少”</td></tr>
+                <tr><td>Kurtic et al.（“Give Me BF16 or Give Me Death”）<a class="cite" href="#ref-13">[13]</a></td><td>Llama-3.1-8B-Instruct，W4A16-g128</td><td>学术基准平均：GPTQ 49.82 / AWQ 50.05（打平）<br>真实任务：Arena-Hard <b>24.0</b> / 22.3，HumanEval <b>67.1</b> / 63.0，MBPP <b>65.8</b> / 62.8<br>70B 上两者几乎相同。作者的 GPTQ 用了 MSE 最优裁剪和更好的校准数据</td></tr>
+                <tr><td>AWQ 原论文 Fig.8</td><td>OPT-6.7B，INT3-g128，校准集与测试集分布错配</td><td>AWQ PPL 只升 0.5–0.6，GPTQ 升 2.3–4.9；AWQ 用 16 条序列就优于 GPTQ 用 192 条</td></tr>
+                <tr><td>LLMC</td><td>把校准文本的 token 顺序打乱</td><td>GPTQ、OmniQuant 的 PPL 上升幅度约为 AWQ 的 3.3 倍</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="grid-2">
+            <div class="mini-card">
+              <h3>GPTQ 占优的情况</h3>
+              <p>3-bit 及以下、不分组（per-channel）量化；开放式生成和代码任务（调优后）；作为旋转类方法（QuaRot / SpinQuant）后面的取整步骤。</p>
+            </div>
+            <div class="mini-card">
+              <h3>AWQ 占优的情况</h3>
+              <p>校准数据少或与实际负载分布不一致；多模态和指令模型（论文中 VLM 结果明显优于 GPTQ）；希望流程简单、不易过拟合。</p>
+            </div>
+          </div>
+          <p class="small muted">注意：许多博客给出的“AWQ 比 GPTQ 高 x 分”的表格没有说明评测框架、group size、act-order 和校准集，结论经常互相矛盾，不宜引用。上表只收录了公开了设置的论文。</p>
+
+          <h3>8.2 应用：现在哪个用得多</h3>
+          <p>没有权威的统一统计（AutoAWQ 弃用时自称 Hugging Face 上有 7000+ 个模型；GPTQ 模型数量也很大，但没有可靠计数）。可以从各生态的默认选择来看：</p>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>生态</th><th>GPTQ</th><th>AWQ</th></tr></thead>
+              <tbody>
+                <tr><td>最初的工具</td><td>AutoGPTQ（2025 年归档）</td><td>AutoAWQ（2025 年宣布弃用，仓库只读）</td></tr>
+                <tr><td>现在维护的工具</td><td>GPT-QModel（HF Transformers / Optimum / PEFT 的官方后端，也已接管 AWQ）；llm-compressor <code>GPTQModifier</code></td><td>llm-compressor <code>AWQModifier</code>（由 vLLM 项目接手 AutoAWQ）；GPT-QModel；MLX-LM</td></tr>
+                <tr><td>vLLM 推理</td><td>支持，走 Marlin 内核</td><td>支持，走 Marlin 内核</td></tr>
+                <tr><td>NVIDIA ModelOpt / TensorRT-LLM</td><td>TRT-LLM 支持 W4A16 / W4A8 GPTQ</td><td><b>ModelOpt 的默认 INT4 方案</b>：<code>INT4_AWQ</code>（W4A16）、<code>W4A8_AWQ</code>、<code>NVFP4_AWQ</code></td></tr>
+                <tr><td>Red Hat / Neural Magic 发布的 INT4 模型</td><td><b>以 GPTQ 为主</b>（Kurtic et al. 的评测后定为主力 INT4 方法）</td><td>—</td></tr>
+                <tr><td>研究论文</td><td><b>绝大多数新方法的基础组件</b>（旋转 + GPTQ、FP4 专用的 MR-GPTQ 等）</td><td>“等价缩放”的思想被广泛继承，但在 W4A4 上逐渐被旋转类变换取代</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p><strong>我的判断：</strong>研究界和 vLLM / Red Hat 生态中 GPTQ 更常见；NVIDIA 官方工具链默认用 AWQ；两者在推理框架里都是一等公民。更大的趋势是：Hopper / Blackwell 数据中心逐步转向 FP8 和 NVFP4，AWQ 和 GPTQ 从“格式”退为“校准算法”（llm-compressor 文档写明 FP4 可以用 GPTQ 或 AWQ 来提升精度）。本地和端侧部署则以 llama.cpp 的 GGUF 为主，两者都不占主导。</p>
+
+          <h3>8.3 量化开销：谁更耗时、更耗资源</h3>
+          <p><strong>耗时在同一量级。</strong>llm-compressor 官方给出的参考时间（Meta-Llama-3-8B-Instruct，单张 A100）：<a class="cite" href="#ref-14">[14]</a></p>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>算法</th><th>估计耗时</th></tr></thead>
+              <tbody>
+                <tr><td>RTN，只量化权重</td><td>约 1 分钟</td></tr>
+                <tr><td>GPTQ，只量化权重</td><td>约 30 分钟</td></tr>
+                <tr><td>AWQ，只量化权重</td><td>约 30 分钟</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>作为参照，GPTQ 原论文在单张 A100 上量化 OPT-13B 用 20.9 分钟、OPT-175B 用 4.2 小时；需要训练的 OmniQuant 量化 LLaMA-7B（仅权重）要 1.1 小时。AWQ 和 GPTQ 都远比 QAT 便宜。</p>
+          <p><strong>资源消耗的结构不同：</strong></p>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th></th><th>GPTQ</th><th>AWQ</th></tr></thead>
+              <tbody>
+                <tr><td>主要计算</td><td>累积 Hessian <code>XX<sup>T</sup></code>（N·d<sub>in</sub><sup>2</sup>）、Cholesky（d<sub>in</sub><sup>3</sup>）、逐列量化与补偿（d<sub>out</sub>·d<sub>in</sub><sup>2</sup>）；每个 block 约 2 次前向</td><td>每组缩放跑 20 个 α，每个 α 都要伪量化并跑一次被检查模块（整个 attention 或 MLP）的前向；再加 10 档裁剪搜索</td></tr>
+                <tr><td>主要显存</td><td>每个正在处理的 Linear 一个 d<sub>in</sub>×d<sub>in</sub> 的 FP32 Hessian。llm-compressor 估算：GPU 占用约为 RTN 的 2 倍（Llama-3-8B 单层约 0.5 GB → 约 1 GB）</td><td>缓存校准激活，随 token 数 × 维度增长（MLP 中间维度更大）。llm-compressor 实测 Llama-2-7B 峰值约 27 GB，开 CPU offload 降到约 20 GB，但每层平滑从约 5 秒变成约 17 秒</td></tr>
+                <tr><td>随什么增长</td><td>层的输入宽度的平方；token 数只影响累积时间</td><td>校准 token 数（缓存和每次前向都与之成正比）</td></tr>
+                <tr><td>时间主要花在哪</td><td>llm-compressor 维护者：校准前向与量化求解大约各占一半</td><td>llm-compressor 维护者：大部分时间花在缩放的网格搜索上</td></tr>
+                <tr><td>需要多少校准数据</td><td>论文默认 128 条 × 2048 token</td><td>论文：16 条序列即可达到好效果；常用 128 条 × 512 token</td></tr>
+                <tr><td>MoE 模型</td><td>每个专家一份 Hessian；校准数据需要覆盖所有专家</td><td>每个专家的激活都要缓存，内存压力大（曾出现过数百 GB 内存占用的问题，后已修复）</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="small muted">结论：GPTQ 的显存开销可预测，只跟层宽有关；AWQ 的显存开销跟着校准数据量走，计算主要花在网格搜索上。具体谁更快取决于实现和校准规模，同一工具里 7–8B 模型都是几十分钟，70B 是小时级。两者都是逐层处理，单卡就能量化远大于显存的模型。<a class="cite" href="#ref-15">[15]</a></p>
+        </section>
+
+        <section id="outliers">
+          <h2><span class="num">09</span>GPTQ / AWQ 量化之后还有 outlier 吗？</h2>
+          <div class="takeaway"><strong>有。“量化”改变数值表示，不等于“消除 outlier”。必须区分激活 outlier 与权重 outlier。</strong></div>
+          <h3>激活 outlier</h3>
+          <ul>
+            <li>经典 GPTQ 与 AWQ 都是 weight-only，激活仍以 FP16/BF16 计算，因此<strong>激活 outlier 基本仍然存在</strong>。</li>
+            <li>GPTQ 使用校准激活估计 Hessian；它利用这些统计来降低输出误差，但并不对激活做平滑。</li>
+            <li>AWQ 的缩放会把激活除以 <code>s</code>，大激活通道确实被缩小了，但目的是保护权重；由于激活本来就不量化，这只是副作用。</li>
+          </ul>
+          <h3>权重 outlier</h3>
+          <ul>
+            <li>反量化后的某些权重仍可能<strong>相对同组其他权重特别大</strong>。</li>
+            <li>大极值会拉大量化步长，让普通权重能利用的有效级别减少。group-wise 量化、AWQ 的缩放与裁剪都在缓解这一问题，而不是保证 outlier 消失。</li>
+            <li>GPTQ 不会把权重 outlier 单独保留为 FP16；它依靠分组量化与误差补偿控制整体输出损伤。SpQR 等扩展方法才会把 outlier 单独保留为高精度。</li>
+          </ul>
+        </section>
+
+        <section id="speedup">
+          <h2><span class="num">10</span>为什么 W4A16 能加速：roofline 与 TinyChat</h2>
+          <p>论文在 RTX 4090 上用 FasterTransformer 跑 FP16 的 Llama-7B（batch 1）：处理 200 token 的 prompt 只要 10 ms，生成 20 个 token 却要 310 ms。<strong>瓶颈在生成阶段。</strong><a class="cite" href="#ref-1">[1]</a></p>
+          <ul>
+            <li>4090 峰值算力 165 TFLOPS、带宽 1 TB/s，算术强度低于 165 FLOPs/Byte 的负载都受带宽限制。</li>
+            <li>FP16 生成阶段的算术强度约为 <strong>1</strong>，访存量又以权重为主，远远受带宽限制。</li>
+            <li>权重换成 4 bit，读同样的权重只要 1/4 的字节，算术强度约提高到 <strong>4</strong>，理论上限提升约 4 倍。</li>
+          </ul>
+          <h3>TinyChat 把理论收益变成实际加速</h3>
+          <ul>
+            <li><strong>即时反量化并与矩阵乘融合：</strong>论文原话是“硬件不提供 INT4 与 FP16 之间的乘法指令”，所以必须先把整数反量化成 FP16 再算；融合进 GEMM/GEMV 内核，避免把反量化结果写回显存。</li>
+            <li><strong>按 SIMD 宽度重排权重：</strong>ARM NEON 128 位寄存器中按 w0, w16, w1, w17, … 排列，3 条 SIMD 指令就能解包 32 个权重（常规排列每个权重要 3 条标量指令），最多快 1.2 倍。GPU 上按 w{0,2,4,6,1,3,5,7} 打包。</li>
+            <li><strong>算子融合：</strong>LayerNorm 全部融合；QKV 投影融合；位置编码在线计算；KV cache 在 attention 内核里更新。4090 上单个 FP16 内核只需约 0.01 ms，和内核启动开销相当，减少内核数量直接带来加速。</li>
+          </ul>
+          <p>结果：相对 Hugging Face FP16 实现平均快 3.2–3.3 倍，4090 上最高 3.9 倍，Jetson Orin 上 3.5 倍；能在 64 GB 的 Jetson Orin 上跑 Llama-2-70B，在 8 GB 显存的笔记本 RTX 4070 上以 30 token/s 运行 13B 模型。</p>
+          <div class="warning">
+            <div class="warning-title">加速只在受带宽限制时成立</div>
+            batch 变大或处于 prefill 阶段时，负载转为受算力限制，W4A16 的加速会消失，反量化开销甚至让它更慢。详见下一节的 Marlin 数据。
+          </div>
+        </section>
+
+        <section id="hardware">
+          <h2><span class="num">11</span>硬件层面：FP4 / INT4 × FP16 有原生加速吗？</h2>
+          <div class="takeaway"><strong>主流 GPU 都没有“4 bit × 16 bit”的矩阵乘指令。W4A16 的加速来自软件内核（读 4 bit 权重 → 寄存器里反量化 → 用 FP16/BF16 Tensor Core 计算），只在受带宽限制时有效。硬件原生加速的是 FP4 × FP4，以及 FP4 × FP8（按 FP8 速率）。</strong></div>
+          <h3>11.1 各代硬件支持的矩阵乘组合</h3>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>硬件</th><th>与 4 bit 相关的原生矩阵乘</th><th>FP4 × FP16/BF16？</th><th>W4A16 怎么跑</th></tr></thead>
+              <tbody>
+                <tr><td>NVIDIA Ampere / Ada（A100、RTX 30/40）</td><td>无 FP4</td><td>无</td><td>软件反量化（如 Marlin）</td></tr>
+                <tr><td>NVIDIA Hopper（H100/H200）</td><td>无 FP4；有 FP8 × FP8</td><td>无</td><td>软件反量化；W4A8 方案则把 INT4 反量化成 FP8 再用 FP8 Tensor Core</td></tr>
+                <tr><td>NVIDIA Blackwell 数据中心（B200/B300）</td><td><code>tcgen05.mma</code>：<br>• <code>kind::mxf4 / mxf4nvf4</code>：FP4 × FP4，速率为 Hopper FP8 的 4 倍<br>• <code>kind::f8f6f4</code>：A、B 可<b>分别</b>选 FP8 / FP6 / FP4，<b>FP4 × FP8 可以</b>，速率为 Hopper FP8 的 2 倍（即 FP8 速率）</td><td><b>无</b>：<code>kind::f16</code> 要求 A、B 同为 F16 或同为 BF16</td><td>软件反量化后用 BF16 Tensor Core</td></tr>
+                <tr><td>NVIDIA Blackwell 消费级（RTX 50）</td><td>warp 级 <code>mma.sync</code>，组合与上面类似（f8f6f4、mxf4nvf4）</td><td>无</td><td>同上</td></tr>
+                <tr><td>AMD MI300X（CDNA3）</td><td>无 FP4 / FP6 / MX 格式；有 FP8</td><td>无</td><td>软件反量化</td></tr>
+                <tr><td>AMD MI355X（CDNA4）</td><td><code>mfma_scale_*_f8f6f4</code>：A、B 可分别选 FP8 / BF8 / FP6 / FP4；任一方为 FP8 时周期数加倍。峰值：FP16 2.5 PF、FP8 5 PF、FP4 10 PF</td><td><b>无</b>：FP16/BF16 MFMA 要求两边同为 16 位</td><td>软件反量化</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="small muted">来源：CUTLASS Blackwell 文档与 CuTe DSL 的 tcgen05 指令支持矩阵<a class="cite" href="#ref-16">[16]</a>；AMD CDNA4 MFMA 文档与 ROCm 博客<a class="cite" href="#ref-17">[17]</a>。</p>
+
+          <h3>11.2 W4A16 在不同 batch 下的真实加速</h3>
+          <p>Marlin（IST Austria 的 FP16 × INT4 内核，PPoPP 2025）在 A10 上测大矩阵：batch 16–32 以内能接近理想的 3.87 倍（扣除 group scale 的 0.125 bit 开销），batch 128 时降到约 1.5 倍。接入 vLLM 后的端到端加速（Llama-2-7B，A10）：<a class="cite" href="#ref-18">[18]</a></p>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>batch</th><th>1</th><th>4</th><th>16</th><th>32</th><th>64</th><th>128</th></tr></thead>
+              <tbody>
+                <tr><td>相对 FP16 的加速</td><td>2.93×</td><td>3.02×</td><td>2.74×</td><td>2.26×</td><td>1.78×</td><td>1.20×</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>NVIDIA ModelOpt 的选型指南也是这个结论：batch ≤ 4 时受带宽限制，INT4 AWQ（W4A16）或 INT4-FP8 AWQ（W4A8）提升最大；batch ≥ 16 时优先考虑 FP8，其次是 W4A8。<a class="cite" href="#ref-19">[19]</a></p>
+
+          <h3>11.3 大 batch 也想加速怎么办</h3>
+          <ul>
+            <li><strong>W4A8：</strong>4 bit 权重 × FP8 激活。在 Blackwell 上可以直接用 <code>kind::f8f6f4</code>；在 Hopper 上把 INT4 反量化成 FP8 再算。既省显存，又能用 FP8 算力。</li>
+            <li><strong>W4A4（NVFP4 / MXFP4）：</strong>权重和激活都是 FP4，在 Blackwell / MI355X 上用最高的 FP4 算力；代价是激活也要量化，需要 SmoothQuant、旋转等技巧。</li>
+            <li><strong>实例：gpt-oss 的 MXFP4 MoE 权重</strong>在 Hopper 上走 BF16 × MXFP4（权重即时反量化，如 Triton <code>matmul_ogs</code>、Marlin、FlashInfer CUTLASS）；在 Blackwell 上可以走 MXFP8 × MXFP4（FlashInfer 的 TRT-LLM / CUTLASS 内核），也可以走 BF16 × MXFP4。<a class="cite" href="#ref-20">[20]</a></li>
+            <li>llm-compressor 文档也写明：NVFP4 / MXFP4 checkpoint 在 Ampere 及以上都能加载，但老 GPU 上走的是 weight-only Marlin 内核，激活保持 16 位，<strong>只省显存，不加速激活计算</strong>。<a class="cite" href="#ref-21">[21]</a></li>
+          </ul>
+        </section>
+
+        <section id="ecosystem">
+          <h2><span class="num">12</span>2026 年的工具链现状</h2>
+          <ul>
+            <li><strong>官方 llm-awq（MIT Han Lab）：</strong>研究参考实现和 TinyChat，仍在维护（已支持 Qwen2、InternVL3、VILA 等）。<a class="cite" href="#ref-3">[3]</a></li>
+            <li><strong>AutoAWQ：</strong>2025 年宣布弃用，仓库归档；最后测试的组合是 Torch 2.6 + Transformers 4.51.3。README 指向 vLLM 的 llm-compressor 和 MLX-LM。<a class="cite" href="#ref-22">[22]</a></li>
+            <li><strong>llm-compressor <code>AWQModifier</code>：</strong>移植自 AutoAWQ，复现 Llama-2-7B g128 的 PPL 为 5.612（论文 5.60）。它只负责缩放，必须配合 <code>QuantizationModifier</code> 才产出量化模型；用 <code>AWQMapping</code>（smooth_layer → balance_layers）描述缩放位置，与官方的 4 组缩放一致；提供 <code>duo_scaling</code> 选项；最初的移植版去掉了裁剪逻辑。<a class="cite" href="#ref-23">[23]</a></li>
+            <li><strong>NVIDIA ModelOpt：</strong><code>INT4_AWQ_CFG</code>（W4A16）、<code>W4A8_AWQ_BETA_CFG</code>（INT4 存储、FP8 计算）、<code>NVFP4_AWQ_LITE / CLIP / FULL</code>。其 <code>awq_lite</code> 默认 α 步长 0.1，且默认 <code>use_weight_scale=True</code>，即 <code>s ∝ act<sup>α</sup> / w<sup>1−α</sup></code>，与论文只用激活统计不同。<a class="cite" href="#ref-19">[19]</a></li>
+            <li><strong>TensorRT-LLM：</strong>支持 W4A16 AWQ、W4A8 AWQ（以及对应的 GPTQ 版本）。</li>
+            <li><strong>GPT-QModel：</strong>已成为 HF Transformers / Optimum / PEFT 的量化后端，同时取代了 AutoGPTQ 和 AutoAWQ。</li>
+          </ul>
+          <div class="takeaway"><strong>趋势：</strong>AWQ 的核心思想（基于激活的等价缩放）已经变成一种通用的“量化前变换”，可以和 INT4、FP8、NVFP4 等格式组合使用，不再只绑定 W4A16。</div>
+        </section>
+
+        <section id="practice">
+          <h2><span class="num">13</span>实践与部署</h2>
+          <h3>官方参考实现的典型命令</h3>
+          <p>下面只展示流程骨架，具体环境与模型支持以官方仓库为准。<a class="cite" href="#ref-3">[3]</a></p>
+          <div class="code-block"><span class="code-comment"># 1. 搜索 AWQ 缩放与裁剪参数</span>
+python -m awq.entry --model_path /PATH/TO/MODEL \
+  --w_bit 4 --q_group_size 128 \
+  --run_awq --dump_awq awq_cache/model-w4-g128.pt
+
+<span class="code-comment"># 2. 伪量化评测：先检查算法质量</span>
+python -m awq.entry --model_path /PATH/TO/MODEL \
+  --tasks wikitext --w_bit 4 --q_group_size 128 \
+  --load_awq awq_cache/model-w4-g128.pt --q_backend fake
+
+<span class="code-comment"># 3. 生成真实 INT4 权重</span>
+python -m awq.entry --model_path /PATH/TO/MODEL \
+  --w_bit 4 --q_group_size 128 \
+  --load_awq awq_cache/model-w4-g128.pt \
+  --q_backend real --dump_quant quant_cache/model-w4-g128-awq.pt</div>
+          <h3>用 llm-compressor（面向 vLLM 部署）</h3>
+          <p>新版 API 中 AWQ 只负责缩放，量化交给 <code>QuantizationModifier</code>；配方再交给 llm-compressor 的 <code>oneshot</code> 流程执行。<a class="cite" href="#ref-23">[23]</a></p>
+          <div class="code-block">from llmcompressor.modifiers.transform.awq import AWQModifier
+from llmcompressor.modifiers.quantization import QuantizationModifier
+
+recipe = [
+    AWQModifier(duo_scaling="both"),
+    QuantizationModifier(ignore=["lm_head"], scheme="W4A16_ASYM", targets=["Linear"]),
+]</div>
+          <h3>上线前检查清单</h3>
+          <ul class="checklist">
+            <li><strong>先确定格式再选算法：</strong>Ampere 选 W4A16；Hopper 优先 FP8 或 W4A8；Blackwell 考虑 NVFP4 / MXFP4。AWQ 和 GPTQ 是实现这些格式的校准算法。</li>
+            <li><strong>确认后端兼容性：</strong>模型架构、AWQ 格式版本、对称性、zero point、group size 和目标硬件是否受支持。</li>
+            <li><strong>让校准数据有代表性：</strong>通用模型可使用多样文本；代码、数学、多语言或垂直领域模型应覆盖目标分布。</li>
+            <li><strong>同时评精度与真实任务：</strong>困惑度只是一个指标，还应覆盖指令遵循、推理、代码、长上下文及业务回归集。Kurtic et al. 的结果说明学术基准打平时，开放式任务仍可能有差距。</li>
+            <li><strong>按真实 batch 分布测速度：</strong>W4A16 对低并发 decode 有效，高并发时加速会消失。分别测 prefill 和 decode。</li>
+            <li><strong>测端到端显存：</strong>包含权重元数据、KV cache、激活和运行时，而非只比较理论权重 bit 数。</li>
+            <li><strong>使用优化内核：</strong>只有低比特存储而缺少高效的反量化与矩阵乘内核时，可能省显存但不提速，甚至更慢。</li>
+          </ul>
+        </section>
+
+        <section id="limits">
+          <h2><span class="num">14</span>局限与常见误区</h2>
+          <div class="mistake"><b>误区 1：AWQ 把 1% 权重永久保留为 FP16。</b><br>不是。1% 是论文中的动机实验；最终方法用等价的逐通道缩放保护显著通道，避免不规则的混合精度。</div>
+          <div class="mistake"><b>误区 2：AWQ 按权重绝对值识别重要权重。</b><br>不是。关键恰恰是参考激活分布；论文实验中按权重大小挑选几乎和随机一样无效。</div>
+          <div class="mistake"><b>误区 3：缩放系数直接等于激活均值。</b><br>不完整。官方实现以 <code>a<sup>α</sup></code> 构造候选，在 α ∈ {0, 0.05, …, 0.95} 上搜索，并做归一化和截断，以模块输出 MSE 选优。</div>
+          <div class="mistake"><b>误区 4：AWQ 对每个 Linear 单独搜索。</b><br>不是。共享同一输入的多个 Linear（如 q/k/v、gate/up）共用一个 <code>s</code>，并以整个 attention 或 MLP 模块的输出误差为目标。</div>
+          <div class="mistake"><b>误区 5：W4A16 表示权重和激活都是 4 bit。</b><br>不是。W4A16 表示 4 bit 权重、16 bit 激活，矩阵乘使用反量化后的高精度值计算。</div>
+          <div class="mistake"><b>误区 6：W4A16 在任何 batch 下都更快。</b><br>不是。batch 增大后负载转为受算力限制，加速从约 3 倍降到 1.2 倍左右（第 11 节）。</div>
+          <div class="mistake"><b>误区 7：Blackwell 有 FP4 Tensor Core，所以 FP4 权重 × BF16 激活也能直接算。</b><br>不能。FP4 Tensor Core 要求另一方也是 FP4（或在 f8f6f4 模式下是 FP6 / FP8）；激活保持 BF16 时仍需软件反量化。</div>
+          <div class="mistake"><b>误区 8：AWQ 会消除激活 outlier。</b><br>不会。它的目的是降低权重量化误差；要把激活也量化成低比特，需要 SmoothQuant、旋转等面向激活的技术。</div>
+          <h3>实际局限</h3>
+          <ul>
+            <li><strong>依赖分组量化：</strong>不分组时 AWQ 明显不如 GPTQ（Llama-2-7B W3A16：24.00 vs 8.37）；2-bit 时会崩溃，需要和 GPTQ 等方法叠加。</li>
+            <li><strong>依赖校准分布：</strong>比 GPTQ 鲁棒，但“不需要训练”不等于“不可能过拟合校准集”。</li>
+            <li><strong>有量化开销：</strong>需要缓存激活、逐 block 网格搜索，大模型和 MoE 的激活缓存可能很占内存。</li>
+            <li><strong>格式不等于性能：</strong>加速高度依赖内核、硬件、batch、序列长度及 prefill/decode 阶段。</li>
+          </ul>
+        </section>
+
+        <section id="sources">
+          <h2>参考资料</h2>
+          <p class="muted small">算法事实优先采用论文与官方实现；硬件事实采用 NVIDIA / AMD 的指令集与框架文档。不同论文的实验设置不同，表中数字只在各自设置内可比。</p>
+          <ol class="sources">
+            <li id="ref-1"><strong>Lin et al.</strong>, <a href="https://arxiv.org/abs/2306.00978">AWQ: Activation-aware Weight Quantization for On-Device LLM Compression and Acceleration</a>. MLSys 2024（Best Paper Award）。</li>
+            <li id="ref-2"><a href="https://proceedings.mlsys.org/paper_files/paper/2024/hash/42a452cbafa9dd64e9ba4aa95cc1ef21-Abstract-Conference.html">MLSys 2024 正式论文摘要页</a>。</li>
+            <li id="ref-3">MIT Han Lab，<a href="https://github.com/mit-han-lab/llm-awq">llm-awq 官方仓库</a>：模型支持、搜索/伪量化/真实量化命令与 TinyChat。</li>
+            <li id="ref-4">官方实现 <a href="https://github.com/mit-han-lab/llm-awq/blob/main/awq/quantize/auto_scale.py">auto_scale.py</a>：激活均值、20 点 α 搜索、模块输出 MSE、等价缩放的三种吸收方式。</li>
+            <li id="ref-5">官方实现 <a href="https://github.com/mit-han-lab/llm-awq/blob/main/awq/quantize/quantizer.py">quantizer.py</a>：group-wise、zero point 与伪量化/真实量化。</li>
+            <li id="ref-6">官方实现 <a href="https://github.com/mit-han-lab/llm-awq/blob/main/awq/quantize/pre_quant.py">pre_quant.py</a>：默认校准配置与逐 block 流程。</li>
+            <li id="ref-7">官方实现 <a href="https://github.com/mit-han-lab/llm-awq/blob/main/awq/quantize/auto_clip.py">auto_clip.py</a>：10 档权重裁剪搜索，跳过 Q/K。</li>
+            <li id="ref-8"><strong>Frantar et al.</strong>, <a href="https://arxiv.org/abs/2210.17323">GPTQ: Accurate Post-Training Quantization for Generative Pre-trained Transformers</a>. ICLR 2023.</li>
+            <li id="ref-9"><strong>Xiao et al.</strong>, <a href="https://arxiv.org/abs/2211.10438">SmoothQuant: Accurate and Efficient Post-Training Quantization for Large Language Models</a>.</li>
+            <li id="ref-10"><strong>Gong et al.</strong>, <a href="https://arxiv.org/abs/2405.06001">LLMC: Benchmarking Large Language Model Quantization with a Versatile Compression Toolkit</a>. EMNLP 2024 Industry.</li>
+            <li id="ref-11"><strong>Shao et al.</strong>, <a href="https://arxiv.org/abs/2308.13137">OmniQuant: Omnidirectionally Calibrated Quantization for Large Language Models</a>.</li>
+            <li id="ref-12"><strong>Huang et al.</strong>, <a href="https://arxiv.org/abs/2409.11055">A Comprehensive Evaluation of Quantized Instruction-Tuned Large Language Models: An Experimental Analysis up to 405B</a>.</li>
+            <li id="ref-13"><strong>Kurtic et al.</strong>, <a href="https://arxiv.org/abs/2411.02355">“Give Me BF16 or Give Me Death”? Accuracy-Performance Trade-Offs in LLM Quantization</a>.</li>
+            <li id="ref-14">llm-compressor，<a href="https://github.com/vllm-project/llm-compressor/blob/main/docs/guides/runtime.md">Runtime requirements</a>；<a href="https://github.com/vllm-project/llm-compressor/blob/main/docs/steps/choosing-algo.md">Choosing the right compression algorithm</a>。</li>
+            <li id="ref-15">llm-compressor 内存与耗时讨论：<a href="https://github.com/vllm-project/llm-compressor/pull/1720">PR #1720（内存需求文档）</a>、<a href="https://github.com/vllm-project/llm-compressor/pull/1435">PR #1435（AWQ 激活缓存与 offload）</a>、<a href="https://github.com/vllm-project/llm-compressor/issues/1678">Issue #1678（维护者对耗时分布的说明）</a>。</li>
+            <li id="ref-16">NVIDIA CUTLASS，<a href="https://docs.nvidia.com/cutlass/latest/media/docs/cpp/blackwell_functionality.html">Blackwell SM100 GEMMs</a>；<a href="https://github.com/NVIDIA/cutlass/blob/main/python/CuTeDSL/cutlass/cute/nvgpu/tcgen05/mma.py">CuTe DSL tcgen05 MMA 指令支持矩阵</a>。</li>
+            <li id="ref-17">AMD，<a href="https://rocm-handbook.amd.com/projects/amd-rocm-optimization-guide/en/latest/compiler-builtins/cdna/cdna4-dense-mfma-builtins.html">CDNA4 dense MFMA builtins</a>；<a href="https://rocm.blogs.amd.com/software-tools-optimization/matrix-cores-cdna/README.html">Matrix Core Programming on CDNA3 and CDNA4</a>。</li>
+            <li id="ref-18"><strong>Frantar et al.</strong>, <a href="https://arxiv.org/abs/2408.11743">MARLIN: Mixed-Precision Auto-Regressive Parallel Inference on Large Language Models</a>. PPoPP 2025.</li>
+            <li id="ref-19">NVIDIA Model Optimizer，<a href="https://nvidia.github.io/Model-Optimizer/guides/_choosing_quant_methods.html">Choosing the right quantization methods</a>；<a href="https://github.com/NVIDIA/Model-Optimizer/blob/main/modelopt/torch/quantization/config.py">quantization config.py</a>。</li>
+            <li id="ref-20">vLLM，<a href="https://vllm.ai/blog/2025-08-05-gpt-oss">vLLM Now Supports gpt-oss</a>；<a href="https://github.com/vllm-project/vllm/pull/23696">PR #23696（Hopper BF16×MXFP4 与 Blackwell MXFP8×MXFP4 内核）</a>。</li>
+            <li id="ref-21">llm-compressor，<a href="https://github.com/vllm-project/llm-compressor/blob/main/docs/steps/choosing-scheme.md">Choosing the right compression scheme</a>。</li>
+            <li id="ref-22"><a href="https://github.com/casper-hansen/AutoAWQ">AutoAWQ 仓库</a>（已归档与弃用说明）；<a href="https://github.com/AutoGPTQ/AutoGPTQ">AutoGPTQ 仓库</a>（已归档，建议使用 GPT-QModel）。</li>
+            <li id="ref-23">llm-compressor，<a href="https://docs.vllm.ai/projects/llm-compressor/en/stable/examples/awq/">AWQ 示例文档</a>；<a href="https://github.com/vllm-project/llm-compressor/pull/1177">PR #1177（AWQModifier 移植与复现结果）</a>。</li>
+          </ol>
+        </section>
+      </main>
+    </div>
+    <footer>
+      AWQ Study Notes · 单文件 HTML · 可离线阅读与打印<br>
+      首次生成：2026-11-17 ｜ 最后更新：2026-11-17 ｜ 首版：Kimi Code（默认模式）｜ 本次更新：Claude Opus 5.5（opencode/claude-opus-5-5，OpenCode 默认模式）
+    </footer>
+  </div>
+</body>
+</html>

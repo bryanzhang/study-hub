@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="论文 Software-Hardware Co-design for Fast and Scalable Training of Deep Learning Recommendation Models 中文调研：Neo 4D 并行、kernel 融合、内存层级、ZionEX 硬件、实验结果与局限。">
+  <title>Neo + ZionEX：DLRM 训练的软硬件协同设计</title>
+  <style>
+    :root {
+      --bg: #f5f6fa;
+      --paper: #ffffff;
+      --ink: #202536;
+      --muted: #626b80;
+      --line: #e0e4ee;
+      --brand: #5650c8;
+      --brand-dark: #37318d;
+      --brand-soft: #eeecff;
+      --cyan: #087e9d;
+      --cyan-soft: #e8f7fb;
+      --accent: #d4772c;
+      --accent-soft: #fff4e9;
+      --code-bg: #20213b;
+      --code-ink: #eeefff;
+      --shadow: 0 12px 32px rgba(38, 43, 77, 0.065);
+      --radius: 18px;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; scroll-padding-top: 24px; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--bg);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      font-size: 16px;
+      line-height: 1.78;
+    }
+    a { color: var(--brand-dark); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+    a:hover { color: var(--brand); }
+    code, .formula, .code-block {
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    }
+    code { padding: .12em .38em; border-radius: 5px; color: #433c9d; background: #f0effb; font-size: .9em; }
+    .container { width: min(1180px, calc(100% - 40px)); margin: 0 auto; }
+    .hero {
+      position: relative;
+      overflow: hidden;
+      padding: 58px 0 46px;
+      color: #f7f6ff;
+      background: linear-gradient(125deg, #20213f 0%, #393477 52%, #5750ba 100%);
+    }
+    .hero::after {
+      content: "";
+      position: absolute;
+      width: 520px;
+      height: 520px;
+      right: -150px;
+      top: -260px;
+      border: 1px solid rgba(255,255,255,.16);
+      border-radius: 50%;
+      box-shadow: 0 0 0 72px rgba(255,255,255,.035), 0 0 0 144px rgba(255,255,255,.025);
+    }
+    .eyebrow { margin: 0 0 12px; color: #bdb8ff; font-size: 13px; font-weight: 700; letter-spacing: .15em; text-transform: uppercase; }
+    h1 { max-width: 900px; margin: 0; font-size: clamp(33px, 4.6vw, 53px); line-height: 1.17; letter-spacing: -.035em; }
+    .paper-title { max-width: 900px; margin: 15px 0 0; color: #d5d2f5; font-size: 14px; line-height: 1.55; }
+    .hero-subtitle { max-width: 850px; margin: 18px 0 24px; color: #e0def7; font-size: 18px; }
+    .hero-subtitle strong { color: #fff; }
+    .tags { display: flex; flex-wrap: wrap; gap: 9px; }
+    .tag { padding: 5px 12px; border: 1px solid rgba(255,255,255,.22); border-radius: 999px; color: #f1efff; background: rgba(255,255,255,.08); font-size: 13px; }
+    .meta { display: flex; flex-wrap: wrap; gap: 7px 24px; margin-top: 28px; padding-top: 19px; border-top: 1px solid rgba(255,255,255,.16); color: #c9c5e8; font-size: 12px; }
+    .layout { display: grid; grid-template-columns: 225px minmax(0, 1fr); gap: 32px; align-items: start; padding: 38px 0 70px; }
+    .toc { position: sticky; top: 24px; max-height: calc(100vh - 48px); overflow-y: auto; padding: 20px 18px; border: 1px solid var(--line); border-radius: 14px; background: rgba(255,255,255,.8); }
+    .toc-title { margin: 0 0 10px; color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: .12em; }
+    .toc a { display: block; padding: 5px 0; color: var(--muted); text-decoration: none; font-size: 13px; line-height: 1.45; }
+    .toc a:hover { color: var(--brand); }
+    .mobile-toc { display: none; }
+    main { min-width: 0; }
+    section { margin-bottom: 24px; padding: 30px 34px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--paper); box-shadow: var(--shadow); }
+    h2 { margin: 0 0 20px; font-size: 26px; line-height: 1.35; letter-spacing: -.02em; }
+    h3 { margin: 28px 0 12px; font-size: 19px; line-height: 1.45; }
+    h2 .num { margin-right: 9px; color: var(--brand); font-size: 14px; vertical-align: middle; }
+    p { margin: 10px 0; }
+    ul, ol { padding-left: 1.35em; }
+    li + li { margin-top: 7px; }
+    .lead { color: #30364e; font-size: 17px; }
+    .muted { color: var(--muted); }
+    .small { font-size: 13px; }
+    .cite { font-size: 11px; font-weight: 700; text-decoration: none; vertical-align: super; }
+    .takeaway { padding: 20px 22px; border-left: 4px solid var(--brand); border-radius: 0 12px 12px 0; background: var(--brand-soft); }
+    .takeaway strong { color: var(--brand-dark); }
+    .info { margin: 16px 0; padding: 17px 20px; border: 1px solid #bce0ea; border-radius: 12px; background: var(--cyan-soft); }
+    .info-title { color: #08647d; font-weight: 750; }
+    .warning { margin: 16px 0; padding: 17px 20px; border: 1px solid #efd2b5; border-radius: 12px; background: var(--accent-soft); }
+    .warning-title { color: #995017; font-weight: 750; }
+    .grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 14px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 14px; }
+    .mini-card { padding: 18px; border: 1px solid var(--line); border-radius: 12px; background: #fcfcfe; }
+    .mini-card h3 { margin: 0 0 8px; font-size: 16px; }
+    .mini-card p { margin: 0; color: var(--muted); font-size: 14px; }
+    .kpi { color: var(--brand); font-size: 26px; font-weight: 800; line-height: 1.2; }
+    .kpi-label { margin-top: 5px; color: var(--ink); font-size: 14px; font-weight: 700; }
+    .formula { overflow-x: auto; margin: 16px 0; padding: 17px 20px; border: 1px solid #d8d5f0; border-radius: 12px; color: #353063; background: #f7f6fd; text-align: center; font-size: 16px; line-height: 1.8; white-space: nowrap; }
+    .formula .label { display: block; margin-bottom: 5px; color: var(--muted); font-family: inherit; font-size: 12px; }
+    sub, sup { line-height: 0; }
+    .flow { display: grid; grid-template-columns: 1fr 24px 1fr 24px 1fr; gap: 8px; align-items: stretch; margin: 20px 0; }
+    .flow-step { padding: 16px 12px; border: 1px solid #d9d6ef; border-radius: 12px; background: #faf9ff; text-align: center; }
+    .flow-step b { display: block; margin-bottom: 5px; color: var(--brand-dark); }
+    .flow-step span { color: var(--muted); font-size: 13px; line-height: 1.5; }
+    .arrow { align-self: center; color: var(--brand); text-align: center; font-size: 22px; }
+    .table-wrap { overflow-x: auto; margin: 16px 0; border: 1px solid var(--line); border-radius: 12px; }
+    table { width: 100%; border-collapse: collapse; min-width: 720px; font-size: 14px; }
+    th, td { padding: 13px 15px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { color: #38365c; background: #f0f0f8; font-weight: 700; }
+    tr:last-child td { border-bottom: 0; }
+    tbody tr:nth-child(even) { background: #fcfcfe; }
+    td.hl { color: var(--brand-dark); font-weight: 700; }
+    .code-block { overflow-x: auto; margin: 14px 0; padding: 20px; border-radius: 12px; color: var(--code-ink); background: var(--code-bg); font-size: 13px; line-height: 1.65; white-space: pre; }
+    .code-comment { color: #aaa8d4; }
+    .code-accent { color: #9fe1ef; }
+    .steps { list-style: none; padding: 0; counter-reset: step; }
+    .steps li { position: relative; min-height: 48px; padding: 0 0 22px 50px; counter-increment: step; }
+    .steps li::before { content: counter(step); position: absolute; left: 0; top: 0; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; color: #fff; background: var(--brand); font-size: 14px; font-weight: 700; }
+    .steps li:not(:last-child)::after { content: ""; position: absolute; left: 15px; top: 36px; bottom: 4px; width: 2px; background: var(--line); }
+    .steps b { display: block; margin-bottom: 3px; }
+    .steps p { margin: 0; color: var(--muted); }
+    .arch { margin: 20px 0; padding: 20px; border: 1px solid var(--line); border-radius: 14px; background: #fafaff; }
+    .arch-title { margin-bottom: 12px; color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: .1em; text-align: center; }
+    .arch-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 9px; }
+    .arch-box { flex: 1 1 120px; max-width: 220px; padding: 12px 10px; border: 1px solid #d8d5ef; border-radius: 10px; color: #373363; background: #fff; text-align: center; font-size: 13px; }
+    .arch-box strong { display: block; color: var(--brand-dark); }
+    .arch-arrow { margin: 8px 0; color: var(--brand); text-align: center; }
+    .arch-network { padding: 11px; border-radius: 10px; color: #fff; background: linear-gradient(90deg, #45409a, #087e9d); text-align: center; font-size: 13px; }
+    .pipeline { overflow-x: auto; margin: 18px 0; padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: #fbfbfd; }
+    .pipe-grid { display: grid; grid-template-columns: 100px repeat(6, minmax(82px, 1fr)); gap: 5px; min-width: 680px; align-items: center; font-size: 12px; text-align: center; }
+    .pipe-head { color: var(--muted); font-weight: 700; }
+    .pipe-label { color: var(--muted); text-align: right; padding-right: 8px; }
+    .pipe-cell { padding: 8px 5px; border-radius: 7px; color: #373363; background: #eae8fa; }
+    .pipe-cell.comm { color: #075e76; background: #dff2f7; }
+    .pipe-cell.compute { color: #fff; background: #625bc0; }
+    .pipe-cell.idle { color: #a3a6b4; background: #f0f1f4; }
+    .memory { display: grid; grid-template-columns: 1fr 34px 1fr 34px 1fr; gap: 8px; align-items: center; margin: 18px 0; }
+    .mem-tier { padding: 18px 12px; border: 1px solid #d8d5ef; border-radius: 12px; background: #faf9ff; text-align: center; }
+    .mem-tier b { display: block; color: var(--brand-dark); font-size: 18px; }
+    .mem-tier span { color: var(--muted); font-size: 13px; }
+    .bars { margin: 18px 0; }
+    .bar-row { display: grid; grid-template-columns: 180px minmax(0, 1fr) 72px; gap: 10px; align-items: center; margin: 9px 0; font-size: 13px; }
+    .bar-row .lbl { color: var(--muted); text-align: right; }
+    .bar-track { height: 17px; border-radius: 9px; background: #eff0f5; overflow: hidden; }
+    .bar { height: 100%; border-radius: 9px; background: linear-gradient(90deg, #817ad9, #5650c8); }
+    .bar.base { background: #b9bdca; }
+    .bar.accent { background: linear-gradient(90deg, #e7a163, #d4772c); }
+    .bar.cyan { background: linear-gradient(90deg, #46b5cf, #087e9d); }
+    .bar-row .val { font-variant-numeric: tabular-nums; }
+    .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 16px 0; }
+    .compare > div { padding: 18px; border: 1px solid var(--line); border-radius: 12px; }
+    .compare .old { background: #f7f7f9; }
+    .compare .new { border-color: #d4d0f2; background: #f8f7ff; }
+    .compare h3 { margin: 0 0 8px; font-size: 17px; }
+    .compare p { margin: 5px 0; color: var(--muted); font-size: 14px; }
+    .checklist { list-style: none; padding: 0; }
+    .checklist li { position: relative; padding-left: 28px; }
+    .checklist li::before { content: "✓"; position: absolute; left: 0; color: var(--brand); font-weight: 800; }
+    .sources { font-size: 14px; }
+    .sources li { margin-bottom: 14px; word-break: break-word; }
+    footer { padding: 0 0 40px; color: var(--muted); text-align: center; font-size: 12px; line-height: 1.8; }
+    @media (max-width: 900px) {
+      .layout { grid-template-columns: 1fr; padding-top: 22px; }
+      .toc { display: none; }
+      .mobile-toc { display: block; margin-bottom: 20px; padding: 14px 18px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); }
+      .mobile-toc a { display: inline-block; margin: 4px 12px 4px 0; font-size: 13px; }
+      section { padding: 25px; }
+      .grid-3 { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 640px) {
+      .container { width: min(100% - 22px, 1180px); }
+      .hero { padding: 42px 0 34px; }
+      .hero-subtitle { font-size: 16px; }
+      .layout { gap: 18px; }
+      section { padding: 22px 18px; border-radius: 14px; }
+      h2 { font-size: 23px; }
+      .grid-2, .compare { grid-template-columns: 1fr; }
+      .flow, .memory { grid-template-columns: 1fr; }
+      .arrow { transform: rotate(90deg); height: 22px; }
+      .memory .arrow { transform: rotate(90deg); }
+      .formula { padding: 14px; font-size: 14px; text-align: left; }
+      .meta { gap: 5px 14px; }
+      .bar-row { grid-template-columns: 105px minmax(0, 1fr) 60px; }
+    }
+    @media print {
+      body { background: #fff; font-size: 12px; }
+      .hero { padding: 25px 0; color: #000; background: #fff; border-bottom: 2px solid #222; }
+      .hero-subtitle, .paper-title, .meta, .eyebrow, .tag { color: #333; }
+      .hero::after, .toc, .mobile-toc { display: none; }
+      .layout { display: block; padding: 15px 0; }
+      section { box-shadow: none; break-inside: avoid; padding: 18px; }
+      a { color: #000; }
+    }
+  </style>
+</head>
+<body>
+  <header class="hero">
+    <div class="container">
+      <p class="eyebrow">ML Systems · Paper Survey</p>
+      <h1>Neo + ZionEX：DLRM 训练的软硬件协同设计</h1>
+      <p class="paper-title">Software-Hardware Co-design for Fast and Scalable Training of Deep Learning Recommendation Models · ISCA 2022 Industry Track</p>
+      <p class="hero-subtitle">这篇论文的核心不是提出一个新的推荐模型，而是让<strong>并行策略、通信、CUDA kernel、优化器状态、内存层级、数值格式和网络拓扑</strong>围绕 DLRM 的真实瓶颈一起设计。</p>
+      <div class="tags" aria-label="主题标签">
+        <span class="tag">DLRM 训练</span>
+        <span class="tag">Neo 软件栈</span>
+        <span class="tag">4D Parallelism</span>
+        <span class="tag">ZionEX 硬件</span>
+        <span class="tag">128 × A100</span>
+        <span class="tag">软硬件协同</span>
+      </div>
+      <div class="meta">
+        <span>首次生成：2026-11-23</span>
+        <span>最后更新：2026-11-23</span>
+        <span>使用模型与模式：Kimi Code（默认模式）</span>
+        <span>主要依据：论文 arXiv v7、原始 DLRM 论文、FBGEMM 与 PARAM 官方仓库</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="container">
+    <div class="layout">
+      <nav class="toc" aria-label="目录">
+        <p class="toc-title">目录</p>
+        <a href="#summary">01 · 一句话与关键结论</a>
+        <a href="#workload">02 · DLRM 为什么难扩展</a>
+        <a href="#architecture">03 · Neo 总体架构</a>
+        <a href="#parallelism">04 · 4D Parallelism</a>
+        <a href="#placement">05 · 分片放置与流水线</a>
+        <a href="#kernels">06 · Embedding kernel 融合</a>
+        <a href="#memory">07 · 内存层级与压缩</a>
+        <a href="#hardware">08 · 从 Zion 到 ZionEX</a>
+        <a href="#software">09 · 数据输入与软件栈</a>
+        <a href="#evaluation">10 · 总体实验结果</a>
+        <a href="#ablation">11 · Model A 优化拆解</a>
+        <a href="#capacity">12 · 12T 参数容量研究</a>
+        <a href="#critique">13 · 结果解读与局限</a>
+        <a href="#takeaways">14 · 带走什么</a>
+        <a href="#sources">参考资料</a>
+      </nav>
+
+      <main>
+        <details class="mobile-toc">
+          <summary><strong>展开目录</strong></summary>
+          <a href="#summary">核心结论</a><a href="#workload">工作负载</a><a href="#architecture">Neo 架构</a><a href="#parallelism">4D 并行</a><a href="#placement">放置与流水线</a><a href="#kernels">Kernel 融合</a><a href="#memory">内存与压缩</a><a href="#hardware">ZionEX</a><a href="#software">软件栈</a><a href="#evaluation">实验</a><a href="#ablation">消融</a><a href="#capacity">12T 模型</a><a href="#critique">局限</a><a href="#takeaways">总结</a><a href="#sources">参考资料</a>
+        </details>
+
+        <section id="summary">
+          <h2><span class="num">01</span>一句话与关键结论</h2>
+          <div class="takeaway">
+            <strong>DLRM 的 dense MLP 想吃算力，sparse embedding 却吃容量、带宽和通信；Neo/ZionEX 的答案是把两类资源分开优化，再通过混合分片、通信隐藏和专用网络重新合成为一个同步训练系统。</strong>
+          </div>
+          <p class="lead">论文由 Meta 团队发表，系统侧称为 <strong>Neo</strong>，硬件平台称为 <strong>ZionEX</strong>。arXiv 首次提交于 2021-04-12，当前 v7 修订于 2023-02-27；正式版本发表于 ISCA 2022 Industry Track，DOI 为 <code>10.1145/3470496.3533727</code>。<a class="cite" href="#ref-1">[1]</a></p>
+          <div class="grid-3">
+            <div class="mini-card"><div class="kpi">最高 40×</div><div class="kpi-label">Model A 相对旧生产平台</div><p>128 张 A100 上达到约 1.2 MQPS；基线是 45 个 CPU parameter server 加 15 个 trainer 的异步系统，不是同硬件消融。</p></div>
+            <div class="mini-card"><div class="kpi">12T</div><div class="kpi-label">可训练参数量级</div><p>Model F 通过 row sharding、FP16、row-wise sparse AdaGrad 和 HBM/DRAM 层级容纳 12 万亿参数。</p></div>
+            <div class="mini-card"><div class="kpi">1.7 MQPS</div><div class="kpi-label">Model F 峰值吞吐</div><p>这是容量研究的结果；不要与 Model A 的“40×”拼接成“12T 模型提速 40×”。</p></div>
+          </div>
+          <h3>论文真正贡献了什么？</h3>
+          <ul>
+            <li><strong>并行抽象：</strong>将 table-wise、row-wise、column-wise 和 data parallelism 组合成可递归的 4D parallelism。</li>
+            <li><strong>执行优化：</strong>融合 embedding lookup、反向传播和稀疏优化器，并对 AlltoAll 做通信/计算重叠。</li>
+            <li><strong>容量优化：</strong>把 HBM、DRAM、SSD 与缓存、低精度存储、优化器状态压缩结合起来。</li>
+            <li><strong>硬件协同：</strong>每 GPU 配置独立 RDMA NIC，区分训练后端网络和数据输入前端网络。</li>
+            <li><strong>生产验证：</strong>用真实但匿名的推荐模型展示吞吐、扩展性和统计质量，而不仅是公开小 benchmark。</li>
+          </ul>
+          <div class="info"><span class="info-title">阅读定位：</span>本文是 2021–2022 年的系统设计与生产经验总结，不应被写成“2026 年当前 SOTA”。它的持久价值主要是分析瓶颈和做协同设计的方法。</div>
+        </section>
+
+        <section id="workload">
+          <h2><span class="num">02</span>DLRM 为什么难扩展</h2>
+          <p>原始 DLRM 用 embedding 处理高维离散类别特征，用 MLP 处理稠密特征及特征交互。一次前向传播大致是：<a class="cite" href="#ref-2">[2]</a></p>
+          <div class="flow">
+            <div class="flow-step"><b>Dense + Sparse 输入</b><span>连续特征；每张表一组稀疏 IDs</span></div><div class="arrow">→</div>
+            <div class="flow-step"><b>Bottom MLP + Lookup</b><span>稠密计算；按 ID 取向量并 pooling</span></div><div class="arrow">→</div>
+            <div class="flow-step"><b>Interaction + Top MLP</b><span>组合特征，输出预测</span></div>
+          </div>
+          <p>一个样本通常不是读整张 embedding，而是按输入索引读取若干行，再做 sum/mean 等 pooling。每个输出向量长度固定，但访问位置直到看到输入才知道。</p>
+          <div class="grid-2">
+            <div class="mini-card"><h3>MLP：compute-dense</h3><p>规则矩阵乘法、较高算术强度，适合 GPU/加速器；通常可通过 data parallelism 扩展。</p></div>
+            <div class="mini-card"><h3>Embedding：memory / communication-dense</h3><p>表数量和总容量巨大，单表也可能超大；随机稀疏访问使算术强度低，容量、HBM/DRAM 带宽和网络常成为瓶颈。</p></div>
+          </div>
+          <div class="formula"><span class="label">论文对 embedding 负载的简化刻画</span>负载 ≈ 表数 × global batch × 每样本平均 indices 数 × embedding dimension</div>
+          <p>生产模型可能包含<strong>数千张表、数万亿参数</strong>。这带来三个直接后果：</p>
+          <ol>
+            <li><strong>纯数据并行放不下：</strong>每个 worker 复制完整模型不现实。</li>
+            <li><strong>普通模型并行不好切：</strong>embedding 的目标行由动态索引决定，切分后需要重分布输入和中间结果。</li>
+            <li><strong>通信难以隐藏：</strong>AllReduce 常能与反向计算重叠，但 pooled embedding 的 AlltoAll 位于后续 MLP 的依赖路径上，更容易形成 exposed latency。</li>
+          </ol>
+          <h3>旧 CPU Parameter Server 路线的问题</h3>
+          <p>CPU parameter server 可以把大 embedding 放在 DRAM 中，trainer 异步拉取和更新参数，天然容易扩容量。但扩大异步训练规模会增大 <strong>staleness</strong>：某些 worker 用旧参数计算，可能影响收敛和模型质量。Neo 因此选择<strong>同步训练</strong>，把“规模扩展”与“统计效率/质量”解耦；代价是必须认真解决同步通信瓶颈。<a class="cite" href="#ref-1">[1]</a></p>
+          <div class="warning"><div class="warning-title">不要把问题简化成“GPU 比 CPU 快”</div>如果 embedding 无法放下、AlltoAll 阻塞关键路径，单纯增加 GPU 并不会线性提速。论文的主线正是消除这些系统瓶颈。</div>
+        </section>
+
+        <section id="architecture">
+          <h2><span class="num">03</span>Neo 总体架构</h2>
+          <p>Neo 不是单一 kernel 或一种 sharding 算法，而是一套同步分布式训练栈。可以把它理解成四层：</p>
+          <div class="arch">
+            <div class="arch-title">NEO：从模型语义到硬件执行的映射</div>
+            <div class="arch-row">
+              <div class="arch-box"><strong>模型与数据</strong>DLRM · mini-batch · sparse IDs</div>
+              <div class="arch-box"><strong>并行与放置</strong>4D sharding · 负载均衡</div>
+              <div class="arch-box"><strong>执行与内存</strong>融合 kernel · cache · 压缩</div>
+              <div class="arch-box"><strong>集合通信</strong>AlltoAll · ReduceScatter · AllReduce</div>
+            </div>
+            <div class="arch-arrow">↓ 联合映射到</div>
+            <div class="arch-network">NVLink 节点内互连 + 每 GPU 专用 RoCE/RDMA 后端网络 + 独立输入网络</div>
+            <div class="arch-arrow">↓</div>
+            <div class="arch-row">
+              <div class="arch-box"><strong>ZionEX 节点</strong>8 × A100 · 320 GB HBM</div>
+              <div class="arch-box"><strong>CPU / DRAM</strong>4 sockets · 1.5 TB DRAM</div>
+              <div class="arch-box"><strong>实验集群</strong>16 nodes · 128 GPUs</div>
+            </div>
+          </div>
+          <h3>一次迭代中的通信角色</h3>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>通信</th><th>为什么出现</th><th>优化重点</th></tr></thead>
+              <tbody>
+                <tr><td><code>AlltoAll / AlltoAllv</code></td><td>把 sparse IDs 路由到 embedding shard 所在 rank，并交换 pooled embedding 结果。</td><td class="hl">与 MLP 重叠；减少消息和小传输；专用后端网络。</td></tr>
+                <tr><td><code>ReduceScatter</code></td><td>row-wise sharding 时，各 rank 可能只完成同一 embedding 的部分 pooling，需要归约并分片结果。</td><td>减少部分结果和路由开销。</td></tr>
+                <tr><td><code>AllReduce</code></td><td>同步 data-parallel MLP 梯度，以及被复制的小 embedding 表。</td><td>大多可与反向传播重叠。</td></tr>
+                <tr><td><code>HtoD</code></td><td>把 dense features、sparse IDs 等输入从主机搬到 GPU。</td><td>合并传输、 pinned memory、预取；实验中可基本隐藏。</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>所以，Neo 的“架构”更像一个约束求解过程：<strong>先决定每张表如何切、放在哪里，再围绕该布局安排 kernel、内存和通信。</strong></p>
+        </section>
+
+        <section id="parallelism">
+          <h2><span class="num">04</span>4D Parallelism：按表选择切分方式</h2>
+          <p>“4D”不是指四维张量，而是四类可组合的并行维度。不同表形状和访问频率差异很大，因此<strong>没有必要让整个模型只使用一种并行策略</strong>。<a class="cite" href="#ref-1">[1]</a></p>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>方式</th><th>如何切</th><th>通信/计算特点</th><th>适合与代价</th></tr></thead>
+              <tbody>
+                <tr><td class="hl">Table-wise</td><td>整张表分配给某个 worker；不同表放在不同 worker。</td><td>输入 IDs 通过 AlltoAll 给表主；结果再交换回来。表内无需再切分。</td><td>通信相对简单；但单表必须放得下，且热门表/大表会造成负载偏斜。</td></tr>
+                <tr><td class="hl">Row-wise</td><td>按 embedding 行切分，同一表跨多个 worker。</td><td>需要 bucketization 和索引重分布；局部 pooling 后用 ReduceScatter 合并。</td><td>能处理超大表；但通信随 worker 数和访问分布增加。</td></tr>
+                <tr><td class="hl">Column-wise</td><td>按 embedding 向量维度切分。</td><td>各列分片需要同一行的 IDs，因此要复制索引，并保留相应 AlltoAll 流程。</td><td>适合 embedding dimension 很大的表；增加索引通信和部分优化器状态。</td></tr>
+                <tr><td class="hl">Data parallel</td><td>小表在 worker 间复制，输入各自处理。</td><td>前向不需要表间 AlltoAll；反向用 AllReduce 同步整表更新。</td><td>小表划算；大表的容量和梯度同步成本不可接受。</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <h3>用两个例子建立直觉</h3>
+          <div class="grid-2">
+            <div class="mini-card"><h3>超大表：100 亿行 × 256 维</h3><p>整张表无法放进单个 GPU，table-wise 不可行；row-wise 把行拆开，再用局部 pooling + 归约得到结果。若维度本身也过大，还可再切 column。</p></div>
+            <div class="mini-card"><h3>小且常用的表</h3><p>如果复制成本很小，data parallel 可以避免前向跨 rank 查表；反向 AllReduce 的消息也小，可能比模型并行更合算。</p></div>
+          </div>
+          <h3>跨硬件层级递归组合</h3>
+          <p>切分不必只发生在一层。例如，<strong>节点之间 table-wise、节点内部 row-wise</strong>：先把整表放到某节点，再利用该节点多张 GPU 的聚合 HBM 容纳它。这样能把较频繁的局部通信留在 NVLink 域内，把跨节点流量留给 RDMA 网络。</p>
+          <div class="code-block"><span class="code-comment"># 概念性示意，不是论文中的可直接运行代码</span>
+table T
+├── inter-node: table-wise → owner node
+│   └── intra-node: row-wise → GPU 0 ... GPU 7
+└── small table U: data-parallel replicas
+
+dense MLP: data parallel + gradient AllReduce</div>
+          <div class="info"><span class="info-title">关键点：</span>分片方式同时决定容量、负载均衡和通信类型。不能只按“能否放下”做决策，也不能只最小化网络流量。</div>
+        </section>
+
+        <section id="placement">
+          <h2><span class="num">05</span>分片放置与流水线：让布局可执行</h2>
+          <h3>5.1 放置是负载均衡问题，不只是装箱问题</h3>
+          <p>给定一组表及其切分选择，要把 shard 映射到 GPU。好布局需要同时满足：</p>
+          <ul>
+            <li>每个 worker 的 HBM/DRAM 容量约束；</li>
+            <li>lookup 和更新工作量尽量均衡；</li>
+            <li>跨 worker/节点通信量尽量小；</li>
+            <li>大表、热点表不会形成单点瓶颈。</li>
+          </ul>
+          <p>论文使用两种<strong>多项式时间启发式</strong>：按最大分片优先放置的 greedy，以及 largest differencing（Karmarkar–Karp）思路。它们比朴素分配更能均衡负载，但不保证全局最优。</p>
+          <h3>5.2 Pipelining：把通信藏进不依赖它的计算</h3>
+          <p>同步不等于所有阶段串行等待。Neo 利用 batch 之间以及同一 batch 内不同子图的独立性：</p>
+          <ul>
+            <li>batch <code>i+1</code> 的 <strong>input AlltoAll</strong> 与 batch <code>i</code> 的 <strong>top MLP</strong> 重叠；</li>
+            <li><strong>pooled embedding AlltoAll</strong> 与 <strong>bottom MLP</strong> 重叠；</li>
+            <li>data-parallel 梯度 <strong>AllReduce</strong> 尽量与反向传播重叠。</li>
+          </ul>
+          <div class="pipeline" aria-label="通信计算重叠示意图">
+            <div class="pipe-grid">
+              <div></div><div class="pipe-head">t₀</div><div class="pipe-head">t₁</div><div class="pipe-head">t₂</div><div class="pipe-head">t₃</div><div class="pipe-head">t₄</div><div class="pipe-head">t₅</div>
+              <div class="pipe-label">batch i</div><div class="pipe-cell comm">input A2A</div><div class="pipe-cell compute">bottom MLP</div><div class="pipe-cell comm">pooled A2A</div><div class="pipe-cell compute">top MLP</div><div class="pipe-cell compute">backward</div><div class="pipe-cell idle"></div>
+              <div class="pipe-label">batch i+1</div><div class="pipe-cell idle"></div><div class="pipe-cell idle"></div><div class="pipe-cell comm">input A2A</div><div class="pipe-cell compute">bottom MLP</div><div class="pipe-cell comm">pooled A2A</div><div class="pipe-cell compute">top MLP</div>
+            </div>
+          </div>
+          <p class="small muted">图为按论文思想重绘的依赖示意，不代表真实时间比例。重点是：batch i+1 的输入通信可以与 batch i 的 top MLP 同处一个时间窗。</p>
+          <div class="warning"><div class="warning-title">为什么 AlltoAll 仍可能暴露？</div>overlap 只能利用真正独立的计算。随着规模扩大，AlltoAll 消息和参与 rank 增多，而可用来覆盖它的 MLP 时间未必增加，因此通信会逐渐露出并限制 scaling efficiency。</div>
+        </section>
+
+        <section id="kernels">
+          <h2><span class="num">06</span>Embedding kernel 融合：减少 launch、搬运与错误更新</h2>
+          <p>如果把每张表的 lookup、pooling、梯度生成和优化器更新都作为独立算子执行，会产生大量 kernel launch 和中间张量。对低算术强度的 embedding，这些开销尤其致命。</p>
+          <ol class="steps">
+            <li><b>前向：融合同 GPU 上多个表的 lookup</b><p>在一个融合算子中处理多表的 indices、offsets 和 pooling，减少小 kernel 与临时结果。理想情况下，每个 GPU worker 的前向 embedding 部分只需一个主 kernel。</p></li>
+            <li><b>反向：融合梯度计算与 sparse optimizer</b><p>不先物化完整 embedding gradients 再启动优化器，而是在反向 kernel 内直接应用更新，减少 HBM 读写和调度。</p></li>
+            <li><b>按 row 排序并聚合重复梯度</b><p>同一 mini-batch 可能多次访问同一 embedding row。排序后把同一 row 的梯度交给一个 CUDA block，在 shared memory 中聚合，再更新该行。</p></li>
+            <li><b>保证非线性优化器语义</b><p>AdaGrad 等更新依赖历史状态，不能把多个重复 row 的更新当作完全独立、任意并发的加法。块内聚合避免竞争和错误更新。</p></li>
+          </ol>
+          <div class="code-block"><span class="code-comment"># 融合前：中间结果和 kernel 边界较多</span>
+for table in local_tables:
+    pooled[table] = lookup_and_pool(table, ids[table])
+grads = embedding_backward(...)
+optimizer_update(grads)
+
+<span class="code-comment"># 融合后：概念流程</span>
+<span class="code-accent">fused_forward</span>(all_local_tables, concatenated_ids)
+<span class="code-accent">fused_backward_and_update</span>(
+    sort_by_row(grads),       <span class="code-comment"># 同行梯度聚集</span>
+    aggregate_in_shared_mem,  <span class="code-comment"># 每行一个 CUDA block</span>
+    sparse_optimizer
+)</div>
+          <p>论文报告这类融合优化最高带来约 <strong>7×</strong> 的改善。这里的数字是特定 embedding 执行路径的局部优化结果，不应直接理解为整个训练任务必然提速 7×。<a class="cite" href="#ref-1">[1]</a></p>
+          <div class="info"><span class="info-title">与开源的关系：</span>论文将优化后的 embedding operators 与 FBGEMM 联系起来。当前 FBGEMM_GPU 仍提供面向推荐系统训练/推理的 PyTorch GPU operators，但仓库范围已比这篇论文更广，不能把今天的整个仓库等同于 Neo。<a class="cite" href="#ref-3">[3]</a></div>
+        </section>
+
+        <section id="memory">
+          <h2><span class="num">07</span>内存层级与压缩：容量、带宽、精度一起做</h2>
+          <p>大 embedding 的首要问题往往是“放哪里、何时搬、以什么格式放”。Neo 把 GPU HBM、CPU DRAM 和 SSD 看成层级，而不是强迫所有参数常驻 HBM。</p>
+          <div class="memory">
+            <div class="mem-tier"><b>HBM</b><span>高带宽、低延迟、容量最贵<br>热点 shard / cache</span></div><div class="arrow">⇄</div>
+            <div class="mem-tier"><b>DRAM</b><span>更大容量<br>较冷参数与 backing store</span></div><div class="arrow">⇄</div>
+            <div class="mem-tier"><b>SSD</b><span>容量层级的一环<br>适合更冷的数据</span></div>
+          </div>
+          <p class="small muted">论文讨论 HBM/DRAM/SSD 层级，但不同实验实际使用的层级不同；不能笼统宣称所有吞吐结果都使用了 SSD。</p>
+          <h3>7.1 软件管理 cache</h3>
+          <ul>
+            <li>采用 <strong>32-way set associative</strong> 设计，与 warp size 对齐；</li>
+            <li>支持 LRU / LFU 等替换策略；</li>
+            <li>利用 embedding 访问的局部性，把热门行留在更快的内存中；</li>
+            <li>论文报告相对 UVM 路径，端到端约 <strong>15%</strong> 改善。</li>
+          </ul>
+          <p>收益依赖访问局部性。如果 IDs 近似均匀遍历一张超大表，cache 命中率未必高，替换和元数据开销反而可能显现。</p>
+          <h3>7.2 低精度 embedding 与通信</h3>
+          <p>FP16 embedding 将权重存储和传输减半，也间接改变 shard 大小与放置，使负载更均衡。训练仍需配合高精度 cache/累加或主状态等设计来控制数值误差。论文还实验了<strong>前向 FP16、反向 BF16 的通信量化</strong>：二者都保留足够动态范围/精度的折中，重点降低 AlltoAll 流量。</p>
+          <h3>7.3 Row-wise sparse AdaGrad：压缩优化器状态</h3>
+          <p>标准 AdaGrad 为每个参数保留一个累计二阶状态。若表有 <code>H</code> 行、每行 <code>D</code> 维，完整状态也是 <code>H × D</code>。Row-wise sparse AdaGrad 改为每行共享状态：</p>
+          <div class="formula">标准状态：H × D　→　row-wise 状态：H<br><span class="label">对 D = 256 的大表，优化器状态几乎不再是第二个完整模型副本</span></div>
+          <p>其他手段还包括混合精度和矩阵分解。共同点是：<strong>压缩不仅省容量，还可能减少通信、改善放置，但也引入统计质量和硬件效率之间的权衡。</strong></p>
+        </section>
+
+        <section id="hardware">
+          <h2><span class="num">08</span>从 Zion 到 ZionEX：网络拓扑也是训练算法的一部分</h2>
+          <div class="compare">
+            <div class="old"><h3>旧 Zion</h3><p>8 个 CPU sockets，约 1.5 TB RAM</p><p>8 个 GPU，8 个 NIC</p><p>NIC 接 CPU，并共享数据中心网络</p><p>GPU↔CPU 搬运、TCP/拥塞和共享网络限制 scale-out</p></div>
+            <div class="new"><h3>ZionEX</h3><p>4-socket CPU，约 1.5 TB DRAM</p><p>8 × A100，320 GB HBM，聚合 12.4 TB/s</p><p><strong>每 GPU 专用 200 Gbps RoCE NIC</strong></p><p>RDMA / GPUDirect；训练后端网络与数据输入前端网络分离</p></div>
+          </div>
+          <div class="arch">
+            <div class="arch-title">ZIONEX 通信域</div>
+            <div class="arch-row">
+              <div class="arch-box"><strong>节点内</strong>NVLink<br>高带宽 GPU 互连</div>
+              <div class="arch-box"><strong>节点间训练</strong>每 GPU 200 Gbps RoCE<br>RDMA / GPUDirect</div>
+              <div class="arch-box"><strong>数据输入</strong>独立前端网络<br>避免与训练流量争用</div>
+            </div>
+          </div>
+          <h3>为什么“每 GPU 一张 NIC”重要？</h3>
+          <p>如果多张 GPU 的 AlltoAll 流量先汇聚到少量 CPU-attached NIC，CPU 内存搬运、PCIe 争用和网络排队会掩盖 GPU 本身的能力。专用 NIC 让网络资源与 GPU 数量一起扩展，RDMA/GPUDirect 则减少不必要的 CPU 路径。这与 4D sharding 配合：<strong>布局算法知道哪些通信留在 NVLink，哪些必须跨节点。</strong></p>
+          <p>CPU 内存带宽在论文平台描述中约为 320 GB/s；单节点 8 张 A100 的聚合 HBM 带宽约 12.4 TB/s。这个巨大差异解释了为什么热点数据应留在 HBM，而 DRAM 更适合作为容量扩展而非等速替代。<a class="cite" href="#ref-1">[1]</a></p>
+          <div class="warning"><div class="warning-title">硬件不是独立变量</div>同一套 Neo 软件在旧网络拓扑上未必能得到论文的扩展效率；反过来，只买 ZionEX 类硬件而不改 sharding、input pipeline 和 kernel，也无法自动获得这些结果。</div>
+        </section>
+
+        <section id="software">
+          <h2><span class="num">09</span>数据输入与软件栈：把小开销聚合掉</h2>
+          <h3>9.1 输入格式与 HtoD</h3>
+          <p>Embedding 输入天然是变长的：每个样本、每张表可有不同数量的 IDs。若每张表分别发送 offsets 和 indices，会产生许多小传输。Neo 改用 <strong>lengths + concatenated indices</strong> 表示，合并小消息，并使用 pinned memory 提高主机到设备传输效率。</p>
+          <div class="code-block"><span class="code-comment"># 每表独立的逻辑视图</span>
+table_0: offsets + indices
+table_1: offsets + indices
+...
+
+<span class="code-comment"># 更适合批量搬运的视图</span>
+lengths: [l₀, l₁, ..., lₙ]
+indices: [ids₀ | ids₁ | ... | idsₙ]  <span class="code-comment"># 连续拼接</span></div>
+          <p>配合自定义 permute、bucketize、replicate kernels，输入可以直接按分片布局重排。数据源可来自 Tectonic。论文实验中 HtoD 延迟可完全隐藏，说明“输入不是瓶颈”也是工程优化后的结果，而非天然如此。</p>
+          <h3>9.2 PyTorch / ATen / DDP / NCCL</h3>
+          <ul>
+            <li>上层使用 PyTorch、ATen 和 DDP 等组件；</li>
+            <li>节点内和节点间集合通信依托 NCCL；</li>
+            <li>通过 NCCL Send/Recv 扩展实现 AlltoAll / AlltoAllv，论文要求 NCCL ≥ 2.7.3；</li>
+            <li>结合 CUDA kernels、通信 stream 和自定义分片逻辑，而不是只调用默认 DDP。</li>
+          </ul>
+          <h3>9.3 PARAM：把系统问题拆成可测的微基准</h3>
+          <p>论文附录使用 PARAM 测量通信行为。官方 PARAM 仓库将自身定位为通信/计算 micro-benchmarks 与完整工作负载之间的桥梁，包括 collectives、compute-communication overlap、GEMM、embedding lookup 和 DLRM 模式。<a class="cite" href="#ref-4">[4]</a></p>
+          <div class="info"><span class="info-title">方法论价值：</span>端到端 QPS 只能告诉你“慢了”，集合通信微基准、时间线和分层消融才能告诉你是 HtoD、AlltoAll、负载不均还是 kernel 造成。</div>
+        </section>
+
+        <section id="evaluation">
+          <h2><span class="num">10</span>总体实验结果：吞吐、扩展与通信</h2>
+          <p>主要实验使用 <strong>16 个 ZionEX 节点、128 张 A100</strong>，评估三类匿名生产模型 A、F、I。指标包括 QPS（queries/samples per second，论文按 QPS 报告）和推荐模型质量指标 normalized entropy。实验设置段将聚合 HBM 写为约 5 TB。<a class="cite" href="#ref-1">[1]</a></p>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>结果</th><th>论文报告</th><th>正确解读</th></tr></thead>
+              <tbody>
+                <tr><td>Model A 生产对比</td><td class="hl">约 1.2 MQPS，最高 40×</td><td>相对 45 CPU parameter servers + 15 trainers 的旧异步平台；包含硬件和训练范式变化。</td></tr>
+                <tr><td>Model A 进一步优化</td><td class="hl">最高约 1.5 MQPS</td><td>大 batch、分片、低精度与通信量化等组合优化的结果。</td></tr>
+                <tr><td>Scaling efficiency</td><td class="hl">A ≈ 50%，I ≈ 75%</td><td>不同模型形状和通信比例导致扩展效率差异，不是固定平台常数。</td></tr>
+                <tr><td>Model F 容量实验</td><td class="hl">12T 参数，最高 1.7 MQPS</td><td>依赖 row sharding、压缩优化器状态、FP16 和 HBM/DRAM 层级。</td></tr>
+                <tr><td>Roofline 对照</td><td class="hl">差距在估算值约 15% 内</td><td>说明 Model A 已较接近论文模型估算的上限，但 roofline 本身仍依赖假设。</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <h3>随规模增加，谁在暴露？</h3>
+          <ul>
+            <li><strong>HtoD：</strong>经输入流水线和预取后，可基本完全隐藏。</li>
+            <li><strong>AllReduce：</strong>到 16 节点大多仍能与反向计算重叠。</li>
+            <li><strong>AlltoAll：</strong>随规模增长，越来越直接转化为 exposed latency，是主要扩展瓶颈。</li>
+          </ul>
+          <p>附录 PARAM 结果中，128 GPU AlltoAll 有效带宽约 <strong>7 GB/s</strong>；scale-out 峰值约 12.5 GB/s，而论文所列 V100 可实现约 10.5 GB/s。这些数字应按论文的微基准定义理解，不能直接当作任意消息大小、任意集群的通用 NCCL 性能。</p>
+          <div class="warning"><div class="warning-title">Weak scaling 的边界</div>部分小节点实验使用缩减 cardinality 的模型，以匹配较少资源。这属于 weak-scaling 研究，不等价于“同一个完整生产模型从 1 节点到 16 节点的强扩展曲线”。</div>
+        </section>
+
+        <section id="ablation">
+          <h2><span class="num">11</span>Model A 优化拆解：为什么收益不是一次跳跃</h2>
+          <p>论文给 Model A 展示了一条逐步优化路径。基线低于 700 KQPS；每项优化解决不同瓶颈，后续优化的收益还依赖前一步已经改变的布局与瓶颈。</p>
+          <div class="bars" aria-label="Model A 优化收益示意">
+            <div class="bar-row"><div class="lbl">Baseline</div><div class="bar-track"><div class="bar base" style="width:46%"></div></div><div class="val">&lt;700 K</div></div>
+            <div class="bar-row"><div class="lbl">更好 sharding</div><div class="bar-track"><div class="bar" style="width:56%"></div></div><div class="val">约 +20%</div></div>
+            <div class="bar-row"><div class="lbl">FP16 embedding</div><div class="bar-track"><div class="bar cyan" style="width:68%"></div></div><div class="val">再约 +20%</div></div>
+            <div class="bar-row"><div class="lbl">通信量化</div><div class="bar-track"><div class="bar accent" style="width:87%"></div></div><div class="val">约 +30%</div></div>
+            <div class="bar-row"><div class="lbl">组合 + 大 batch</div><div class="bar-track"><div class="bar" style="width:100%"></div></div><div class="val">约 1.5 M</div></div>
+          </div>
+          <p class="small muted">条形只用于呈现优化路径，长度不是严格按 QPS 比例重建；精确结果以论文图表为准。</p>
+          <ol class="steps">
+            <li><b>优化 sharding</b><p>更好的放置改善 GPU 间负载均衡，减少因最慢 worker 决定的同步等待，带来约 20%。</p></li>
+            <li><b>FP16 embedding</b><p>除了减少容量和带宽，还改变 shard 大小，使放置更灵活、负载更均衡，再带来约 20%。</p></li>
+            <li><b>量化通信</b><p>前向 FP16、反向 BF16 降低 AlltoAll 数据量，约带来 30%；证明此时网络已是显著瓶颈。</p></li>
+            <li><b>扩大 global batch：64K → 256K</b><p>提高单次迭代可做的计算与并行度，但大 batch 的收敛和最终质量需要重新调参，并非免费吞吐。</p></li>
+          </ol>
+          <p>组合优化相对 TF32 + global batch 64K 配置累计提升约 <strong>87%</strong>，最高约 1.5 MQPS。</p>
+          <h3>统计质量呢？</h3>
+          <p>论文比较了 Neo 同步 global batch 64K 与旧 CPU 异步系统约 150 batch 的配置。经过调参，两者质量相当或 Neo 更好。这个结论支持“同步大规模训练可行”，但并不证明任意模型、任意 batch 都不损失质量；论文也明确指出大 batch 行为需要更多研究。</p>
+          <div class="info"><span class="info-title">最重要的消融结论：</span>FP16 的收益不只是“每个数少两个字节”，量化通信的收益也不只是“网络快一点”。优化会改变放置、均衡和后续瓶颈，因此不能孤立相加。</div>
+        </section>
+
+        <section id="capacity">
+          <h2><span class="num">12</span>12T 参数容量研究：Model F 如何放下</h2>
+          <p>Model F 包含约 <strong>12 万亿参数</strong>，其中巨型表约 100 亿行、256 维。若简单按 FP32 权重和一份同形 AdaGrad 状态估算：</p>
+          <div class="formula">FP32 权重：12T × 4 B ≈ 48 TB<br>FP32 逐元素 AdaGrad 状态：≈ 48 TB<br><strong>合计约 96 TB</strong></div>
+          <p>论文通过两项主要压缩，将占用降到约 <strong>24 TB</strong>：</p>
+          <ul>
+            <li><strong>FP16 embedding：</strong>权重从约 48 TB 降到约 24 TB；</li>
+            <li><strong>Row-wise sparse AdaGrad：</strong>状态由每元素一个降为每行一个，相对完整权重近似可忽略。</li>
+          </ul>
+          <div class="bars" aria-label="Model F 内存占用估算">
+            <div class="bar-row"><div class="lbl">FP32 + 完整状态</div><div class="bar-track"><div class="bar base" style="width:100%"></div></div><div class="val">96 TB</div></div>
+            <div class="bar-row"><div class="lbl">FP16 + row-wise</div><div class="bar-track"><div class="bar" style="width:25%"></div></div><div class="val">24 TB</div></div>
+          </div>
+          <p>之后还需用 row-wise sharding 把巨表拆开，并用 HBM/DRAM 层级容纳分片。论文报告该配置最高达到 <strong>1.7 MQPS</strong>。</p>
+          <div class="warning"><div class="warning-title">原文资源数字有一个需要保留的语境差异</div>Model F 相关脚注将原型描述为约 4 TB HBM + 24 TB DRAM，而实验设置段将 128 GPU 集群写为约 5 TB HBM。页面不擅自把二者统一成同一个数；阅读原文时应区分通用集群设置与 Model F 原型脚注。</div>
+          <h3>这个实验真正证明什么？</h3>
+          <p>它证明的是<strong>超大模型可以通过联合压缩和层级内存变得可训练，同时维持可观吞吐</strong>。它没有证明所有 12T 模型都能达到 1.7 MQPS，也没有证明低精度和 row-wise 优化器对每种模型都无损。</p>
+        </section>
+
+        <section id="critique">
+          <h2><span class="num">13</span>结果解读、局限与可复现性</h2>
+          <h3>13.1 “40×”不能当作单算法加速比</h3>
+          <p>40× 比较的是新 ZionEX/Neo 同步系统与旧 CPU 异步生产平台，二者在 GPU、网络、软件、并行策略和训练方式上都不同。它适合回答“生产平台换代带来多大收益”，不适合回答“某一个优化在同硬件上提速多少”。</p>
+          <h3>13.2 生产真实性高，但独立复现困难</h3>
+          <ul>
+            <li>Model A/F/I 匿名，完整表形状、访问分布、数据和质量调参细节不可全部获得；</li>
+            <li>部分精确配置和结果只出现在论文图表中；</li>
+            <li>ZionEX 是定制硬件，普通集群无法直接复现其网络拓扑；</li>
+            <li>FBGEMM 和 PARAM 提供重要组件与基准，但不是一键复现整篇生产系统的完整仓库。</li>
+          </ul>
+          <h3>13.3 方法本身的边界</h3>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>设计</th><th>依赖条件 / 风险</th><th>读论文时应追问</th></tr></thead>
+              <tbody>
+                <tr><td>启发式放置</td><td>不保证全局最优；表访问和负载可能随时间变化。</td><td>布局多久重算？热点偏斜如何处理？</td></tr>
+                <tr><td>软件 cache</td><td>依赖 ID 局部性；低局部性时收益下降。</td><td>命中率、替换成本、miss 流量是多少？</td></tr>
+                <tr><td>FP16/BF16 与通信量化</td><td>收益依赖网络瓶颈，质量依赖数值敏感性。</td><td>是否需高精度主副本？长期收敛是否改变？</td></tr>
+                <tr><td>大 global batch</td><td>吞吐提高不等于统计效率提高，需调学习率等超参。</td><td>达到同一 NE 的总样本数和时间如何？</td></tr>
+                <tr><td>Row-wise 优化器状态</td><td>共享行状态改变更新近似，不是纯无损压缩。</td><td>不同表的更新频率是否适合共享？</td></tr>
+                <tr><td>通信/计算重叠</td><td>需要足够独立计算；规模增大后仍可能暴露。</td><td>暴露的是哪条依赖边，而非总通信量多少？</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <h3>13.4 如何从这篇论文继续读</h3>
+          <ol>
+            <li>先读原始 <strong>DLRM</strong>，理解 embedding + MLP 的模型语义和最初并行方案。<a class="cite" href="#ref-2">[2]</a></li>
+            <li>再读本文的 4D parallelism 与 ZionEX 拓扑，建立“布局—通信—硬件”对应关系。<a class="cite" href="#ref-1">[1]</a></li>
+            <li>通过 <strong>FBGEMM_GPU</strong> 看融合 embedding operators 的实际工程接口，通过 <strong>PARAM</strong> 学如何分解通信和计算瓶颈。<a class="cite" href="#ref-3">[3]</a><a class="cite" href="#ref-4">[4]</a></li>
+            <li>若迁移到现代平台，应重新测量网络、HBM、kernel 和模型访问分布，不要照搬论文的百分比。</li>
+          </ol>
+        </section>
+
+        <section id="takeaways">
+          <h2><span class="num">14</span>带走什么：一套比数字更有用的方法</h2>
+          <div class="takeaway"><strong>先找关键路径上的稀缺资源，再让模型表示、并行策略和硬件拓扑一起改变；不要只在固定系统上优化单个算子。</strong></div>
+          <h3>可复用的分析顺序</h3>
+          <ol class="steps">
+            <li><b>拆分工作负载</b><p>哪些是 compute-bound，哪些是 capacity/bandwidth/network-bound？DLRM 中 MLP 与 embedding 的答案不同。</p></li>
+            <li><b>按数据结构选并行方式</b><p>大表、宽表、小表采用不同 sharding；不要用一种并行策略覆盖所有参数。</p></li>
+            <li><b>把容量、均衡和通信放进同一个放置决策</b><p>能放下只是约束，同步系统最终由最慢 worker 和暴露通信决定。</p></li>
+            <li><b>减少中间结果，再重叠剩余通信</b><p>先融合 lookup/backward/optimizer 降低本地成本，再把 AlltoAll/AllReduce 藏入独立计算。</p></li>
+            <li><b>让压缩服务于系统瓶颈</b><p>FP16、row-wise optimizer 和量化通信不只是算法技巧，也会改变放置、流量与硬件利用率。</p></li>
+            <li><b>最后核对质量与比较口径</b><p>大 batch、低精度、异步/同步变化都可能影响统计质量；平台换代加速比不能冒充单算法消融。</p></li>
+          </ol>
+          <div class="grid-2">
+            <div class="mini-card"><h3>最值得记住的系统结论</h3><p>扩展 DLRM 的关键不是让某个 kernel 更快，而是同时减少需要通信的数据、缩短通信经过的路径、提供可重叠的计算，并避免负载偏斜。</p></div>
+            <div class="mini-card"><h3>最值得记住的阅读纪律</h3><p>把 Model A 的 40×、Model A 的 1.5 MQPS、Model F 的 12T/1.7 MQPS 和局部 kernel 的 7× 分开理解。</p></div>
+          </div>
+        </section>
+
+        <section id="sources">
+          <h2>参考资料</h2>
+          <p class="small muted">除特别说明外，本文中的系统设计与实验数字均来自论文 [1]。链接用于追溯一手资料；当前开源仓库的 scope 可能已晚于论文。</p>
+          <ol class="sources">
+            <li id="ref-1">Dheevatsa Mudigere et al. <strong>Software-Hardware Co-design for Fast and Scalable Training of Deep Learning Recommendation Models</strong>. ISCA 2022 Industry Track. <a href="https://arxiv.org/abs/2104.05158">arXiv:2104.05158</a> · <a href="https://arxiv.org/pdf/2104.05158">PDF</a> · <a href="https://doi.org/10.1145/3470496.3533727">DOI</a>. arXiv v1：2021-04-12；v7：2023-02-27。</li>
+            <li id="ref-2">Maxim Naumov et al. <strong>Deep Learning Recommendation Model for Personalization and Recommendation Systems</strong>. 2019. <a href="https://arxiv.org/abs/1906.00091">arXiv:1906.00091</a>。用于 DLRM 的 embedding/MLP 结构与并行背景。</li>
+            <li id="ref-3">PyTorch. <strong>FBGEMM / FBGEMM_GPU 官方仓库</strong>. <a href="https://github.com/pytorch/FBGEMM">github.com/pytorch/FBGEMM</a>。FBGEMM_GPU 提供面向推荐系统训练与推理的 PyTorch GPU operator libraries。</li>
+            <li id="ref-4">Meta Research. <strong>PARAM Benchmarks 官方仓库</strong>. <a href="https://github.com/facebookresearch/param">github.com/facebookresearch/param</a>。包含通信、计算、overlap 和 DLRM 工作负载基准。</li>
+          </ol>
+          <p class="small muted">说明：本页为中文学习调研，图示均按论文内容重绘；没有使用论文原始图表图片，也没有把论文结果表述为 2026 年当前最佳结果。</p>
+        </section>
+      </main>
+    </div>
+    <footer>Neo / ZionEX 论文学习笔记 · 单文件离线 HTML<br>首次生成与最后更新：2026-11-23 · Kimi Code（默认模式）</footer>
+  </div>
+</body>
+</html>
